@@ -1,0 +1,63 @@
+{
+  "manifest_version": 1,
+  "type": "WebApp",
+  "meta": {
+    "name": "Counterlock",
+    "author": "Counterlock",
+    "version": "0.2.0",
+    "minimum-overwolf-version": "0.311.0.6",
+    "description": "Team scouting, hero statistics and counter-item suggestions for Deadlock.",
+    "icon": "icon.png",
+    "icon_gray": "icon-gray.png",
+    "launcher_icon": "icon.ico",
+    "window_icon": "icon.ico",
+    "dock_button_title": "Counterlock"
+  },
+  "permissions": ["GameInfo", "Hotkeys", "Extensions"],
+  "data": {
+    "start_window": "background",
+    "game_targeting": { "type": "dedicated", "game_ids": [24482] },
+    "game_events": [24482],
+    "windows": {
+      "background": {
+        "file": "background/background.html",
+        "is_background_page": true
+      },
+      "desktop": {
+        "file": "desktop/desktop.html",
+        "desktop_only": true,
+        "native_window": true,
+        "transparent": true,
+        "resizable": true,
+        "size": { "width": 1260, "height": 900 },
+        "min_size": { "width": 850, "height": 650 },
+        "show_in_taskbar": true
+      },
+      "in_game": {
+        "file": "in_game/in_game.html",
+        "in_game_only": true,
+        "focus_game_takeover": "ReleaseOnHidden",
+        "focus_game_takeover_release_hotkey": "toggle_counterlock",
+        "transparent": true,
+        "resizable": true,
+        "size": { "width": 1260, "height": 900 },
+        "min_size": { "width": 850, "height": 650 },
+        "show_in_taskbar": false
+      }
+    },
+    "hotkeys": {
+      "toggle_counterlock": {
+        "title": "Show / hide Counterlock",
+        "action-type": "custom",
+        "default": "Ctrl+Shift+S"
+      }
+    },
+    "launch_events": [
+      {
+        "event": "GameLaunch",
+        "event_data": { "game_ids": [24482] },
+        "start_minimized": false
+      }
+    ]
+  }
+}
