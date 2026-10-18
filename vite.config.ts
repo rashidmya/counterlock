@@ -7,6 +7,7 @@ const entry = (path: string) =>
 
 export default defineConfig({
   root: "src",
+  resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   publicDir: "../public",
   base: "./",
   plugins: [react()],

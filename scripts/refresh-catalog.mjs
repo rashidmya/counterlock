@@ -64,9 +64,9 @@ if (process.argv[1]?.endsWith("refresh-catalog.mjs")) {
       throw new Error(`Catalog refresh failed: ${response.status} ${endpoint}`);
     data.push(await response.json());
   }
-  await mkdir("src/data", { recursive: true });
+  await mkdir("src/shared/catalog", { recursive: true });
   await writeFile(
-    "src/data/catalog.json",
+    "src/shared/catalog/catalog.json",
     JSON.stringify(compact(...data), null, 2) + "\n",
   );
   console.log(

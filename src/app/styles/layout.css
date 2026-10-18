@@ -1,0 +1,362 @@
+footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #29363c;
+  padding: 15px 30px;
+  color: #7c8c8f;
+  font-size: 9px;
+}
+footer > span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.footer-dot {
+  width: 4px;
+  height: 4px;
+}
+.divider {
+  color: #43585d;
+  margin: 0 2px;
+}
+footer a {
+  color: #a6b6b1;
+}
+@media (min-width: 1500px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr) 370px;
+  }
+  .item-card p {
+    font-size: 11px;
+  }
+}
+@media (max-width: 1100px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr) 285px;
+    gap: 15px;
+    padding: 0 20px 20px;
+  }
+  header,
+  .intro {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  nav {
+    margin: 0 20px;
+  }
+  .notice {
+    margin-left: 20px;
+    margin-right: 20px;
+  }
+  .rank-icon {
+    display: none;
+  }
+  th {
+    font-size: 7px;
+  }
+  td {
+    padding: 6px;
+  }
+  .player-label small {
+    max-width: 95px;
+  }
+  .panel-heading {
+    padding: 13px;
+  }
+  .panel-heading .muted {
+    font-size: 7px;
+  }
+  .portrait {
+    width: 32px;
+    height: 36px;
+  }
+  .player-button {
+    gap: 7px;
+  }
+  .counters {
+    padding: 15px 12px;
+  }
+  .item-card {
+    padding: 10px;
+  }
+  .kda span {
+    margin: 0 2px;
+  }
+}
+@media (max-width: 850px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+  .counters {
+    padding: 20px;
+  }
+  .recommendations {
+    grid-template-columns: 1fr 1fr;
+  }
+  .shortcut {
+    display: none;
+  }
+  .rank-icon {
+    display: block;
+  }
+  .settings {
+    margin: 15px 20px;
+  }
+  .lookup form {
+    flex-wrap: wrap;
+  }
+  .lookup label {
+    flex: auto !important;
+  }
+  .intro h1 {
+    font-size: 31px;
+  }
+  .table-wrap {
+    width: 100%;
+  }
+}
+@media (max-width: 520px) {
+  .recommendations {
+    grid-template-columns: 1fr;
+  }
+  .brand {
+    font-size: 20px;
+  }
+  .brand small {
+    font-size: 7px;
+  }
+  .header-right {
+    gap: 8px;
+  }
+  .connection {
+    font-size: 8px;
+  }
+  .intro {
+    align-items: flex-start;
+    gap: 15px;
+  }
+  .intro h1 {
+    font-size: 26px;
+  }
+  .intro .muted {
+    font-size: 11px;
+  }
+  .match-clock strong {
+    font-size: 29px;
+  }
+  .notice {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .notice button {
+    margin-left: 0;
+  }
+  .rank-icon {
+    display: none;
+  }
+  .panel-heading .muted {
+    display: none;
+  }
+  th:first-child,
+  td:first-child {
+    padding-left: 10px;
+  }
+  .player-label strong {
+    font-size: 11px;
+  }
+  .player-label small {
+    max-width: 85px;
+  }
+  .portrait {
+    width: 27px;
+    height: 31px;
+  }
+  td:last-child,
+  th:last-child {
+    display: none;
+  }
+  .lookup {
+    padding: 25px 20px;
+  }
+  .lookup form {
+    display: grid;
+  }
+  .lookup input {
+    width: 100%;
+  }
+  footer {
+    gap: 15px;
+    padding: 15px 20px;
+    font-size: 8px;
+  }
+}
+
+/* Keep controls anchored while each information panel scrolls independently. */
+body.overwolf {
+  background: transparent;
+}
+.app {
+  height: 100vh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+header,
+nav,
+.intro,
+.notice,
+footer,
+.settings {
+  flex-shrink: 0;
+}
+.workspace {
+  min-height: 0;
+  flex: 1;
+  grid-template-rows: minmax(0, 1fr);
+}
+.match-column {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  max-height: 100%;
+  overflow: auto;
+  grid-auto-rows: max-content;
+  scrollbar-width: thin;
+  scrollbar-color: #435050 transparent;
+}
+.counters {
+  max-height: 100%;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #435050 transparent;
+}
+.lookup {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+.compact header {
+  height: 58px;
+}
+.compact nav {
+  height: 43px;
+}
+.compact .intro {
+  padding-top: 17px;
+  padding-bottom: 17px;
+}
+.compact h1 {
+  font-size: 30px;
+  margin: 5px 0;
+}
+.compact .panel-heading {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+.compact td {
+  height: 42px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.compact .portrait {
+  width: 30px;
+  height: 30px;
+}
+.compact .rosters {
+  gap: 13px;
+}
+.compact .notice {
+  margin-bottom: 15px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+.compact .workspace {
+  padding-bottom: 14px;
+}
+.compact .brand {
+  font-size: 21px;
+}
+.compact .brand img {
+  height: 35px;
+  width: 35px;
+}
+.compact .brand small {
+  font-size: 8px;
+}
+.compact .player-label strong {
+  font-size: 11px;
+}
+.compact .player-label small {
+  font-size: 9px;
+}
+.compact th {
+  padding-top: 8px;
+  padding-bottom: 6px;
+}
+.compact .data-note {
+  font-size: 9px;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #435050 transparent;
+}
+@media (max-width: 850px) {
+  .app {
+    height: auto;
+    min-height: 100vh;
+  }
+  .workspace {
+    display: block;
+  }
+  .match-column,
+  .counters {
+    max-height: none;
+    overflow: visible;
+  }
+  .counters {
+    margin-top: 20px;
+  }
+  .lookup {
+    min-height: 500px;
+  }
+  .table-wrap {
+    overflow: auto;
+  }
+}
+@media (min-width: 851px) {
+  .compact .intro {
+    height: 50px;
+    padding: 8px 30px;
+  }
+  .compact .intro h1 {
+    font-size: 23px;
+    margin: 0;
+  }
+  .compact .intro .eyebrow,
+  .compact .intro .muted,
+  .compact .match-clock small {
+    display: none;
+  }
+  .compact .match-clock {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+  }
+  .compact .match-clock strong {
+    font-size: 27px;
+  }
+  .compact .notice {
+    margin-bottom: 10px;
+  }
+  .compact td {
+    height: 40px;
+  }
+  .compact .panel-heading {
+    padding-top: 9px;
+    padding-bottom: 9px;
+  }
+  .compact .rosters {
+    gap: 10px;
+  }
+}

@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 
-const path = "src/data/catalog.json";
+const path = "src/shared/catalog/catalog.json";
 const catalog = JSON.parse(await readFile(path, "utf8"));
 await mkdir("public/items", { recursive: true });
 const queue = [...catalog.items];

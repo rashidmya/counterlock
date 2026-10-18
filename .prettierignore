@@ -3,4 +3,4 @@ dist
 test-results
 releases
 package-lock.json
-src/data/catalog.json
+src/shared/catalog/catalog.json

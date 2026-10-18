@@ -13,11 +13,22 @@
     "window_icon": "icon.ico",
     "dock_button_title": "Counterlock"
   },
-  "permissions": ["GameInfo", "Hotkeys", "Extensions"],
+  "permissions": [
+    "GameInfo",
+    "Hotkeys",
+    "Extensions"
+  ],
   "data": {
     "start_window": "background",
-    "game_targeting": { "type": "dedicated", "game_ids": [24482] },
-    "game_events": [24482],
+    "game_targeting": {
+      "type": "dedicated",
+      "game_ids": [
+        24482
+      ]
+    },
+    "game_events": [
+      24482
+    ],
     "windows": {
       "background": {
         "file": "background/background.html",
@@ -29,20 +40,53 @@
         "native_window": true,
         "transparent": true,
         "resizable": true,
-        "size": { "width": 1260, "height": 900 },
-        "min_size": { "width": 850, "height": 650 },
+        "size": {
+          "width": 1260,
+          "height": 900
+        },
+        "min_size": {
+          "width": 850,
+          "height": 650
+        },
         "show_in_taskbar": true
       },
       "in_game": {
         "file": "in_game/in_game.html",
-        "in_game_only": true,
         "focus_game_takeover": "ReleaseOnHidden",
         "focus_game_takeover_release_hotkey": "toggle_counterlock",
         "transparent": true,
         "resizable": true,
-        "size": { "width": 1260, "height": 900 },
-        "min_size": { "width": 850, "height": 650 },
-        "show_in_taskbar": false
+        "size": {
+          "width": 320,
+          "height": 240
+        },
+        "min_size": {
+          "width": 240,
+          "height": 160
+        },
+        "show_in_taskbar": false,
+        "in_game_only": true
+      },
+      "counter_overlay": {
+        "file": "in_game/in_game.html",
+        "focus_game_takeover": "ReleaseOnHidden",
+        "focus_game_takeover_release_hotkey": "toggle_counterlock",
+        "transparent": true,
+        "resizable": true,
+        "size": {
+          "width": 280,
+          "height": 220
+        },
+        "min_size": {
+          "width": 240,
+          "height": 160
+        },
+        "show_in_taskbar": false,
+        "start_position": {
+          "left": 340,
+          "top": 0
+        },
+        "in_game_only": true
       }
     },
     "hotkeys": {
@@ -55,7 +99,11 @@
     "launch_events": [
       {
         "event": "GameLaunch",
-        "event_data": { "game_ids": [24482] },
+        "event_data": {
+          "game_ids": [
+            24482
+          ]
+        },
         "start_minimized": false
       }
     ]

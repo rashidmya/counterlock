@@ -1,0 +1,14 @@
+.app > header {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+.app > header :is(button, input, a, select, textarea, [role="button"]) {
+  -webkit-app-region: no-drag;
+}
+
+.workspace.without-counters {
+  grid-template-columns: minmax(0, 1fr);
+}
+.settings {
+  flex-wrap: wrap;
+}

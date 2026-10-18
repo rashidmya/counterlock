@@ -1,0 +1,25 @@
+.settings {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 15px;
+  margin: 15px 30px;
+}
+.settings label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: #aabbba;
+}
+.settings span {
+  font-size: 10px;
+  color: #7e9297;
+}
+.settings input {
+  accent-color: #c3aa72;
+}
+.settings input[type="range"] {
+  width: 100px;
+}

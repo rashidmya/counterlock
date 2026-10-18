@@ -1,0 +1,203 @@
+.rosters {
+  display: grid;
+  gap: 20px;
+}
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 15px 17px;
+  border-bottom: 1px solid #303a3f;
+  background: #1d292b66;
+}
+.panel-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.team-mark {
+  width: 4px;
+  height: 17px;
+  background: #84c5b1;
+  border-radius: 3px;
+}
+.enemy .team-mark {
+  background: #d88b7e;
+}
+.enemy .panel-heading {
+  background: #30272966;
+}
+.panel-heading .muted {
+  font-size: 8px;
+  letter-spacing: 1.1px;
+}
+.count {
+  color: #7e9395;
+  border: 1px solid #3b4c50;
+  border-radius: 4px;
+  font-size: 9px;
+  padding: 1px 5px;
+}
+.table-wrap {
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+}
+th {
+  font-weight: 500;
+  color: #77898d;
+  letter-spacing: 0.7px;
+  font-size: 8px;
+  padding: 12px 8px 8px;
+}
+th:first-child,
+td:first-child {
+  padding-left: 16px;
+}
+th:last-child,
+td:last-child {
+  padding-right: 16px;
+  text-align: right;
+}
+td {
+  height: 66px;
+  font-size: 11px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #29343a66;
+}
+tr:last-child td {
+  border-bottom: 0;
+}
+.player-button {
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  width: 100%;
+}
+.player-button:disabled {
+  opacity: 1;
+}
+.portrait {
+  height: 39px;
+  width: 39px;
+  border-radius: 5px;
+  object-fit: cover;
+  background: #29373c;
+  flex-shrink: 0;
+  border: 1px solid #46505566;
+}
+.player-label strong {
+  display: block;
+  color: #d9dfdc;
+  font-size: 12px;
+  line-height: 1.6;
+  font-weight: 600;
+}
+.player-label small {
+  color: #7f9297;
+  font-size: 10px;
+  display: block;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player-label i {
+  font-size: 7px;
+  font-style: normal;
+  letter-spacing: 0.8px;
+  border: 1px solid #4c7269;
+  color: #a8d8bf;
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin-left: 7px;
+}
+.rank {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: #bbc3c4;
+}
+.rank-icon {
+  width: 25px;
+  height: 25px;
+  object-fit: contain;
+}
+.placeholder {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 10px;
+  color: #9caaa7;
+}
+.numeric,
+.positive,
+.kda {
+  font-variant-numeric: tabular-nums;
+}
+.positive {
+  color: #85c8aa;
+}
+.numeric {
+  color: #bdc7c7;
+}
+.kda {
+  font-size: 10px;
+  color: #a6b2b4;
+}
+.kda span {
+  color: #50646d;
+  margin: 0 4px;
+}
+.rate-line {
+  display: block;
+  background: #2a3b3d;
+  width: 45px;
+  height: 3px;
+  border-radius: 2px;
+  margin-top: 5px;
+  overflow: hidden;
+}
+.rate-line > span {
+  display: block;
+  height: 100%;
+  background: #749d8a;
+}
+.selected {
+  background: #b8a16c16;
+}
+.selected td:first-child {
+  box-shadow: inset 2px 0 #c7b17d;
+}
+.enemy tr:has(.player-button:hover) {
+  background: #ffffff04;
+}
+.data-note {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  color: #70838a;
+  font-size: 10px;
+  line-height: 1.7;
+  padding: 0 2px;
+}
+.text-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  white-space: nowrap;
+  color: #96a6ab;
+}
+.text-button svg {
+  width: 13px;
+  height: 13px;
+}

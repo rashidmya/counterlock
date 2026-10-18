@@ -15,9 +15,9 @@ npm ci
 npm run dev
 ```
 
-Open the local URL Vite prints. The browser starts in a clearly labeled demo match; all player names, ranks and history in that mode are fictional. The **Player lookup** tab makes real requests using an exact SteamID64, account ID, or `[U:1:account]` ID. No API key is required by the endpoints used here.
+Open the local URL Vite prints. The browser starts in standby, waiting for live match data from Overwolf. Demo match data is confined to test fixtures. The **Player lookup** tab makes real requests using an exact SteamID64, account ID, or `[U:1:account]` ID. No API key is required by the endpoints used here.
 
-The root preview redirects to `/desktop/desktop.html`. Open `/in_game/in_game.html` to preview the in-game entrypoint. Both use the same React UI.
+The root preview redirects to `/desktop/desktop.html`. Open `/in_game/in_game.html` to preview the in-game entrypoint. Without Overwolf, the in-game entrypoint also renders the full browser preview. In Overwolf, it resolves the native window name and mounts the compact build or counter overlay.
 
 ## Load in Overwolf on Windows
 
@@ -25,9 +25,9 @@ The root preview redirects to `/desktop/desktop.html`. Open `/in_game/in_game.ht
 2. Run `npm run build`, then copy the entire `dist/` folder to the Windows PC.
 3. In Overwolf, open **Settings → About → Development options → Load unpacked extension**. Select the folder containing `manifest.json`, not the project root.
 4. Launch Deadlock and enable its Overwolf overlay. The app targets Overwolf game ID **24482** and starts automatically with the game.
-5. Use **Ctrl+Shift+S** to show or hide Counterlock's in-game window. The binding can be changed in Overwolf. Drag the app header to move the window. The gear button exposes compact rows, opacity and demo mode.
+5. Use **Ctrl+Shift+S** to show or hide Counterlock's in-game window. The binding can be changed in Overwolf. Drag the app header to move the window. The gear button exposes overlay visibility and opacity while Deadlock is running; desktop rows remain compact.
 
-The window structure follows the [Overwolf TypeScript sample](https://github.com/overwolf/sample-app/tree/master/ts/src): `background` owns the shared live store and game-event subscription, `desktop` opens outside Deadlock, and `in_game` opens while Deadlock runs. The background closes the previous foreground window when switching. Each window has its own HTML and TypeScript entrypoint under `src/`; Vite preserves those window folders in `dist/`, and the manifest points to them.
+The `background` window owns the shared live store, game-event subscriptions, feature registration, hotkeys, and overlay lifecycle. The `desktop` window stays independent of overlay visibility. The `in_game` and `counter_overlay` windows both use `in_game/in_game.html`, resolving their native window identity at mount time to render the appropriate compact panel. Each declared HTML path remains stable in `dist/` and in the manifest. Foreground windows subscribe to the background store through `getMainWindow()`; they do not create their own live stores.
 
 For developer packaging and installation, see [Overwolf's unpacked app instructions](https://dev.overwolf.com/ow-native/getting-started/onboarding-resources/basic-sample-app/) and [OPK packaging reference](https://dev.overwolf.com/ow-native/reference/ow-sdk-introduction/).
 
@@ -35,7 +35,7 @@ For Overwolf development, load the built files. Avoid `debug_url` with this back
 
 ## What it does
 
-- Shows a recommended build above the roster, with **eight items per phase**: **early game 0–10 minutes**, **mid game 10–20 minutes**, and **late game 20+ minutes**. The current phase is highlighted from the match clock; exactly 10:00 switches to mid game and 20:00 switches to late game. The hero selector follows your hero by default and supports every catalog hero. Owned items are marked when viewing your hero, and the build can be collapsed.
+- Shows a community build for the selected hero, with recorded win rate and match count. The hero selector follows your hero by default; owned items are marked and the desktop build can be collapsed. Compact build overlays follow the local hero and provide a group selector. Build statistics are unavailable in Street Brawl.
 - Uses the full in-game shop artwork for both builds and counter cards. All **173 item icons** are bundled locally, so item artwork works without the asset CDN.
 - Identifies your team using the local roster entry; enemy detection waits until that identity is available. Team sizes are dynamic, including Street Brawl.
 - Shows the latest recorded rank, **hero-specific** win rate and recorded games, plus live K/D/A. The API's hero history is filtered to the active game mode and ranked/unranked matches.
@@ -48,7 +48,9 @@ Rank comes from the latest recorded ranked match, not a live rank feed or a hist
 
 The counter engine is a transparent set of strategic heuristics, not a learned optimal build or a statistical claim that an item causes more wins. It does not calculate your build's damage, automatically buy items, or modify Deadlock's files. The budget is a **per-item price limit**, not a shopping-list total or your remaining souls.
 
-The recommended build selects the most popular available items in each hero's Valve-generated phase data served by Deadlock API. It prioritizes affordable early items (up to 1,600 souls), mid-game items (1,600–3,200), and late items (3,200+), without duplicates across the path. Where a phase has fewer than eight picks, an affordable pick from another phase for the same hero fills the gap and is labeled **FLEX**; its tooltip retains the actual source phase. These are adaptable item suggestions, not a jointly optimized build or a mandatory purchase order. The requested minute bands control the display and active-phase highlighting; the upstream popularity groups do not expose exact purchase-time cutoffs. The source generation date is shown because it may precede the catalog refresh date.
+The displayed community build is selected by recorded match count among builds with at least 20 matches in the API's aggregate bucket. Its win rate is measured over the last 30 days of ranked and unranked matches and can span multiple build versions. Item groups come from the selected community build. These are adaptable suggestions, not a mandatory purchase order or a claim that the build causes more wins.
+
+The separate catalog phase-recommendation utility remains available under `features/builds/utils/recommendations.ts`, with coverage for eight distinct picks per phase and match-clock boundaries. It is not the source of the current community-build UI.
 
 ## Maintain the catalog and rules
 
@@ -56,7 +58,7 @@ The recommended build selects the most popular available items in each hero's Va
 npm run catalog:refresh
 ```
 
-This fetches active heroes, popular items, shop items and ranks from the current Deadlock API asset endpoints into `src/data/catalog.json`, then downloads the shop artwork into `public/items/`. Run `npm run assets:sync` to retry only the artwork download. Review `src/counters.ts` when a patch changes heroes or item effects. Coverage tests validate eight build picks per phase for the current catalog and counter advice for every active hero. Removed items are excluded automatically because recommendations resolve IDs against the current snapshot. Future heroes without profiles have a manual threat fallback in the UI.
+This fetches active heroes, popular items, shop items and ranks from the current Deadlock API asset endpoints into `src/shared/catalog/catalog.json`, then downloads the shop artwork into `public/items/`. Run `npm run assets:sync` to retry only the artwork download. Review `src/features/counters/utils/recommendations.ts` when a patch changes heroes or item effects. Coverage tests validate eight build picks per phase for the current catalog and counter advice for every active hero. Removed items are excluded automatically because recommendations resolve IDs against the current snapshot. Future heroes without profiles have a manual threat fallback in the UI.
 
 Catalog metadata and item icons are bundled, while portraits, rank images and fonts load from their providers. Item icons use the local file first, then the source URL if it fails, then text. No backend, analytics or persistent player database is included. Public player IDs are sent to Deadlock API to retrieve statistics; lookups are cached only in memory. Production distribution should include the appropriate privacy notice and asset attribution.
 
@@ -76,20 +78,28 @@ Before a public release, test in Windows with a live match: game startup and shu
 
 ## Project map
 
-| File                                  | Responsibility                                                                        |
-| ------------------------------------- | ------------------------------------------------------------------------------------- |
-| `src/background/`                     | Shared live store, game detection, feature registration, hotkeys and window lifecycle |
-| `src/desktop/`, `src/in_game/`        | Separate foreground HTML and TypeScript entrypoints                                   |
-| `src/consts.ts`                       | Shared game IDs, game features, window names and hotkey names                         |
-| `src/store.ts`                        | Live state, subscriptions, debounced lookups and stale-result protection              |
-| `src/game.ts`                         | Event parsing, Steam ID conversion, roster merging and team identity                  |
-| `src/api.ts`                          | Batched player statistics, validation, caching and cooldowns                          |
-| `src/counters.ts`                     | Hero threat profiles and explainable item rules                                       |
-| `src/builds.ts`, `src/BuildPanel.tsx` | Phase recommendations, time windows, hero selection and owned-item indicators         |
-| `src/ItemIcon.tsx`, `public/items/`   | Shared in-game shop artwork and image fallback                                        |
-| `src/App.tsx`, `src/style.css`        | Shared React UI for desktop and in-game windows                                       |
-| `src/data/catalog.json`               | Dated hero/item/rank metadata snapshot                                                |
-| `public/manifest.json`                | Overwolf application configuration                                                    |
+| Directory                                         | Responsibility                                                                              |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `src/app/`                                        | React window composition and mounting; global, shell, and responsive layout styles          |
+| `src/features/match/`                             | Live match types, event parsing, identity, shared store, match overview                     |
+| `src/features/roster/`                            | Team tables, player rows, roster and inventory styles                                       |
+| `src/features/player-stats/`                      | Batched statistics client, cache/cooldowns, response types, win-rate utility                |
+| `src/features/player-lookup/`                     | Lookup form and request state                                                               |
+| `src/features/builds/`                            | Desktop/compact builds, shared request hook, build analytics, phase recommendations, styles |
+| `src/features/counters/`                          | Counter rules, threat types, selection state, desktop/compact panels, styles                |
+| `src/features/overlay/`                           | Visibility preferences, persisted keys, settings UI, overlay styles                         |
+| `src/platform/overwolf/`                          | Background lifecycle, store bridge, game detection, window controls and native window hooks |
+| `src/shared/catalog/`                             | Typed catalog access, metadata types and the dated JSON snapshot                            |
+| `src/shared/ui/`                                  | Reusable icons, images, item artwork and overlay item tiles                                 |
+| `src/background/`, `src/desktop/`, `src/in_game/` | Stable HTML and minimal TypeScript entrypoints used by the manifest                         |
+| `tests/`                                          | Unit suites grouped by feature, browser integration tests, and demo fixtures                |
+| `public/`                                         | Manifest, app icons and bundled item artwork                                                |
+
+Use `@/` imports across feature boundaries and relative imports within a feature. The alias is configured consistently in TypeScript, Vite and Vitest. Types belong to the feature that owns them; shared code must not depend on app composition. Keep Overwolf lifecycle operations in the platform layer and leave game parsing and recommendation calculations independent of React.
+
+The app shell owns lookup and counter hook lifetimes so switching tabs preserves their state. Build requests share timeout, abort and stale-response handling while retaining each presentation's error messages. The background remains the only live-store owner. Existing `scout.overlay.*` keys and native window names are compatibility contracts.
+
+Feature styles are composed centrally by `src/app/styles/index.css`. Its import order preserves the original cascade, including responsive and compact overrides; keep that order deliberate when adding styles. There are no new runtime dependencies. Type checking rejects unused imports and parameters.
 
 ## Sources
 
@@ -101,3 +111,27 @@ Before a public release, test in Windows with a live match: game startup and shu
 - [Active heroes](https://api.deadlock-api.com/v1/assets/heroes?only_active=true), [items](https://api.deadlock-api.com/v1/assets/items) and [rank metadata](https://api.deadlock-api.com/v1/assets/ranks)
 
 Deadlock and its game assets belong to Valve. Deadlock API is a community service, not an official Valve API. This project is not affiliated with Valve or Overwolf.
+
+## Product source and Underwolf packaging
+
+The source now owns the features previously injected by Underwolf's Scout adapter:
+independent compact build/counter overlays, game-only overlay preferences and
+opacity, purchased-item rows, hero/team identity, live match-clock display, and
+community-build statistics. The desktop remains independent of overlay visibility;
+production has no demo-match or compact-layout switches. Existing `scout.overlay.*`
+preference keys are retained so saved choices and positions remain compatible.
+
+`npm run build` builds these features directly for native Overwolf using the shared
+background store. `npm test` covers game state, overlay lifecycle, hero identity,
+and build analytics; `npm run test:browser` covers production browser rendering.
+The Underwolf integration test remains in the host repository and accepts
+`SCOUT_OPK` to select a package.
+
+For Linux packaging, the source adapter in the Underwolf/Underlock host repository must use the new module paths. An adapter that patches `src/App.tsx` is incompatible with this layout. Update its targets as follows before running it:
+
+- Replace the native-store expression in `src/platform/overwolf/store-bridge.ts` rather than `src/App.tsx`.
+- Import the generated message bridge with `@/underwolf-bridge`.
+- In that generated bridge, import `initialState` from `@/features/match/utils/game` and the store/state types from `@/features/match/types`.
+- Append the background publisher to `src/platform/overwolf/background.ts`, where `store` and `kWindowNames` are in scope, rather than the thin HTML entrypoint module.
+
+The host adapter and its integration test live in a separate repository and are not modified here. The old hash-pinned binary patcher remains archived under `scripts/legacy-underwolf/`; it is not used by the native build.

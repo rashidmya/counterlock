@@ -1,4 +1,4 @@
-import { mountApp } from "../App";
-import { kWindowNames } from "../consts";
+import { mountApp } from "@/app/mountApp";
+import { kWindowNames } from "@/platform/overwolf/constants";
 
 mountApp(kWindowNames.desktop);
