@@ -1,3 +1,4 @@
+import { PROFILE_KEY } from "@/features/profile/storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 function setup(initiallyRunning = false, enabled = true) {
@@ -53,8 +54,10 @@ function setup(initiallyRunning = false, enabled = true) {
     enabled ? [["scout.overlay.recommended-build", "true"]] : [],
   );
   const storage = event();
+  const setItem = vi.fn();
   vi.stubGlobal("localStorage", {
     getItem: (key: string) => preferences.get(key) ?? null,
+    setItem,
   });
   vi.stubGlobal("window", {
     addEventListener: (_name: string, callback: any) =>
@@ -63,11 +66,13 @@ function setup(initiallyRunning = false, enabled = true) {
   return {
     api,
     preferences,
+    setItem,
     storage,
     windows,
     hotkey,
     launch,
     errors,
+    info,
     setWindowState: (state: string) => {
       windowState = state;
     },
@@ -174,6 +179,20 @@ describe("background window lifecycle", () => {
     const count = windows.restore.mock.calls.length;
     launch.emit({ origin: "gamelaunchevent" });
     expect(windows.restore).toHaveBeenCalledTimes(count);
+  });
+});
+
+it("records the detected account when the live store learns it", async () => {
+  const { setItem, info } = setup(true);
+  await import("@/platform/overwolf/background");
+  expect(setItem).not.toHaveBeenCalled();
+  info.emit({ info: { game_info: { steam_id: "76561198060265728" } } });
+  expect(setItem).toHaveBeenCalledTimes(1);
+  const [key, value] = setItem.mock.calls[0];
+  expect(key).toBe(PROFILE_KEY);
+  expect(JSON.parse(value)).toMatchObject({
+    accountId: 100000000,
+    source: "detected",
   });
 });
 

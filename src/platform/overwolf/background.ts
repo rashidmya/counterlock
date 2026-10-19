@@ -1,5 +1,6 @@
 import { isDeadlock, type GameInfo } from "./game";
 import { overlayPreferenceKey } from "@/features/overlay/preferences";
+import { recordDetectedAccount } from "@/features/profile/storage";
 import { LiveStore } from "@/features/match/store/LiveStore";
 import {
   kGamesFeatures,
@@ -15,6 +16,7 @@ const overlayWindows = [
 
 const store = new LiveStore();
 window.counterlockStore = store;
+store.subscribe(() => recordDetectedAccount(store.getSnapshot()));
 let running = false;
 let initialized = false;
 let gameRevision = 0;
