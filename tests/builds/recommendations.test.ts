@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import catalog from "@/shared/catalog/catalog.json";
+import { catalog } from "@/shared/catalog";
 import {
   buildPhase,
   recommendedBuild,
@@ -69,7 +69,7 @@ describe("recommended hero builds", () => {
       expect(item.localImage, item.name).toMatch(
         /^\.\/items\/\d+\.(webp|png)$/,
       );
-      expect(existsSync(resolve("public", item.localImage)), item.name).toBe(
+      expect(existsSync(resolve("public", item.localImage!)), item.name).toBe(
         true,
       );
     }
