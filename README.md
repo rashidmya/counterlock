@@ -39,9 +39,9 @@ For Overwolf development, load the built files. Avoid `debug_url` with this back
 
 **Companion pages** (desktop window):
 
-- **Live** shows the current match roster, builds and counters, or a "Deadlock isn't running" / "Waiting for a match" state. It switches to itself once per match when live data first arrives.
+- **Live** shows the current match roster, builds and counters, or a "Deadlock isn't running" / "Waiting for a match" state. The app opens on Live when Deadlock is detected running (unless you have already picked a tab); otherwise it opens on Home. It also switches to Live once per match when live data first arrives.
 - **Home** shows the profile of the last account detected on this PC: rank badge, ranked games, KDA, souls per minute, top heroes, frequent teammates and a filterable match history. Click a match for its scoreboard. Further tabs list played heroes and show performance charts.
-- **Heroes** lists heroes with tiers derived from win-rate percentiles, a role filter, sorting and a rank filter. A hero page shows abilities, skill order, a build, matchups, best partners and best items, with counter items listed separately.
+- **Heroes** lists heroes with tiers derived from win-rate percentiles, a role filter, sorting and a rank filter. A hero page shows abilities, skill order, a build, matchups, best partners and best items, with counter items listed separately. Counter items use measured data (an item's win rate against the hero compared with its overall win rate) and fall back to hero-trait heuristics, labelled "Based on hero traits", when there is not enough data.
 - **Items** is a shop-style browser with search, filtering and sorting. An item page shows its stats and what it builds from and into.
 
 **Live match overlays and roster:**
@@ -121,7 +121,14 @@ Feature styles are composed centrally by `src/app/styles/index.css`. Its import 
 
 ## API endpoints
 
-Beyond the asset and build endpoints, the companion pages use these Deadlock API routes: `/v1/players/steam`, `/v1/players/rank`, `/v1/players/{id}/match-history`, `/v1/players/{id}/mate-stats`, `/v1/players/hero-stats`, `/v1/matches/{id}/metadata`, and `/v1/analytics/` `hero-stats`, `hero-counter-stats`, `hero-synergy-stats`, `ability-order-stats` and `item-stats`. They go through the shared client in `src/shared/api`, with in-memory caching (two to ten minutes depending on the data), a 15-second timeout, in-flight request sharing and `Retry-After` cooldowns.
+Live player statistics and community builds use `/v1/players/hero-stats`, `/v1/players/rank`, `/v1/analytics/hero-build-stats` and `/v1/builds`, and the catalog uses `/v1/assets/*`. The companion pages add these routes, all fetched through the shared client in `src/shared/api`:
+
+- `/v1/players/steam`, `/v1/players/rank`, `/v1/players/hero-stats`
+- `/v1/players/{id}/match-history` and `/v1/players/{id}/mate-stats`
+- `/v1/matches/{id}/metadata`
+- `/v1/analytics/hero-stats`, `hero-counter-stats`, `hero-synergy-stats`, `ability-order-stats` and `item-stats`
+
+The client caches in memory (two to ten minutes depending on the data), times out after 15 seconds, shares in-flight requests and honours `Retry-After` cooldowns.
 
 ## Sources
 
