@@ -247,13 +247,17 @@ const heroName = (id: number) =>
   catalog.heroes.find((hero) => hero.id === id)!.name;
 
 // A: 3 ranked games (2W 1L), B: 2 unranked wins, C: 1 ranked loss.
+// C has the highest KDA (47/5) and B the lowest (9/5); A is 17/5.
 const heroesHistory = [
   historyRow(2001, heroes[0], 1, 4, true, now - 3600),
   historyRow(2002, heroes[0], 1, 4, true, now - 7200),
   historyRow(2003, heroes[0], 1, 4, false, now - 10800),
-  historyRow(2004, heroes[1], 1, 1, true, now - 14400),
-  historyRow(2005, heroes[1], 1, 1, true, now - 18000),
-  historyRow(2006, heroes[2], 1, 4, false, now - 21600),
+  { ...historyRow(2004, heroes[1], 1, 1, true, now - 14400), player_kills: 2 },
+  { ...historyRow(2005, heroes[1], 1, 1, true, now - 18000), player_kills: 2 },
+  {
+    ...historyRow(2006, heroes[2], 1, 4, false, now - 21600),
+    player_kills: 40,
+  },
 ];
 
 async function openHeroes(page: Page, fixtures: Fixtures = {}) {
@@ -343,6 +347,21 @@ test("heroes tab sorts by header and filters by mode", async ({ page }) => {
   expect(await heroRowNames(page)).toEqual(alphabetical);
   await hero.click();
   expect(await heroRowNames(page)).toEqual([...alphabetical].reverse());
+
+  const kda = page.getByRole("button", { name: "K/D/A", exact: true });
+  await kda.click();
+  expect(await heroRowNames(page)).toEqual([c, a, b]);
+  await expect(
+    page.getByRole("columnheader", { name: /K\/D\/A/ }),
+  ).toHaveAttribute("aria-sort", "descending");
+  await expect(
+    page.getByRole("columnheader", { name: /^KDA/ }),
+  ).not.toHaveAttribute("aria-sort");
+  await kda.click();
+  expect(await heroRowNames(page)).toEqual([b, a, c]);
+  await expect(
+    page.getByRole("columnheader", { name: /K\/D\/A/ }),
+  ).toHaveAttribute("aria-sort", "ascending");
 
   await page.getByRole("button", { name: "Ranked", exact: true }).click();
   await expect(page.locator(".hero-row")).toHaveCount(2);

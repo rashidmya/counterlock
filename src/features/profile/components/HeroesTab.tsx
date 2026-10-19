@@ -26,7 +26,6 @@ const orNone = <T,>(value: T | null, format: (value: T) => string) =>
 interface Column {
   key: keyof Line;
   label: string;
-  sortable?: false;
   firstDir?: SortDir;
 }
 
@@ -36,7 +35,7 @@ const columns: Column[] = [
   { key: "wins", label: "W–L" },
   { key: "winRate", label: "WR" },
   { key: "kda", label: "KDA" },
-  { key: "kills", label: "K/D/A", sortable: false },
+  { key: "kda", label: "K/D/A" },
   { key: "soulsPerMin", label: "Souls/min" },
   { key: "damagePerMin", label: "Dmg/min" },
   { key: "accuracy", label: "Accuracy" },
@@ -58,10 +57,11 @@ export function HeroesTab({
   onFilter(filter: HistoryFilter): void;
   navigate: Navigate;
 }) {
-  const [sort, setSort] = useState<{ key: keyof Line; dir: SortDir }>({
-    key: "games",
-    dir: "desc",
-  });
+  const [sort, setSort] = useState<{
+    label: string;
+    key: keyof Line;
+    dir: SortDir;
+  }>({ label: "Games", key: "games", dir: "desc" });
   const stats = useAsync(
     () => fetchPlayerHeroStats(accountId, filter),
     [accountId, filter],
@@ -79,11 +79,11 @@ export function HeroesTab({
     };
   });
   const sorted = sortRows(lines, sort.key, sort.dir);
-  const toggle = ({ key, firstDir = "desc" }: Column) =>
+  const toggle = ({ label, key, firstDir = "desc" }: Column) =>
     setSort((current) =>
-      current.key === key
-        ? { key, dir: current.dir === "desc" ? "asc" : "desc" }
-        : { key, dir: firstDir },
+      current.label === label
+        ? { label, key, dir: current.dir === "desc" ? "asc" : "desc" }
+        : { label, key, dir: firstDir },
     );
   return (
     <div className="heroes-tab">
@@ -105,7 +105,7 @@ export function HeroesTab({
               <thead>
                 <tr>
                   {columns.map((column) => {
-                    const active = sort.key === column.key;
+                    const active = sort.label === column.label;
                     return (
                       <th
                         key={column.label}
@@ -118,18 +118,14 @@ export function HeroesTab({
                         }
                         className={active ? "sorted" : ""}
                       >
-                        {column.sortable === false ? (
-                          column.label
-                        ) : (
-                          <button onClick={() => toggle(column)}>
-                            {column.label}
-                            {active && (
-                              <span aria-hidden="true">
-                                {sort.dir === "asc" ? " ▴" : " ▾"}
-                              </span>
-                            )}
-                          </button>
-                        )}
+                        <button onClick={() => toggle(column)}>
+                          {column.label}
+                          {active && (
+                            <span aria-hidden="true">
+                              {sort.dir === "asc" ? " ▴" : " ▾"}
+                            </span>
+                          )}
+                        </button>
                       </th>
                     );
                   })}
