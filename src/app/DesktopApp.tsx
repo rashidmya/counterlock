@@ -18,6 +18,7 @@ import { OverlaySettings } from "@/features/overlay/components/OverlaySettings";
 import { useCounters } from "@/features/counters/hooks/useCounters";
 import { usePlayerLookup } from "@/features/player-lookup/hooks/usePlayerLookup";
 import { PlayerLookup } from "@/features/player-lookup/components/PlayerLookup";
+import { HomePage } from "@/features/profile/components/HomePage";
 import { LivePage } from "@/features/live/components/LivePage";
 import {
   liveStatus,
@@ -168,7 +169,7 @@ export function DesktopApp({
       )}
       {visited.includes("home") && (
         <div className="page" hidden={route.page !== "home"}>
-          {placeholder("home")}
+          <HomePage navigate={navigate} />
         </div>
       )}
       {visited.includes("live") && (

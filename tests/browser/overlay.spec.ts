@@ -54,7 +54,10 @@ test("player lookup renders API data and reports partial failure", async ({
   await page
     .getByRole("button", { name: "Player lookup", exact: true })
     .click();
-  await page.getByLabel("Steam ID", { exact: true }).fill("76561198060265728");
+  await page
+    .locator(".lookup")
+    .getByLabel("Steam ID", { exact: true })
+    .fill("76561198060265728");
   await page
     .getByRole("button", { name: "Look up player", exact: true })
     .click();

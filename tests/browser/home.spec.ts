@@ -1,0 +1,241 @@
+import { expect, test, type Page } from "@playwright/test";
+import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
+
+const ACCOUNT = 100000000;
+const STORAGE_KEY = "counterlock.profile.account";
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAHnOcQAAAAABJRU5ErkJggg==",
+  "base64",
+);
+const heroes = catalog.heroes.slice(0, 4).map((hero) => hero.id);
+const items = catalog.items.slice(0, 4).map((item) => item.id);
+const names: Record<number, string> = {
+  [ACCOUNT]: "Fixture Persona",
+  200: "Teammate Tess",
+  201: "Teammate Tom",
+};
+
+const historyRow = (
+  matchId: number,
+  heroId: number,
+  gameMode: number,
+  matchMode: number,
+  won: boolean,
+  startTime: number,
+) => ({
+  account_id: ACCOUNT,
+  match_id: matchId,
+  hero_id: heroId,
+  hero_level: 20,
+  start_time: startTime,
+  game_mode: gameMode,
+  match_mode: matchMode,
+  player_team: 0,
+  player_kills: 10,
+  player_deaths: 5,
+  player_assists: 7,
+  denies: 3,
+  last_hits: 120,
+  net_worth: 30000,
+  match_duration_s: 1800,
+  match_result: won ? 0 : 1,
+});
+
+const now = Math.floor(Date.now() / 1000);
+const history = [
+  historyRow(1001, heroes[0], 1, 4, true, now - 3600),
+  historyRow(1002, heroes[1], 1, 1, false, now - 7200),
+  historyRow(1003, heroes[2], 4, 1, true, now - 10800),
+  historyRow(1004, heroes[3], 2, 3, false, now - 14400),
+];
+
+const scoreboard = {
+  match_info: {
+    match_id: 1001,
+    duration_s: 1800,
+    winning_team: 0,
+    players: Array.from({ length: 12 }, (_, index) => ({
+      account_id: index === 0 ? ACCOUNT : 5000 + index,
+      team: index < 6 ? 0 : 1,
+      hero_id: heroes[index % heroes.length],
+      kills: index,
+      deaths: 2,
+      assists: 3,
+      net_worth: 20000 + index * 1000,
+      last_hits: 100,
+      denies: 4,
+      level: 20,
+      items: items.map((item_id, slot) => ({
+        item_id,
+        game_time_s: 100 * slot,
+        sold_time_s: 0,
+      })),
+    })),
+  },
+};
+
+interface Fixtures {
+  history?: number | unknown[];
+  rank?: unknown;
+}
+
+async function routeApi(page: Page, fixtures: Fixtures = {}) {
+  await page.route("https://api.deadlock-api.com/**", (route) => {
+    const url = new URL(route.request().url());
+    const json = (body: unknown, status = 200) =>
+      route.fulfill({
+        status,
+        json: body,
+        headers: { "access-control-allow-origin": "*" },
+      });
+    if (url.pathname.startsWith("/v1/assets/"))
+      return route.fulfill({
+        body: PNG,
+        contentType: "image/png",
+        headers: { "access-control-allow-origin": "*" },
+      });
+    if (url.pathname === "/v1/players/steam") {
+      const ids = (url.searchParams.get("account_ids") ?? "")
+        .split(",")
+        .map(Number);
+      return json(
+        ids
+          .filter((id) => names[id])
+          .map((id) => ({
+            account_id: id,
+            personaname: names[id],
+            avatarmedium: "https://api.deadlock-api.com/v1/assets/avatar.png",
+          })),
+      );
+    }
+    if (url.pathname === "/v1/players/rank")
+      return json(
+        fixtures.rank ?? [
+          { account_id: ACCOUNT, badge: 53, rank: 5, subrank: 3 },
+        ],
+      );
+    if (url.pathname.endsWith("/match-history")) {
+      const value = fixtures.history ?? history;
+      return typeof value === "number" ? json({}, value) : json(value);
+    }
+    if (url.pathname.endsWith("/mate-stats"))
+      return json([
+        { mate_id: 200, matches_played: 12, wins: 9 },
+        { mate_id: 201, matches_played: 5, wins: 2 },
+      ]);
+    if (url.pathname.endsWith("/metadata")) return json(scoreboard);
+    return json([]);
+  });
+}
+
+async function storeAccount(page: Page) {
+  await page.addInitScript(
+    ({ key, accountId }) =>
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          accountId,
+          seenAt: Date.now() - 2 * 3600_000,
+          source: "detected",
+        }),
+      ),
+    { key: STORAGE_KEY, accountId: ACCOUNT },
+  );
+}
+
+test("empty state accepts a Steam ID", async ({ page }) => {
+  await routeApi(page);
+  await page.goto("/");
+  await expect(
+    page.getByText(
+      "Play a match with Counterlock open and your profile appears here",
+    ),
+  ).toBeVisible();
+  await page.getByLabel("Steam ID").fill("76561198060265728");
+  await page.getByLabel("Steam ID").press("Enter");
+  await expect(page.locator(".profile-header")).toContainText(
+    "Fixture Persona",
+  );
+  await expect(page.locator(".profile-header")).toContainText(
+    "Entered manually",
+  );
+  const stored = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key) ?? "null"),
+    STORAGE_KEY,
+  );
+  expect(stored).toMatchObject({ accountId: ACCOUNT, source: "manual" });
+  await page.getByRole("button", { name: "Change" }).click();
+  await expect(page.getByLabel("Steam ID")).toBeVisible();
+});
+
+test("overview shows rank, summary, top heroes, teammates and filtered history", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page);
+  await page.goto("/");
+  await expect(page.locator(".profile-header")).toContainText(
+    "Seen on this PC · 2h ago",
+  );
+  const rank = page.locator(".rank-card");
+  await expect(rank).toContainText("Mystic 3");
+  await expect(rank.locator("img")).toHaveAttribute(
+    "src",
+    /\/ranks\/5\/3\/image/,
+  );
+  await expect(page.locator(".stat-card", { hasText: "Ranked" })).toHaveText(
+    /RANKED1100\.0% WR/,
+  );
+  await expect(page.getByText("Normal & ranked games")).toBeVisible();
+  // Street Brawl and bot matches stay out of the Normal & ranked summary.
+  await expect(page.locator(".top-hero")).toHaveCount(2);
+  await expect(page.getByText("Teammate Tess")).toBeVisible();
+
+  await expect(page.locator(".match-row")).toHaveCount(4);
+  await page.getByRole("button", { name: "Street Brawl", exact: true }).click();
+  await expect(page.locator(".match-row")).toHaveCount(1);
+  await page.getByRole("button", { name: "All", exact: true }).click();
+  await expect(page.locator(".match-row")).toHaveCount(4);
+});
+
+test("protected history degrades", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, { history: 403, rank: [] });
+  await page.goto("/");
+  await expect(page.locator(".profile-header")).toContainText(
+    "Fixture Persona",
+  );
+  await expect(page.getByText("Match history unavailable")).toBeVisible();
+  await expect(page.locator(".rank-card")).toContainText("Unavailable");
+});
+
+test("empty history says no recorded matches", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, { history: [] });
+  await page.goto("/");
+  await expect(page.getByText("No recorded matches")).toBeVisible();
+});
+
+test("match detail shows both teams with items", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page);
+  await page.goto("/");
+  await page.locator(".match-row").first().click();
+  await expect(page.locator(".scoreboard .score-row")).toHaveCount(12);
+  await expect(page.locator(".scoreboard .score-row.local")).toContainText(
+    "YOU",
+  );
+  await expect(page.locator(".scoreboard img.item-icon").first()).toBeVisible();
+  await page.locator(".match-row").first().click();
+  await expect(page.locator(".scoreboard")).toHaveCount(0);
+});
+
+test("hero cross-link opens the Heroes tab", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page);
+  await page.goto("/");
+  await page.locator(".top-hero").first().click();
+  await expect(page.getByRole("button", { name: "Heroes" })).toHaveClass(
+    /active/,
+  );
+});

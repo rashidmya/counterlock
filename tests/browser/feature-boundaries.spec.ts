@@ -97,15 +97,18 @@ test("desktop retains counter and lookup state across tabs and exposes game-only
   await page
     .getByRole("button", { name: "Player lookup", exact: true })
     .click();
-  await page.getByLabel("Steam ID", { exact: true }).fill("100000000");
+  await page
+    .locator(".lookup")
+    .getByLabel("Steam ID", { exact: true })
+    .fill("100000000");
   await page.getByRole("button", { name: "Live" }).click();
   await expect(page.getByLabel("Item budget")).toHaveValue("1600");
   await page
     .getByRole("button", { name: "Player lookup", exact: true })
     .click();
-  await expect(page.getByLabel("Steam ID", { exact: true })).toHaveValue(
-    "100000000",
-  );
+  await expect(
+    page.locator(".lookup").getByLabel("Steam ID", { exact: true }),
+  ).toHaveValue("100000000");
   await page
     .getByRole("button", { name: "Overlay settings", exact: true })
     .click();

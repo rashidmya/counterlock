@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-type AsyncState<T> = { data?: T; error?: string; loading: boolean };
+export type AsyncState<T> = { data?: T; error?: string; loading: boolean };
 
 export function useAsync<T>(
   load: (() => Promise<T>) | null,
