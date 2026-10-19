@@ -28,6 +28,7 @@ export interface Ability {
   image?: string;
   quip: string;
   description: string;
+  // Always length 3; index = tier - 1; "" = no upgrade text for that tier.
   upgrades: string[];
 }
 export interface ItemStat {

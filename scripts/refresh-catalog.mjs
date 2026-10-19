@@ -91,9 +91,7 @@ export function compact(heroes, items, ranks) {
           i.description?.t1_desc,
           i.description?.t2_desc,
           i.description?.t3_desc,
-        ]
-          .map(plainText)
-          .filter(Boolean),
+        ].map(plainText),
       })),
     items: items
       .filter((i) => i.type === "upgrade" && i.shopable && !i.disabled)

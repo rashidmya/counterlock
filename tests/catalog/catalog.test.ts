@@ -39,6 +39,17 @@ describe("catalog", () => {
     }
   });
 
+  it("ability upgrades stay positional by tier", () => {
+    for (const ability of catalog.abilities)
+      expect(ability.upgrades, ability.name).toHaveLength(3);
+    const keg = catalog.abilities.find(
+      (ability) => ability.name === "Powder Keg",
+    );
+    expect(keg?.upgrades[0]).toBe("");
+    expect(keg?.upgrades[1]).toBe("");
+    expect(keg?.upgrades[2]).toContain("Impact Damage");
+  });
+
   it("items carry tier, class and formatted stats", () => {
     const leech = catalog.items.find((item) => item.name === "Leech");
     expect(leech?.tier).toBe(4);
