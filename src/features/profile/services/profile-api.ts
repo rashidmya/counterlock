@@ -140,13 +140,24 @@ export function heroStatsQueries(filter: HistoryFilter): string[] {
   return [`${normal}&match_mode=ranked,unranked`, brawl];
 }
 
-export async function fetchPlayerHeroStats(
+export const fetchPlayerHeroStats = (
   id: number,
   filter: HistoryFilter,
   api: DeadlockApi = deadlockApi,
+) => fetchHeroStats(id, heroStatsQueries(filter), api);
+
+export const fetchSummaryHeroStats = (
+  id: number,
+  api: DeadlockApi = deadlockApi,
+) => fetchHeroStats(id, [SUMMARY_HERO_STATS], api);
+
+async function fetchHeroStats(
+  id: number,
+  queries: string[],
+  api: DeadlockApi,
 ): Promise<PlayerHeroStat[]> {
   const responses = await Promise.all(
-    heroStatsQueries(filter).map((query) =>
+    queries.map((query) =>
       api.get<unknown>(
         `/v1/players/hero-stats?account_ids=${id}&${query}`,
         TTL.profile,

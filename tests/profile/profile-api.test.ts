@@ -8,6 +8,7 @@ import {
   fetchPlayerHeroStats,
   fetchRank,
   fetchScoreboard,
+  fetchSummaryHeroStats,
   fetchSteamProfiles,
   heroStatsQueries,
 } from "@/features/profile/services/profile-api";
@@ -44,6 +45,29 @@ describe("heroStatsQueries", () => {
     expect(SUMMARY_HERO_STATS).toBe(
       "game_mode=normal&match_mode=ranked,unranked",
     );
+  });
+});
+
+describe("fetchSummaryHeroStats", () => {
+  it("requests only normal ranked and unranked games", async () => {
+    const { api, calls } = fakeApi({
+      "/v1/players/hero-stats?account_ids=7&game_mode=normal&match_mode=ranked,unranked":
+        [
+          {
+            hero_id: 1,
+            matches_played: 2,
+            accuracy: 0.5,
+            damage_per_min: 100,
+          },
+        ],
+    });
+    const rows = await fetchSummaryHeroStats(7, api);
+    expect(calls).toEqual([
+      "/v1/players/hero-stats?account_ids=7&game_mode=normal&match_mode=ranked,unranked",
+    ]);
+    expect(rows).toEqual([
+      { heroId: 1, matches: 2, accuracy: 0.5, damagePerMin: 100 },
+    ]);
   });
 });
 

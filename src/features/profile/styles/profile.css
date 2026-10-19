@@ -417,3 +417,47 @@
 .hero-table td:last-child {
   color: #889697;
 }
+.performance {
+  display: grid;
+  gap: 8px;
+}
+.performance .section-head {
+  margin-bottom: 0;
+}
+.performance .data-note {
+  margin: 0;
+}
+.chart-card {
+  background: #192129;
+  border: 1px solid #303a3f;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.chart-card small {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 9px;
+  letter-spacing: 1.3px;
+  color: #889697;
+}
+.line-chart {
+  display: block;
+  width: 100%;
+  height: 90px;
+}
+.chart-card .form {
+  display: flex;
+  gap: 3px;
+}
+.chart-card .form i {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+.chart-card .form i.win {
+  background: #84c6ae;
+}
+.chart-card .form i.loss {
+  background: #e59b80;
+}

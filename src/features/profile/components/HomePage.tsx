@@ -6,6 +6,7 @@ import { fetchMatchHistory } from "../services/profile-api";
 import type { HistoryFilter } from "../types";
 import { HeroesTab } from "./HeroesTab";
 import { OverviewTab } from "./OverviewTab";
+import { PerformanceTab } from "./PerformanceTab";
 import { ProfileEmpty } from "./ProfileEmpty";
 import { ProfileHeader } from "./ProfileHeader";
 
@@ -57,9 +58,7 @@ export function HomePage({ navigate }: { navigate: Navigate }) {
         />
       )}
       {subtab === "performance" && (
-        <p className="muted">
-          {subtabs.find((tab) => tab.id === subtab)?.label} is coming soon.
-        </p>
+        <PerformanceTab accountId={account.accountId} history={history} />
       )}
     </section>
   );

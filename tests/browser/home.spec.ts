@@ -377,3 +377,122 @@ test("heroes tab hero cell navigates to the Heroes page", async ({ page }) => {
   ).toHaveClass(/active/);
   await expect(page.locator(".page-placeholder")).toHaveText("Heroes");
 });
+
+// 60 summary games, newest first; every third one is lost. Street Brawl,
+// bot and private-lobby games sit between them and must stay out of the charts.
+const performanceHistory = [
+  ...Array.from({ length: 60 }, (_, index) =>
+    historyRow(
+      3000 + index,
+      heroes[index % 2],
+      1,
+      index % 2 ? 4 : 1,
+      index % 3 !== 0,
+      now - 3600 * (index + 1),
+    ),
+  ),
+  historyRow(3100, heroes[2], 4, 1, true, now - 60),
+  historyRow(3101, heroes[3], 2, 3, true, now - 120),
+];
+
+const pointCount = async (page: Page, label: string) =>
+  (
+    (await page
+      .locator(`svg[aria-label="${label}"] polyline`)
+      .getAttribute("points")) ?? ""
+  )
+    .trim()
+    .split(/\s+/).length;
+
+test("performance tab charts, form and range switch", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, {
+    history: performanceHistory,
+    heroStats: [
+      {
+        account_id: ACCOUNT,
+        hero_id: heroes[0],
+        matches_played: 3,
+        accuracy: 0.4,
+        damage_per_min: 1000,
+      },
+      {
+        account_id: ACCOUNT,
+        hero_id: heroes[1],
+        matches_played: 1,
+        accuracy: 0.8,
+        damage_per_min: 2000,
+      },
+    ],
+  });
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Performance" }).click();
+
+  await expect(page.locator('svg[aria-label="KDA per match"]')).toBeVisible();
+  await expect(
+    page.locator('svg[aria-label="Souls per minute"]'),
+  ).toBeVisible();
+  expect(await pointCount(page, "KDA per match")).toBe(20);
+  expect(await pointCount(page, "Souls per minute")).toBe(20);
+
+  const squares = page.locator(".form i");
+  await expect(squares).toHaveCount(20);
+  // Newest game (index 0) was lost; the next ones were won.
+  await expect(squares.nth(0)).toHaveCSS(
+    "background-color",
+    "rgb(229, 155, 128)",
+  );
+  await expect(squares.nth(1)).toHaveCSS(
+    "background-color",
+    "rgb(132, 198, 174)",
+  );
+
+  await expect(
+    page.locator(".stat-card", { hasText: "ACCURACY" }),
+  ).toContainText("50.0%");
+  await expect(
+    page.locator(".stat-card", { hasText: "DMG/MIN" }),
+  ).toContainText("1,250");
+  await expect(
+    page.locator(".stat-card", { hasText: "LAST HITS" }),
+  ).toContainText("120.0");
+  await expect(page.locator(".stat-card", { hasText: "DEATHS" })).toContainText(
+    "5.0",
+  );
+  await expect(
+    page.getByText(
+      "Accuracy and damage cover all normal & ranked games in the period.",
+    ),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Last 50", exact: true }).click();
+  await expect.poll(() => pointCount(page, "KDA per match")).toBe(50);
+  expect(await pointCount(page, "Souls per minute")).toBe(50);
+  await expect(squares).toHaveCount(20);
+
+  await page.getByRole("button", { name: "All", exact: true }).click();
+  await expect.poll(() => pointCount(page, "KDA per match")).toBe(60);
+  await expect(
+    page.getByText("Accuracy and damage cover all normal & ranked games"),
+  ).toHaveCount(0);
+});
+
+test("performance tab says so with too few matches", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, {
+    history: [historyRow(1, heroes[0], 1, 4, true, now)],
+  });
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(page.getByText("Not enough matches")).toHaveCount(2);
+  await expect(page.locator(".form i")).toHaveCount(1);
+});
+
+test("performance tab degrades without match history", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, { history: 403 });
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(page.getByText("Match history unavailable")).toBeVisible();
+  await expect(page.locator("svg[aria-label]")).toHaveCount(0);
+});
