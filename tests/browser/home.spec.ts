@@ -238,9 +238,9 @@ test("hero cross-link opens the Heroes tab", async ({ page }) => {
   await routeApi(page);
   await page.goto("/");
   await page.locator(".top-hero").first().click();
-  await expect(page.getByRole("button", { name: "Heroes" })).toHaveClass(
-    /active/,
-  );
+  await expect(
+    page.getByRole("button", { name: "Heroes", exact: true }),
+  ).toHaveClass(/active/);
 });
 
 const heroName = (id: number) =>
@@ -375,7 +375,9 @@ test("heroes tab hero cell navigates to the Heroes page", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Heroes", exact: true }),
   ).toHaveClass(/active/);
-  await expect(page.locator(".page-placeholder")).toHaveText("Heroes");
+  await expect(page.locator(".hero-detail-placeholder")).toContainText(
+    heroName(heroes[0]),
+  );
 });
 
 // 60 summary games, newest first; every third one is lost. Street Brawl,

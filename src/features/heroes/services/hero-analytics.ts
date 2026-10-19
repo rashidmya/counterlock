@@ -24,12 +24,11 @@ export async function fetchHeroSummaries(
   q: AnalyticsQuery,
   api: DeadlockApi = deadlockApi,
 ): Promise<HeroSummary[]> {
-  return summarizeHeroes(
-    await fetchRows<AnalyticsHeroStatsRow>(
-      `/v1/analytics/hero-stats?${analyticsParams(q)}`,
-      api,
-    ),
+  const rows = await fetchRows<AnalyticsHeroStatsRow>(
+    `/v1/analytics/hero-stats?${analyticsParams(q)}`,
+    api,
   );
+  return summarizeHeroes(rows.filter((row) => heroById.has(row?.hero_id)));
 }
 
 export function fetchMatchups(

@@ -317,6 +317,24 @@ describe("hero-analytics services", () => {
     expect(list[0].heroId).toBe(1);
     expect(calls[0]).toMatch(/^\/v1\/analytics\/hero-stats\?game_mode=normal/);
   });
+  it("fetchHeroSummaries ignores heroes missing from the catalog", async () => {
+    const known = catalog.heroes.slice(0, 10).map((h) => h.id);
+    const unknownId = Math.max(...catalog.heroes.map((h) => h.id)) + 1000;
+    const rows = known.map((id, index) => hero(id, 500 + index * 10, 1000));
+    const clean = fakeApi({
+      [`/v1/analytics/hero-stats?${params()}`]: rows,
+    });
+    const mixed = fakeApi({
+      [`/v1/analytics/hero-stats?${params()}`]: [
+        hero(unknownId, 990, 1000),
+        ...rows,
+      ],
+    });
+    const expected = await fetchHeroSummaries(q, clean.api);
+    const list = await fetchHeroSummaries(q, mixed.api);
+    expect(list.map((row) => row.heroId)).not.toContain(unknownId);
+    expect(list).toEqual(expected);
+  });
   it("uses the documented endpoints", async () => {
     const calls: string[] = [];
     const api = {

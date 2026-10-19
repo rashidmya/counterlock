@@ -19,6 +19,8 @@ import { useCounters } from "@/features/counters/hooks/useCounters";
 import { usePlayerLookup } from "@/features/player-lookup/hooks/usePlayerLookup";
 import { PlayerLookup } from "@/features/player-lookup/components/PlayerLookup";
 import { HomePage } from "@/features/profile/components/HomePage";
+import { HeroesPage } from "@/features/heroes/components/HeroesPage";
+import type { AnalyticsQuery } from "@/features/heroes/utils/analytics";
 import { LivePage } from "@/features/live/components/LivePage";
 import {
   liveStatus,
@@ -50,6 +52,7 @@ export function DesktopApp({
   const counters = useCounters(state);
   const [route, setRoute] = useState<Route>({ page: "home" });
   const [visited, setVisited] = useState<Page[]>(["home"]);
+  const [query, setQuery] = useState<AnalyticsQuery>({ minBadge: 0 });
   const userNavigated = useRef(false);
   const matchSeen = useRef<string | null>(null);
   const [opacity, setOpacity] = useState(readOverlayOpacity);
@@ -182,7 +185,7 @@ export function DesktopApp({
       )}
       {visited.includes("heroes") && (
         <div className="page" hidden={route.page !== "heroes"}>
-          {placeholder("heroes")}
+          <HeroesPage {...{ route, navigate, query, setQuery }} />
         </div>
       )}
       {visited.includes("items") && (
