@@ -77,6 +77,7 @@ const scoreboard = {
 interface Fixtures {
   history?: number | unknown[];
   rank?: unknown;
+  heroStats?: unknown[];
 }
 
 async function routeApi(page: Page, fixtures: Fixtures = {}) {
@@ -118,6 +119,8 @@ async function routeApi(page: Page, fixtures: Fixtures = {}) {
       const value = fixtures.history ?? history;
       return typeof value === "number" ? json({}, value) : json(value);
     }
+    if (url.pathname === "/v1/players/hero-stats")
+      return json(fixtures.heroStats ?? []);
     if (url.pathname.endsWith("/mate-stats"))
       return json([
         { mate_id: 200, matches_played: 12, wins: 9 },
@@ -238,4 +241,120 @@ test("hero cross-link opens the Heroes tab", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Heroes" })).toHaveClass(
     /active/,
   );
+});
+
+const heroName = (id: number) =>
+  catalog.heroes.find((hero) => hero.id === id)!.name;
+
+// A: 3 ranked games (2W 1L), B: 2 unranked wins, C: 1 ranked loss.
+const heroesHistory = [
+  historyRow(2001, heroes[0], 1, 4, true, now - 3600),
+  historyRow(2002, heroes[0], 1, 4, true, now - 7200),
+  historyRow(2003, heroes[0], 1, 4, false, now - 10800),
+  historyRow(2004, heroes[1], 1, 1, true, now - 14400),
+  historyRow(2005, heroes[1], 1, 1, true, now - 18000),
+  historyRow(2006, heroes[2], 1, 4, false, now - 21600),
+];
+
+async function openHeroes(page: Page, fixtures: Fixtures = {}) {
+  await storeAccount(page);
+  await routeApi(page, { history: heroesHistory, ...fixtures });
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Heroes" }).click();
+}
+
+const heroRowNames = async (page: Page) =>
+  (await page.locator(".hero-row .hero-link").allTextContents()).map((text) =>
+    text.trim(),
+  );
+
+test("heroes tab lists played heroes sorted by games with real stats", async ({
+  page,
+}) => {
+  await openHeroes(page, {
+    heroStats: [
+      {
+        account_id: ACCOUNT,
+        hero_id: heroes[0],
+        matches_played: 3,
+        accuracy: 0.425,
+        damage_per_min: 1480.4,
+      },
+    ],
+  });
+  await expect(page.locator(".hero-row")).toHaveCount(3);
+  expect(await heroRowNames(page)).toEqual([
+    heroName(heroes[0]),
+    heroName(heroes[1]),
+    heroName(heroes[2]),
+  ]);
+  await expect(
+    page.getByRole("columnheader", { name: /Games/ }),
+  ).toHaveAttribute("aria-sort", "descending");
+  const first = page.locator(".hero-row").first();
+  await expect(first).toContainText("2–1");
+  await expect(first).toContainText("66.7%");
+  await expect(first).toContainText("10.0/5.0/7.0");
+  await expect(first).toContainText("1,000");
+  await expect(first).toContainText("1,480");
+  await expect(first).toContainText("42.5%");
+  await expect(first).toContainText("120.0");
+  await expect(first).toContainText("3.0");
+  await expect(first).toContainText("1h ago");
+  await expect(first.locator("img.hero-portrait")).toHaveAttribute(
+    "src",
+    /^https?:/,
+  );
+});
+
+test("heroes tab shows dashes where hero stats have no row", async ({
+  page,
+}) => {
+  await openHeroes(page);
+  const rows = page.locator(".hero-row");
+  await expect(rows).toHaveCount(3);
+  for (const row of await rows.all()) {
+    const cells = row.locator("td");
+    await expect(cells.nth(7)).toHaveText("—");
+    await expect(cells.nth(8)).toHaveText("—");
+  }
+});
+
+test("heroes tab sorts by header and filters by mode", async ({ page }) => {
+  await openHeroes(page);
+  const [a, b, c] = heroes.map(heroName);
+  const wr = page.getByRole("button", { name: "WR", exact: true });
+  await wr.click();
+  expect(await heroRowNames(page)).toEqual([b, a, c]);
+  await expect(page.getByRole("columnheader", { name: /WR/ })).toHaveAttribute(
+    "aria-sort",
+    "descending",
+  );
+  await wr.click();
+  expect(await heroRowNames(page)).toEqual([c, a, b]);
+  await expect(page.getByRole("columnheader", { name: /WR/ })).toHaveAttribute(
+    "aria-sort",
+    "ascending",
+  );
+
+  const hero = page.getByRole("button", { name: "Hero", exact: true });
+  await hero.click();
+  const alphabetical = [a, b, c].sort((x, y) => x.localeCompare(y));
+  expect(await heroRowNames(page)).toEqual(alphabetical);
+  await hero.click();
+  expect(await heroRowNames(page)).toEqual([...alphabetical].reverse());
+
+  await page.getByRole("button", { name: "Ranked", exact: true }).click();
+  await expect(page.locator(".hero-row")).toHaveCount(2);
+  await page.getByRole("button", { name: "Street Brawl", exact: true }).click();
+  await expect(page.getByText("No recorded matches")).toBeVisible();
+});
+
+test("heroes tab hero cell navigates to the Heroes page", async ({ page }) => {
+  await openHeroes(page);
+  await page.locator(".hero-row .hero-link").first().click();
+  await expect(
+    page.getByRole("button", { name: "Heroes", exact: true }),
+  ).toHaveClass(/active/);
+  await expect(page.locator(".page-placeholder")).toHaveText("Heroes");
 });

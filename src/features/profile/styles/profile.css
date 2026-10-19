@@ -365,3 +365,55 @@
   width: 26px;
   height: 26px;
 }
+.heroes-tab {
+  display: grid;
+  gap: 8px;
+}
+.hero-table-wrap {
+  overflow-x: auto;
+}
+.hero-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.hero-table th {
+  padding: 6px 8px;
+  border-bottom: 1px solid #2a3134;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-align: right;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #889697;
+}
+.hero-table th button {
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+}
+.hero-table th.sorted,
+.hero-table th.sorted button {
+  color: #dfc48c;
+}
+.hero-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #222b30;
+  text-align: right;
+  white-space: nowrap;
+  color: #bbc3c4;
+}
+.hero-table th:first-child,
+.hero-table td:first-child {
+  text-align: left;
+}
+.hero-table .hero-link {
+  flex: none;
+  padding: 0;
+  color: #e7e8e6;
+}
+.hero-table td:last-child {
+  color: #889697;
+}

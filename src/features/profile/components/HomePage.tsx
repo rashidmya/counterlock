@@ -4,6 +4,7 @@ import { useAsync } from "@/shared/api/useAsync";
 import { useProfileAccount } from "../hooks/useProfileAccount";
 import { fetchMatchHistory } from "../services/profile-api";
 import type { HistoryFilter } from "../types";
+import { HeroesTab } from "./HeroesTab";
 import { OverviewTab } from "./OverviewTab";
 import { ProfileEmpty } from "./ProfileEmpty";
 import { ProfileHeader } from "./ProfileHeader";
@@ -48,7 +49,14 @@ export function HomePage({ navigate }: { navigate: Navigate }) {
           onFilter={setFilter}
         />
       )}
-      {subtab !== "overview" && (
+      {subtab === "heroes" && (
+        <HeroesTab
+          accountId={account.accountId}
+          {...{ history, filter, navigate }}
+          onFilter={setFilter}
+        />
+      )}
+      {subtab === "performance" && (
         <p className="muted">
           {subtabs.find((tab) => tab.id === subtab)?.label} is coming soon.
         </p>
