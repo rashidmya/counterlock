@@ -278,3 +278,26 @@ test("the rank filter selection is shared between Heroes and Items", async ({
   await page.getByRole("button", { name: "Heroes", exact: true }).click();
   await expect(rank(page)).toHaveValue("0");
 });
+
+test("stat lines with a repeated label all render without key warnings", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  const express = catalog.items.find((entry) => entry.name === "Express Shot")!;
+  await openItems(page);
+  await tiles(page)
+    .filter({ has: page.getByAltText("Express Shot") })
+    .click();
+  const lines = page.locator(".item-detail .item-stat");
+  await expect(lines).toHaveCount(express.stats!.length);
+  await expect(lines.filter({ hasText: "Bullet Velocity" })).toHaveText([
+    "+60% Bullet Velocity",
+    "+100% Bullet Velocity",
+  ]);
+  expect(errors.filter((text) => /same key|unique "key"/.test(text))).toEqual(
+    [],
+  );
+});

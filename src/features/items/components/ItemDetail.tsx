@@ -96,8 +96,8 @@ export function ItemDetail({
         </div>
         {item.stats && item.stats.length > 0 && (
           <ul className="item-stats">
-            {item.stats.map((stat) => (
-              <li key={stat.label} className="item-stat">
+            {item.stats.map((stat, index) => (
+              <li key={`${stat.label}:${index}`} className="item-stat">
                 {stat.icon && <img src={stat.icon} alt="" />}
                 {`${stat.value} ${stat.label}`}
               </li>
