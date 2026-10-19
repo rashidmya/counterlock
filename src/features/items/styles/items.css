@@ -1,0 +1,211 @@
+.items-page,
+.item-detail {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 30px;
+}
+.items-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.items-toolbar input[type="search"] {
+  width: 160px;
+  padding: 4px 8px;
+  border: 1px solid #394148;
+  border-radius: 5px;
+  background: transparent;
+  font-size: 11px;
+  color: #e7e8e6;
+}
+.items-selects {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+.items-page > .notice {
+  margin: 0 0 14px;
+}
+.items-page > .data-note {
+  margin-top: 14px;
+}
+.shop-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+.shop-column h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  font:
+    600 13px "Barlow Condensed",
+    sans-serif;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.shop-column h2 img {
+  width: 16px;
+  height: 16px;
+}
+.shop-column.weapon h2 {
+  color: #e0a35a;
+}
+.shop-column.vitality h2 {
+  color: #86c46f;
+}
+.shop-column.spirit h2 {
+  color: #b48ee6;
+}
+.cost-heading {
+  margin: 10px 0 4px;
+  font:
+    600 9px "DM Sans",
+    sans-serif;
+  letter-spacing: 1.4px;
+  color: #889697;
+}
+.shop-column .item-tiles {
+  grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+  gap: 4px;
+}
+.shop-column .item-tile {
+  padding: 4px;
+}
+.shop-column .item-tile-art {
+  margin-bottom: 0;
+}
+.shop-flat {
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+}
+.shop-flat .item-tile small {
+  font-size: 10px;
+  color: #84c6ae;
+}
+.item-detail-card {
+  display: grid;
+  gap: 14px;
+  padding: 20px 24px 24px;
+  background: #0f151b;
+  color: #e7e8e6;
+  border: 1px solid #30383b;
+  border-radius: 10px;
+}
+.item-back {
+  justify-self: start;
+  padding: 0;
+  color: #909b9c;
+  font-size: 10px;
+}
+.item-head {
+  display: flex;
+  gap: 14px;
+}
+.item-head .item-detail-art {
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+}
+.item-head h1 {
+  margin: 0;
+  font:
+    600 24px "Barlow Condensed",
+    sans-serif;
+}
+.item-meta {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #889697;
+}
+.item-description {
+  max-width: 560px;
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #afb7b5;
+}
+.item-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.item-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #d7dad8;
+}
+.item-stat img {
+  width: 16px;
+  height: 16px;
+}
+.stat-boxes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 480px;
+}
+.stat-box {
+  padding: 8px 10px;
+  background: #192129;
+  border: 1px solid #303a3f;
+  border-radius: 6px;
+}
+.stat-box small {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  color: #889697;
+}
+.stat-box strong {
+  font:
+    600 18px "Barlow Condensed",
+    sans-serif;
+}
+.stat-box .win {
+  color: #84c6ae;
+}
+.item-detail .data-note {
+  margin: 0;
+}
+.item-links h2 {
+  margin: 0 0 6px;
+  font:
+    600 9px "DM Sans",
+    sans-serif;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: #b9a77f;
+}
+.item-links > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.item-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid #303a3f;
+  border-radius: 6px;
+  background: #192129;
+  font-size: 11px;
+}
+.item-link:hover:not(:disabled) {
+  border-color: #dfc48c;
+  color: inherit;
+}
+.item-link .item-icon {
+  width: 28px;
+  height: 28px;
+}

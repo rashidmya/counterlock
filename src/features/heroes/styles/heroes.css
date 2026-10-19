@@ -15,20 +15,6 @@
   display: flex;
   gap: 10px;
 }
-.select-field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: #889697;
-}
-.select-field select {
-  padding: 4px 8px;
-  border: 1px solid #394148;
-  border-radius: 5px;
-  font-size: 11px;
-  color: #afb7b5;
-}
 .tier-heading {
   margin: 14px 0 6px;
   font:

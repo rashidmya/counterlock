@@ -20,6 +20,7 @@ import { usePlayerLookup } from "@/features/player-lookup/hooks/usePlayerLookup"
 import { PlayerLookup } from "@/features/player-lookup/components/PlayerLookup";
 import { HomePage } from "@/features/profile/components/HomePage";
 import { HeroesPage } from "@/features/heroes/components/HeroesPage";
+import { ItemsPage } from "@/features/items/components/ItemsPage";
 import type { AnalyticsQuery } from "@/features/heroes/utils/analytics";
 import { LivePage } from "@/features/live/components/LivePage";
 import {
@@ -36,12 +37,6 @@ const tabs: { page: Page; label: string }[] = [
   { page: "items", label: "Items" },
   { page: "lookup", label: "Player lookup" },
 ];
-const placeholder = (page: Page) => (
-  <section className="page-placeholder">
-    {tabs.find((tab) => tab.page === page)?.label}
-  </section>
-);
-
 export function DesktopApp({
   windowName,
 }: {
@@ -190,7 +185,7 @@ export function DesktopApp({
       )}
       {visited.includes("items") && (
         <div className="page" hidden={route.page !== "items"}>
-          {placeholder("items")}
+          <ItemsPage {...{ route, navigate, query, setQuery }} />
         </div>
       )}
       {visited.includes("lookup") && (
