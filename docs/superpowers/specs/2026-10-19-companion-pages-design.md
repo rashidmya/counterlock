@@ -74,6 +74,13 @@ without touching anything.
   stay bundled.
 - `tsc` rejects unused locals/params. Existing unit and Playwright tests must
   pass (update them where the tab structure changes them).
+- **Use actual game art/icons for anything possible** (owner request): hero
+  portraits/cards/backgrounds, ability icons, item shop art, rank badges
+  with sub-rank (`https://api.deadlock-api.com/v1/assets/ranks/{tier}/{subrank}/image?format=webp`),
+  souls/kill/death icons, Weapon/Vitality/Spirit category icons
+  (`shop/keystat_courage|fortitude|spirit.png`), early/mid/late icons,
+  item stat property icons. Hand-drawn SVG only where the game has no
+  icon (e.g. there are no role icons in the asset API; roles stay text).
 - **Check the Overwolf docs** (https://dev.overwolf.com/ow-native/) for
   anything that touches Overwolf before implementing it (owner request).
   In particular: sharing `localStorage` and `storage` events between the
