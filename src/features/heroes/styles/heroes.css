@@ -1,5 +1,4 @@
-.heroes-page,
-.hero-detail-placeholder {
+.heroes-page {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -104,9 +103,6 @@
 }
 .heroes-page > .data-note {
   margin-top: 14px;
-}
-.hero-detail-placeholder h1 {
-  margin: 12px 0 0;
 }
 .heroes-page > .notice {
   margin: 0 0 14px;

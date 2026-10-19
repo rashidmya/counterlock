@@ -1,10 +1,11 @@
 import { useState } from "react";
 import type { Navigate, Route } from "@/app/navigation";
 import { useAsync } from "@/shared/api/useAsync";
-import { catalog, heroById } from "@/shared/catalog";
+import { catalog } from "@/shared/catalog";
 import { sortRows } from "@/shared/utils/sort";
 import { fetchHeroSummaries } from "../services/hero-analytics";
 import type { AnalyticsQuery, Tier } from "../utils/analytics";
+import { HeroDetail } from "./HeroDetail";
 import { HeroGrid, type HeroCard } from "./HeroGrid";
 import { RankFilter } from "./RankFilter";
 
@@ -26,21 +27,6 @@ const sorts: { value: SortMode; label: string }[] = [
 ];
 const tiers: Tier[] = ["S", "A", "B", "C", "D"];
 
-function HeroDetailPlaceholder({
-  heroId,
-  navigate,
-}: {
-  heroId: number;
-  navigate: Navigate;
-}) {
-  return (
-    <section className="hero-detail-placeholder">
-      <button onClick={() => navigate({ page: "heroes" })}>← All heroes</button>
-      <h1>{heroById.get(heroId)?.name ?? `Hero ${heroId}`}</h1>
-    </section>
-  );
-}
-
 export function HeroesPage({
   route,
   navigate,
@@ -56,7 +42,14 @@ export function HeroesPage({
   const [sort, setSort] = useState<SortMode>("tier");
   const summaries = useAsync(() => fetchHeroSummaries(query), [query.minBadge]);
   if (route.heroId !== undefined)
-    return <HeroDetailPlaceholder heroId={route.heroId} navigate={navigate} />;
+    return (
+      <HeroDetail
+        key={route.heroId}
+        heroId={route.heroId}
+        query={query}
+        navigate={navigate}
+      />
+    );
 
   const summaryById = new Map(summaries.data?.map((s) => [s.heroId, s]));
   const cards: HeroCard[] = catalog.heroes

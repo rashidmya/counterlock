@@ -375,9 +375,7 @@ test("heroes tab hero cell navigates to the Heroes page", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Heroes", exact: true }),
   ).toHaveClass(/active/);
-  await expect(page.locator(".hero-detail-placeholder")).toContainText(
-    heroName(heroes[0]),
-  );
+  await expect(page.locator(".hero-header h1")).toHaveText(heroName(heroes[0]));
 });
 
 // 60 summary games, newest first; every third one is lost. Street Brawl,

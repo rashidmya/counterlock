@@ -159,9 +159,7 @@ test("clicking a card opens that hero and back returns to the list", async ({
   await openHeroes(page);
   const hero = byWinRate[3];
   await page.locator(".hero-card", { hasText: hero.name }).click();
-  await expect(page.locator(".hero-detail-placeholder")).toContainText(
-    hero.name,
-  );
+  await expect(page.locator(".hero-header h1")).toHaveText(hero.name);
   await expect(page.locator(".hero-card")).toHaveCount(0);
   await page.getByRole("button", { name: "← All heroes" }).click();
   await expect(page.locator(".hero-card")).toHaveCount(catalog.heroes.length);

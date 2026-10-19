@@ -14,6 +14,7 @@
 @import "../../features/live/styles/live.css";
 @import "../../features/profile/styles/profile.css";
 @import "../../features/heroes/styles/heroes.css";
+@import "../../features/heroes/styles/hero-detail.css";
 
 .page {
   flex: 1;
