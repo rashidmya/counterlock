@@ -95,6 +95,9 @@ export function HeroesTab({
       {history.error && (
         <p className="notice warning" role="status">
           Match history unavailable
+          <button type="button" onClick={history.retry}>
+            Retry
+          </button>
         </p>
       )}
       {matches && !lines.length && <p className="muted">No recorded matches</p>}

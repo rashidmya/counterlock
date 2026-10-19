@@ -26,11 +26,16 @@ function RankCard({ accountId }: { accountId: number }) {
     () => fetchRank(accountId),
     [accountId],
   );
+  const unranked = rank?.rank === 0 || rank?.badge === 0;
   const name = rank && catalog.ranks.find((r) => r.tier === rank.rank)?.name;
   return (
     <div className="stat-card rank-card">
       <small>RANK</small>
-      {rank && name ? (
+      {rank && unranked ? (
+        <div className="rank-value">
+          <strong>Unranked</strong>
+        </div>
+      ) : rank && name ? (
         <div className="rank-value">
           <Picture
             className="profile-rank-badge"
@@ -42,6 +47,7 @@ function RankCard({ accountId }: { accountId: number }) {
       ) : (
         <strong className="unavailable">{loading ? "…" : "Unavailable"}</strong>
       )}
+      <em>From your latest recorded ranked match</em>
     </div>
   );
 }
@@ -138,6 +144,9 @@ export function OverviewTab({
       {history.error && (
         <p className="notice warning" role="status">
           Match history unavailable
+          <button type="button" onClick={history.retry}>
+            Retry
+          </button>
         </p>
       )}
       {matches && !matches.length && (

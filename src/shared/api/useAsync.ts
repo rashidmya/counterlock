@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 
-export type AsyncState<T> = { data?: T; error?: string; loading: boolean };
+type Settled<T> = { data?: T; error?: string; loading: boolean };
+export type AsyncState<T> = Settled<T> & { retry(): void };
 
 export function useAsync<T>(
   load: (() => Promise<T>) | null,
   deps: unknown[],
 ): AsyncState<T> {
-  const [state, setState] = useState<AsyncState<T>>({ loading: !!load });
+  const [state, setState] = useState<Settled<T>>({ loading: !!load });
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!load) {
       setState({ loading: false });
@@ -29,6 +31,6 @@ export function useAsync<T>(
     return () => {
       stale = true;
     };
-  }, deps);
-  return state;
+  }, [...deps, attempt]);
+  return { ...state, retry: () => setAttempt((count) => count + 1) };
 }

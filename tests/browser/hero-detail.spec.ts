@@ -60,10 +60,11 @@ const heroItems = [
 const baseItems = shopItems
   .slice(0, 6)
   .map((entry) => itemRow(entry.id, 0.5, 200000));
+// Average win rate vs this hero equals the baseline (shift 0), so deltas are raw.
 const versusItems = [
   itemRow(counterA.id, 0.6, 3000),
   itemRow(counterB.id, 0.55, 3000),
-  itemRow(losing.id, 0.45, 3000),
+  itemRow(losing.id, 0.35, 3000),
 ];
 
 const pairs = (

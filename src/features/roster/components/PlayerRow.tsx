@@ -21,9 +21,11 @@ export function PlayerRow({
   const stats = player.accountId ? state.stats[player.accountId] : undefined;
   const history = stats?.heroes?.find((h) => h.hero_id === player.heroId);
   const rank = stats?.rank;
-  const rankMeta = rank
-    ? catalog.ranks.find((r) => r.tier === rank.rank)
-    : undefined;
+  const unranked = rank?.rank === 0 || rank?.badge === 0;
+  const rankMeta =
+    rank && !unranked
+      ? catalog.ranks.find((r) => r.tier === rank.rank)
+      : undefined;
   const rate = history ? winRate(history.wins, history.matches_played) : null;
   const reason = !player.accountId
     ? "Steam ID unavailable"
@@ -93,15 +95,19 @@ export function PlayerRow({
         }
       >
         <span className="rank">
-          <Picture
-            className="rank-icon"
-            src={rankMeta?.image}
-            label={rankMeta?.name ?? "?"}
-          />
+          {!unranked && (
+            <Picture
+              className="rank-icon"
+              src={rankMeta?.image}
+              label={rankMeta?.name ?? "?"}
+            />
+          )}
           <span>
-            {rankMeta
-              ? `${rankMeta.name}${rank?.subrank ? ` ${rank.subrank}` : ""}`
-              : "Unavailable"}
+            {unranked
+              ? "Unranked"
+              : rankMeta
+                ? `${rankMeta.name}${rank?.subrank ? ` ${rank.subrank}` : ""}`
+                : "Unavailable"}
           </span>
         </span>
       </td>

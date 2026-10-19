@@ -31,6 +31,10 @@ const percent = (rate: number) => `${(rate * 100).toFixed(1)}%`;
 const merge = (...states: AsyncState<unknown>[]) => ({
   loading: states.some((state) => state.loading),
   error: states.find((state) => state.error)?.error,
+  retry: () =>
+    states.forEach((state) => {
+      if (state.error) state.retry();
+    }),
 });
 
 function Section({
@@ -60,12 +64,20 @@ function Body({
   empty,
   children,
 }: {
-  state: { loading: boolean; error?: string };
+  state: { loading: boolean; error?: string; retry(): void };
   empty: boolean;
   children: ReactNode;
 }) {
   if (state.loading) return <p className="muted">Loading…</p>;
-  if (state.error) return <p className="muted">Unavailable: {state.error}</p>;
+  if (state.error)
+    return (
+      <p className="muted">
+        Unavailable: {state.error}{" "}
+        <button type="button" className="retry" onClick={state.retry}>
+          Retry
+        </button>
+      </p>
+    );
   if (empty) return <p className="muted">Not enough data</p>;
   return <>{children}</>;
 }
@@ -161,6 +173,9 @@ export function HeroDetail({
         {summaries.error && (
           <p className="notice warning" role="status">
             Hero stats unavailable: {summaries.error}
+            <button type="button" onClick={summaries.retry}>
+              Retry
+            </button>
           </p>
         )}
         <div className="hero-detail-body">
@@ -221,7 +236,7 @@ export function HeroDetail({
                 <p className="data-note">
                   {fallback
                     ? "Based on hero traits"
-                    : "Win rate against this hero compared with the item's overall win rate."}
+                    : "Win rate against this hero compared with the item's overall win rate, adjusted for the hero's overall win rate."}
                 </p>
               </Body>
             </Section>

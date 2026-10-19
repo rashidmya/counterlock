@@ -41,7 +41,7 @@ For Overwolf development, load the built files. Avoid `debug_url` with this back
 
 - **Live** shows the current match roster, builds and counters, or a "Deadlock isn't running" / "Waiting for a match" state. The app opens on Live when Deadlock is detected running (unless you have already picked a tab); otherwise it opens on Home. It also switches to Live once per match when live data first arrives.
 - **Home** shows the profile of the last account detected on this PC: rank badge, ranked games, KDA, souls per minute, top heroes, frequent teammates and a filterable match history. Click a match for its scoreboard. Further tabs list played heroes and show performance charts.
-- **Heroes** lists heroes with tiers derived from win-rate percentiles, a role filter, sorting and a rank filter. A hero page shows abilities, skill order, a build, matchups, best partners and best items, with counter items listed separately. Counter items use measured data (an item's win rate against the hero compared with its overall win rate) and fall back to hero-trait heuristics, labelled "Based on hero traits", when there is not enough data.
+- **Heroes** lists heroes with tiers derived from win-rate percentiles, a role filter, sorting and a rank filter. A hero page shows abilities, skill order, a build, matchups, best partners and best items, with counter items listed separately. Counter items use measured data (an item's win rate against the hero compared with its overall win rate, adjusted for the hero's overall win rate) and fall back to hero-trait heuristics, labelled "Based on hero traits", when there is not enough data.
 - **Items** is a shop-style browser with search, filtering and sorting. An item page shows its stats and what it builds from and into.
 
 **Live match overlays and roster:**
@@ -63,7 +63,7 @@ The displayed community build is selected by recorded match count among builds w
 
 The separate catalog phase-recommendation utility remains available under `features/builds/utils/recommendations.ts`, with coverage for eight distinct picks per phase and match-clock boundaries. It is not the source of the current community-build UI.
 
-Home and the hero and item pages use Deadlock API aggregates, so figures reflect community data for the filters shown, not a complete record. Hero tiers are relative to the current win-rate distribution, not an official ranking.
+Home and the hero and item pages use Deadlock API aggregates, so figures reflect community data for the filters shown, not a complete record. Hero tiers are relative to the current win-rate distribution, not an official ranking. Each hero detail view makes several analytics requests and the Deadlock API limits analytics to 200 requests per minute per IP, so very rapid browsing can hit the cooldown.
 
 ## Maintain the catalog and rules
 

@@ -131,6 +131,11 @@
   font-size: 11px;
   color: #889697;
 }
+.stat-card.rank-card em {
+  display: block;
+  margin: 3px 0 0;
+  font-size: 10px;
+}
 .stat-card .unavailable {
   font-size: 15px;
   color: #889697;

@@ -65,6 +65,9 @@ export function PerformanceTab({
       {history.error && (
         <p className="notice warning" role="status">
           Match history unavailable
+          <button type="button" onClick={history.retry}>
+            Retry
+          </button>
         </p>
       )}
       {matches && !averages.games && (

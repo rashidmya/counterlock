@@ -47,3 +47,28 @@ test("build contents must match the measured build and preserve its groups", () 
     /identity/,
   );
 });
+
+test("unmapped Citadel build group keys become readable names", () => {
+  const raw = {
+    hero_build: {
+      hero_id: 77,
+      hero_build_id: 100,
+      name: "Build",
+      details: {
+        mod_categories: [
+          { name: "#Citadel_HeroBuilds_Early", mods: [{ ability_id: 1 }] },
+          { name: "#Citadel_HeroBuilds_LateGame", mods: [{ ability_id: 2 }] },
+          {
+            name: "#Citadel_HeroBuilds_SituationalPicks",
+            mods: [{ ability_id: 3 }],
+          },
+          { name: "Custom group", mods: [{ ability_id: 4 }] },
+        ],
+      },
+    },
+  };
+  assert.deepEqual(
+    parseBuild(raw, row).groups.map((group) => group.name),
+    ["Early", "Late game", "Situational picks", "Custom group"],
+  );
+});

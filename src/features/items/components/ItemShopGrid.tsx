@@ -34,6 +34,7 @@ function Tile({
         <ItemIcon item={item} />
         {icon && <img className="item-category" src={icon} alt="" />}
       </span>
+      <strong>{item.name}</strong>
       {note && <small>{note}</small>}
     </button>
   );

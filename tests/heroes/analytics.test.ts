@@ -261,14 +261,32 @@ describe("item derivations", () => {
     const vs = [
       itemRow(shopA, 600, 1000),
       itemRow(shopB, 450, 1000),
-      itemRow(shopC, 900, 100),
+      itemRow(shopC, 50, 100),
       itemRow(shopD, 550, 1000, 410),
       itemRow(123456789, 900, 1000),
     ];
+    // Overall shift is (600+450+50+550)/3100 - 0.5 = +0.0323.
     const result = counterItems(vs, base);
     expect(result.map((r) => r.itemId)).toEqual([shopA, shopD]);
-    expect(result[0].delta).toBeCloseTo(0.1);
+    expect(result[0].delta).toBeCloseTo(0.1 - (1650 / 3100 - 0.5), 5);
     expect(result[1].avgBuyS).toBe(410);
+  });
+  it("counterItems normalises by the hero's overall win rate shift", () => {
+    const base = [
+      itemRow(shopA, 500, 1000),
+      itemRow(shopB, 500, 1000),
+      itemRow(shopC, 500, 1000),
+    ];
+    const vs = [
+      itemRow(shopA, 480, 1000),
+      itemRow(shopB, 440, 1000),
+      itemRow(shopC, 470, 1000),
+    ];
+    // Every raw delta is negative; the overall shift is -3.67%.
+    const result = counterItems(vs, base);
+    expect(result.map((r) => r.itemId)).toEqual([shopA, shopC]);
+    expect(result[0].delta).toBeCloseTo(0.0167, 3);
+    expect(result[1].delta).toBeCloseTo(0.0067, 3);
   });
   it("counterItems is empty when nothing qualifies", () => {
     expect(counterItems([], [itemRow(shopA, 5, 10)])).toEqual([]);

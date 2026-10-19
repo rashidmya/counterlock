@@ -51,7 +51,7 @@ describe("DeadlockApi", () => {
     let now = 1_000;
     const api = new DeadlockApi(request, () => now);
     await expect(api.get("/v1/x", 1000)).rejects.toThrow(
-      "Deadlock API unavailable (429).",
+      "API busy. Retry after the cooldown.",
     );
     await expect(api.get("/v1/other", 1000)).rejects.toThrow(
       "API busy. Retry after the cooldown.",
@@ -69,7 +69,9 @@ describe("DeadlockApi", () => {
       .mockImplementation(async () => json([]));
     let now = 0;
     const api = new DeadlockApi(request, () => now);
-    await expect(api.get("/v1/x", 1000)).rejects.toThrow("(503)");
+    await expect(api.get("/v1/x", 1000)).rejects.toThrow(
+      "API busy. Retry after the cooldown.",
+    );
     now += 29_999;
     await expect(api.get("/v1/x", 1000)).rejects.toThrow("API busy");
     now += 2;
@@ -85,7 +87,9 @@ describe("DeadlockApi", () => {
       .mockImplementation(async () => json([]));
     let now = 0;
     const api = new DeadlockApi(request, () => now);
-    await expect(api.get("/v1/x", 1000)).rejects.toThrow("(429)");
+    await expect(api.get("/v1/x", 1000)).rejects.toThrow(
+      "API busy. Retry after the cooldown.",
+    );
     now += 5_000;
     await expect(api.get("/v1/x", 1000)).rejects.toThrow("API busy");
   });

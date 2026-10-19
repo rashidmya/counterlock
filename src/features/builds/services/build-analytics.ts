@@ -1,3 +1,4 @@
+const PREFIX = "#Citadel_HeroBuilds_";
 export type BuildStats = {
   hero_id: number;
   hero_build_id: number;
@@ -49,8 +50,23 @@ export function parseBuild(raw: any, stats: BuildStats): MeasuredBuild {
     "#Citadel_HeroBuilds_MidGame": "Mid game",
     "#Citadel_HeroBuilds_LateGame": "Late game",
   };
+  const groupName = (key: unknown) => {
+    const raw = String(key ?? "Items");
+    const mapped = names[raw];
+    if (mapped) return mapped;
+    const readable = raw.startsWith(PREFIX)
+      ? raw
+          .slice(PREFIX.length)
+          .replace(/_+/g, " ")
+          .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+          .trim()
+          .toLowerCase()
+      : raw;
+    const text = readable.charAt(0).toUpperCase() + readable.slice(1);
+    return (text || "Items").slice(0, 150);
+  };
   const groups = b.details.mod_categories.slice(0, 64).map((g: any) => ({
-    name: names[g.name] ?? String(g.name ?? "Items").slice(0, 150),
+    name: groupName(g.name),
     description: String(g.description ?? "").slice(0, 1000),
     ids: Array.isArray(g.mods)
       ? g.mods

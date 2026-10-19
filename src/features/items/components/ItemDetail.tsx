@@ -54,10 +54,12 @@ function Links({
 export function ItemDetail({
   item,
   perf,
+  loading = false,
   navigate,
 }: {
   item?: Item;
   perf?: ItemPerf;
+  loading?: boolean;
   navigate: Navigate;
 }) {
   const back = (
@@ -77,6 +79,7 @@ export function ItemDetail({
       </div>
     );
   const open = (itemId: number) => navigate({ page: "items", itemId });
+  const shown = (value: string) => (loading && !perf ? "…" : value);
   return (
     <div className="item-detail">
       <div className="item-detail-card">
@@ -107,15 +110,15 @@ export function ItemDetail({
         <div className="stat-boxes">
           <div className="stat-box">
             <small>Win rate</small>
-            <strong className="win">{percent(perf?.winRate)}</strong>
+            <strong className="win">{shown(percent(perf?.winRate))}</strong>
           </div>
           <div className="stat-box">
             <small>Pick rate</small>
-            <strong>{percent(perf?.pickRate)}</strong>
+            <strong>{shown(percent(perf?.pickRate))}</strong>
           </div>
           <div className="stat-box">
             <small>Avg buy time</small>
-            <strong>{clock(perf?.avgBuyS)}</strong>
+            <strong>{shown(clock(perf?.avgBuyS))}</strong>
           </div>
         </div>
         <p className="data-note">

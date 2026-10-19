@@ -70,7 +70,7 @@
   color: #889697;
 }
 .shop-column .item-tiles {
-  grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
   gap: 4px;
 }
 .shop-column .item-tile {

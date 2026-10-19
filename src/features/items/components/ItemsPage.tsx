@@ -63,6 +63,7 @@ export function ItemsPage({
         key={route.itemId}
         item={itemById.get(route.itemId)}
         perf={table.get(route.itemId)}
+        loading={stats.loading || heroes.loading}
         navigate={navigate}
       />
     );
@@ -139,6 +140,15 @@ export function ItemsPage({
       {failed && (
         <p className="notice warning" role="status">
           Item stats unavailable: {failed}
+          <button
+            type="button"
+            onClick={() => {
+              if (stats.error) stats.retry();
+              if (heroes.error) heroes.retry();
+            }}
+          >
+            Retry
+          </button>
         </p>
       )}
       {tiles.length === 0 ? (

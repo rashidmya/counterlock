@@ -78,7 +78,7 @@ export function HeroesPage({
             ),
           })),
           {
-            label: "UNRANKED",
+            label: summaries.error ? "NO DATA" : "UNRANKED",
             cards: sortRows(
               cards.filter((card) => !card.tier),
               "name",
@@ -132,6 +132,9 @@ export function HeroesPage({
       {summaries.error && (
         <p className="notice warning" role="status">
           Hero stats unavailable: {summaries.error}
+          <button type="button" onClick={summaries.retry}>
+            Retry
+          </button>
         </p>
       )}
       {!summaries.loading &&

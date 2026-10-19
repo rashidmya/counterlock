@@ -76,11 +76,13 @@ const scoreboard = {
 
 interface Fixtures {
   history?: number | unknown[];
+  failFirstHistory?: boolean;
   rank?: unknown;
   heroStats?: unknown[];
 }
 
 async function routeApi(page: Page, fixtures: Fixtures = {}) {
+  let historyRequests = 0;
   await page.route("https://api.deadlock-api.com/**", (route) => {
     const url = new URL(route.request().url());
     const json = (body: unknown, status = 200) =>
@@ -116,6 +118,8 @@ async function routeApi(page: Page, fixtures: Fixtures = {}) {
         ],
       );
     if (url.pathname.endsWith("/match-history")) {
+      if (fixtures.failFirstHistory && historyRequests++ === 0)
+        return json({}, 500);
       const value = fixtures.history ?? history;
       return typeof value === "number" ? json({}, value) : json(value);
     }
@@ -186,9 +190,9 @@ test("overview shows rank, summary, top heroes, teammates and filtered history",
     "src",
     /\/ranks\/5\/3\/image/,
   );
-  await expect(page.locator(".stat-card", { hasText: "Ranked" })).toHaveText(
-    /RANKED1100\.0% WR/,
-  );
+  await expect(
+    page.locator(".stat-card:not(.rank-card)", { hasText: "Ranked" }),
+  ).toHaveText(/RANKED1100\.0% WR/);
   await expect(page.getByText("Normal & ranked games")).toBeVisible();
   // Street Brawl and bot matches stay out of the Normal & ranked summary.
   await expect(page.locator(".top-hero")).toHaveCount(2);
@@ -210,6 +214,28 @@ test("protected history degrades", async ({ page }) => {
   );
   await expect(page.getByText("Match history unavailable")).toBeVisible();
   await expect(page.locator(".rank-card")).toContainText("Unavailable");
+});
+
+test("unranked players show Unranked without a badge", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, {
+    rank: [{ account_id: ACCOUNT, badge: 0, rank: 0, subrank: 0 }],
+  });
+  await page.goto("/");
+  const rank = page.locator(".rank-card");
+  await expect(rank).toContainText("Unranked");
+  await expect(rank).not.toContainText("Obscurus");
+  await expect(rank.locator("img")).toHaveCount(0);
+});
+
+test("retry reloads a failed match history", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, { failFirstHistory: true });
+  await page.goto("/");
+  await expect(page.getByText("Match history unavailable")).toBeVisible();
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(page.locator(".match-row")).toHaveCount(4);
+  await expect(page.getByText("Match history unavailable")).toHaveCount(0);
 });
 
 test("empty history says no recorded matches", async ({ page }) => {

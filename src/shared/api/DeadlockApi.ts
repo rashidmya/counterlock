@@ -1,4 +1,5 @@
 const BASE = "https://api.deadlock-api.com";
+const BUSY = "API busy. Retry after the cooldown.";
 
 export const TTL = {
   analytics: 10 * 60_000,
@@ -21,8 +22,7 @@ export class DeadlockApi {
       return Promise.resolve(saved.data as T);
     const pending = this.inFlight.get(path);
     if (pending) return pending as Promise<T>;
-    if (this.now() < this.cooldownUntil)
-      return Promise.reject(new Error("API busy. Retry after the cooldown."));
+    if (this.now() < this.cooldownUntil) return Promise.reject(new Error(BUSY));
     const run = this.fetchJson<T>(path)
       .then((data) => {
         this.cache.set(path, { data, fetchedAt: this.now() });
@@ -47,6 +47,7 @@ export class DeadlockApi {
         this.now() + 30_000,
         Number.isFinite(until) ? until : 0,
       );
+      throw new Error(BUSY);
     }
     if (!response.ok)
       throw new Error(

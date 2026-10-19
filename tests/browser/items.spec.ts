@@ -106,6 +106,33 @@ test("default layout is a shop with Weapon, Vitality and Spirit columns split by
   await expect(tiles(page).first().locator("img.item-icon")).toBeVisible();
 });
 
+test("tiles show the item name and stay inside their column", async ({
+  page,
+}) => {
+  await openItems(page);
+  const first = tiles(page).first();
+  const name = (await first.locator("strong").textContent())!;
+  expect(name.length).toBeGreaterThan(0);
+  await expect(first).toHaveAttribute(
+    "title",
+    new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} · `),
+  );
+  for (const width of [1260, 850]) {
+    await page.setViewportSize({ width, height: 900 });
+    const overflowing = await page.evaluate(
+      () =>
+        [...document.querySelectorAll<HTMLElement>(".item-tile")].filter(
+          (tile) =>
+            tile.scrollWidth > tile.clientWidth + 1 ||
+            tile.parentElement!.scrollWidth >
+              tile.parentElement!.clientWidth + 1,
+        ).length,
+    );
+    expect(overflowing).toBe(0);
+    await expect(page.locator(".shop-column")).toHaveCount(3);
+  }
+});
+
 test("search narrows to matching items", async ({ page }) => {
   await openItems(page);
   await page.getByRole("searchbox", { name: "Search items" }).fill("leech");

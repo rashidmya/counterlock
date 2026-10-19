@@ -336,6 +336,16 @@ export function bestItems(
     .slice(0, n);
 }
 
+const overallRate = (items: Map<number, ItemPerf>) => {
+  let wins = 0;
+  let matches = 0;
+  for (const item of items.values()) {
+    wins += item.winRate * item.matches;
+    matches += item.matches;
+  }
+  return matches > 0 ? wins / matches : 0;
+};
+
 export function counterItems(
   vsRows: ItemStatsRow[],
   baseRows: ItemStatsRow[],
@@ -343,11 +353,14 @@ export function counterItems(
   minMatches = 500,
 ): ItemPerf[] {
   const base = shopItems(baseRows);
-  return [...shopItems(vsRows).values()]
+  const vs = shopItems(vsRows);
+  const shift = overallRate(vs) - overallRate(base);
+  return [...vs.values()]
     .filter((item) => item.matches >= minMatches)
     .flatMap((item) => {
       const reference = base.get(item.itemId);
-      const delta = reference ? item.winRate - reference.winRate : 0;
+      if (!reference) return [];
+      const delta = item.winRate - reference.winRate - shift;
       return delta > 0 ? [{ ...item, delta }] : [];
     })
     .sort((a, b) => b.delta - a.delta || a.itemId - b.itemId)

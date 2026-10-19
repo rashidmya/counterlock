@@ -30,9 +30,20 @@ const alphabetical = catalog.heroes
 
 async function openHeroes(
   page: Page,
-  options: { stats?: unknown[]; status?: number; requests?: string[] } = {},
+  options: {
+    stats?: unknown[];
+    status?: number;
+    failFirst?: boolean;
+    requests?: string[];
+  } = {},
 ) {
-  const { stats = heroStats, status = 200, requests } = options;
+  const {
+    stats = heroStats,
+    status = 200,
+    failFirst = false,
+    requests,
+  } = options;
+  let served = 0;
   await page.route("https://assets-bucket.deadlock-api.com/**", (route) =>
     route.fulfill({ body: PNG, contentType: "image/png", headers: cors }),
   );
@@ -40,7 +51,12 @@ async function openHeroes(
     const url = new URL(route.request().url());
     if (url.pathname === "/v1/analytics/hero-stats") {
       requests?.push(route.request().url());
-      return route.fulfill({ status, json: stats, headers: cors });
+      const failing = failFirst && served++ === 0;
+      return route.fulfill({
+        status: failing ? 500 : status,
+        json: stats,
+        headers: cors,
+      });
     }
     return route.fulfill({ json: [], headers: cors });
   });
@@ -151,6 +167,20 @@ test("failed stats keep the heroes browsable", async ({ page }) => {
     "Hero stats unavailable",
   );
   await expect(page.locator(".hero-card")).toHaveCount(catalog.heroes.length);
+  await expect(page.locator(".tier-heading")).toHaveText(["NO DATA"]);
+});
+
+test("retry reloads failed stats", async ({ page }) => {
+  await openHeroes(page, { failFirst: true });
+  await expect(page.getByRole("status")).toContainText(
+    "Hero stats unavailable",
+  );
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(page.locator(".tier-heading").first()).toHaveText("S TIER");
+  await expect(page.getByRole("status")).toHaveCount(0);
+  await expect(
+    page.getByText("Tiers are based on win rate.", { exact: true }),
+  ).toBeVisible();
 });
 
 test("clicking a card opens that hero and back returns to the list", async ({
