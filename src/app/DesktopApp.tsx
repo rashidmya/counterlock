@@ -4,7 +4,7 @@ import {
   dragCurrentWindow,
 } from "@/platform/overwolf/window-controls";
 import { readOverlayOpacity } from "@/features/overlay/preferences";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { catalog } from "@/shared/catalog";
 import { Icon } from "@/shared/ui/Icon";
 import { bridge, inOverwolf, waiting } from "@/platform/overwolf/store-bridge";
@@ -18,7 +18,26 @@ import { OverlaySettings } from "@/features/overlay/components/OverlaySettings";
 import { useCounters } from "@/features/counters/hooks/useCounters";
 import { usePlayerLookup } from "@/features/player-lookup/hooks/usePlayerLookup";
 import { PlayerLookup } from "@/features/player-lookup/components/PlayerLookup";
-import { MatchOverview } from "@/features/match/components/MatchOverview";
+import { LivePage } from "@/features/live/components/LivePage";
+import {
+  liveStatus,
+  matchKey,
+  shouldAutoSwitch,
+} from "@/features/live/utils/live-status";
+import type { Page, Route } from "./navigation";
+
+const tabs: { page: Page; label: string }[] = [
+  { page: "home", label: "Home" },
+  { page: "live", label: "Live" },
+  { page: "heroes", label: "Heroes" },
+  { page: "items", label: "Items" },
+  { page: "lookup", label: "Player lookup" },
+];
+const placeholder = (page: Page) => (
+  <section className="page-placeholder">
+    {tabs.find((tab) => tab.page === page)?.label}
+  </section>
+);
 
 export function DesktopApp({
   windowName,
@@ -28,9 +47,31 @@ export function DesktopApp({
   const live = useSyncExternalStore(bridge.subscribe, bridge.getSnapshot);
   const state = inOverwolf ? live : waiting;
   const counters = useCounters(state);
-  const [tab, setTab] = useState<"match" | "lookup">("match");
+  const [route, setRoute] = useState<Route>({ page: "home" });
+  const [visited, setVisited] = useState<Page[]>(["home"]);
+  const userNavigated = useRef(false);
+  const matchSeen = useRef<string | null>(null);
   const [opacity, setOpacity] = useState(readOverlayOpacity);
   const gameRunning = useDeadlockRunning();
+  const status = liveStatus(gameRunning, state);
+  const show = (next: Route) => {
+    setRoute(next);
+    setVisited((pages) =>
+      pages.includes(next.page) ? pages : [...pages, next.page],
+    );
+  };
+  const navigate = (next: Route) => {
+    userNavigated.current = true;
+    show(next);
+  };
+  useEffect(() => {
+    if (gameRunning && !userNavigated.current) show({ page: "live" });
+  }, [gameRunning]);
+  const key = matchKey(state);
+  useEffect(() => {
+    if (shouldAutoSwitch(matchSeen.current, key)) show({ page: "live" });
+    matchSeen.current = key;
+  }, [key]);
   const overlaySettings = windowName === kWindowNames.desktop && gameRunning;
   const [settings, setSettings] = useState(false);
   const [overlayBuild, setShowBuild] =
@@ -63,7 +104,13 @@ export function DesktopApp({
         <div className="header-right">
           <span className="connection">
             <span />
-            {state.players.length ? "LIVE MATCH" : "STANDBY"}
+            {!inOverwolf
+              ? "STANDBY"
+              : status === "in-match"
+                ? "LIVE MATCH"
+                : status === "waiting"
+                  ? "IN MENUS"
+                  : "GAME NOT RUNNING"}
           </span>
           <button
             className="icon-button"
@@ -89,19 +136,18 @@ export function DesktopApp({
       </header>
       <nav>
         <div className="tabs">
-          <button
-            className={tab === "match" ? "active" : ""}
-            onClick={() => setTab("match")}
-          >
-            <Icon name="eye" />
-            Match overview
-          </button>
-          <button
-            className={tab === "lookup" ? "active" : ""}
-            onClick={() => setTab("lookup")}
-          >
-            Player lookup
-          </button>
+          {tabs.map(({ page, label }) => (
+            <button
+              key={page}
+              className={route.page === page ? "active" : ""}
+              onClick={() => navigate({ page })}
+            >
+              {label}
+              {page === "live" && status === "in-match" && (
+                <span className="live-dot" aria-hidden="true" />
+              )}
+            </button>
+          ))}
         </div>
         <span className="shortcut">
           TOGGLE OVERLAY <kbd>{hotkey}</kbd>
@@ -120,13 +166,33 @@ export function DesktopApp({
           }}
         />
       )}
-      {tab === "match" ? (
-        <MatchOverview
-          {...{ state, showBuild, showCounters, counters }}
-          refresh={bridge.refresh}
-        />
-      ) : (
-        <PlayerLookup model={lookup} />
+      {visited.includes("home") && (
+        <div className="page" hidden={route.page !== "home"}>
+          {placeholder("home")}
+        </div>
+      )}
+      {visited.includes("live") && (
+        <div className="page" hidden={route.page !== "live"}>
+          <LivePage
+            {...{ state, status, showBuild, showCounters, counters, navigate }}
+            refresh={bridge.refresh}
+          />
+        </div>
+      )}
+      {visited.includes("heroes") && (
+        <div className="page" hidden={route.page !== "heroes"}>
+          {placeholder("heroes")}
+        </div>
+      )}
+      {visited.includes("items") && (
+        <div className="page" hidden={route.page !== "items"}>
+          {placeholder("items")}
+        </div>
+      )}
+      {visited.includes("lookup") && (
+        <div className="page" hidden={route.page !== "lookup"}>
+          <PlayerLookup model={lookup} />
+        </div>
       )}
       <footer>
         <span>

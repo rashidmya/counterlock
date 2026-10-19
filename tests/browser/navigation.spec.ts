@@ -1,0 +1,70 @@
+import { expect, test } from "@playwright/test";
+import { matchPlayers, nativeWindow, updateMatch } from "./helpers";
+
+test("browser preview opens Home and Live shows not running", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Home" })).toHaveClass(
+    /active/,
+  );
+  await page.getByRole("button", { name: "Live" }).click();
+  await expect(page.getByText("Deadlock isn't running")).toBeVisible();
+  await page.getByRole("button", { name: "Browse heroes" }).click();
+  await expect(page.getByRole("button", { name: "Heroes" })).toHaveClass(
+    /active/,
+  );
+});
+
+test("game running without match shows waiting", async ({ page }) => {
+  await nativeWindow(page, "desktop", "normal", {
+    running: true,
+    players: false,
+  });
+  await page.goto("/desktop/desktop.html");
+  await expect(page.getByRole("button", { name: "Live" })).toHaveClass(
+    /active/,
+  );
+  await expect(page.getByText("Waiting for a match")).toBeVisible();
+  await expect(page.getByText("EVENTS CONNECTED")).toHaveCount(0);
+  await page.getByRole("button", { name: "View your profile" }).click();
+  await expect(page.getByRole("button", { name: "Home" })).toHaveClass(
+    /active/,
+  );
+});
+
+test("joining a match switches to Live once", async ({ page }) => {
+  await nativeWindow(page, "desktop", "normal", {
+    running: true,
+    players: false,
+  });
+  await page.route("**/analytics/hero-build-stats/**", (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.goto("/desktop/desktop.html");
+  await page.getByRole("button", { name: "Heroes" }).click();
+  await expect(page.getByRole("button", { name: "Heroes" })).toHaveClass(
+    /active/,
+  );
+
+  await updateMatch(page, { players: matchPlayers(), matchId: null });
+  await expect(page.getByRole("button", { name: "Live" })).toHaveClass(
+    /active/,
+  );
+  await expect(page.locator(".build-panel")).toBeVisible();
+
+  await page.getByRole("button", { name: "Heroes" }).click();
+  await updateMatch(page, { matchId: "42" });
+  await expect(page.getByRole("button", { name: "Heroes" })).toHaveClass(
+    /active/,
+  );
+  await expect(
+    page.getByRole("button", { name: "Live" }).locator(".live-dot"),
+  ).toBeVisible();
+
+  await updateMatch(page, { players: [] });
+  await updateMatch(page, { players: matchPlayers(), matchId: "43" });
+  await expect(page.getByRole("button", { name: "Live" })).toHaveClass(
+    /active/,
+  );
+});

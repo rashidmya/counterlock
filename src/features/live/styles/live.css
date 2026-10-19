@@ -1,0 +1,32 @@
+.live-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 30px;
+  text-align: center;
+}
+.live-empty svg {
+  width: 34px;
+  height: 34px;
+  color: #6d7f82;
+}
+.live-empty h1 {
+  margin: 4px 0 0;
+  font-size: 30px;
+}
+.live-empty .text-button {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #dfc48c;
+}
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #84c6ae;
+  box-shadow: 0 0 8px #84c6ae88;
+}

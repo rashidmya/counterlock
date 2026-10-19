@@ -8,8 +8,11 @@ for (const entry of ["/", "/desktop/desktop.html"]) {
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(entry);
     await expect(page.getByText("STANDBY", { exact: true })).toBeVisible();
-    await expect(page.locator(".build-panel")).toBeVisible();
-    await expect(page.locator(".counters")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Home" })).toHaveClass(
+      /active/,
+    );
+    await page.getByRole("button", { name: "Live" }).click();
+    await expect(page.getByText("Deadlock isn't running")).toBeVisible();
     await expect(page.locator(".app")).toHaveClass(/compact/);
     await page
       .getByRole("button", { name: "Overlay settings", exact: true })

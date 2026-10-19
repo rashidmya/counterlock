@@ -1,101 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
-
-const item = catalog.items[0];
-async function nativeWindow(page: Page, name: string, gameMode = "normal") {
-  await page.addInitScript(
-    ({ name, gameMode, itemId }) => {
-      const listeners = new Set<() => void>();
-      const player = {
-        slot: "player_0",
-        name: "Local player",
-        heroId: 7,
-        heroName: "Haze",
-        team: 2,
-        local: true,
-        accountId: null,
-        kills: 1,
-        deaths: 2,
-        assists: 3,
-        items: [itemId],
-        itemsKnown: true,
-      };
-      let state = {
-        mode: "live",
-        status: "Connected",
-        phase: "GameInProgress",
-        matchId: "42",
-        gameMode,
-        localAccountId: null,
-        clock: "12:34",
-        players: [
-          player,
-          {
-            ...player,
-            slot: "player_1",
-            heroId: 13,
-            heroName: "Haze",
-            name: "Enemy",
-            team: 3,
-            local: false,
-            items: [],
-          },
-        ],
-        stats: {},
-        error: null,
-        loading: false,
-      };
-      const bridge = {
-        getSnapshot: () => state,
-        subscribe: (listener: () => void) => {
-          listeners.add(listener);
-          return () => listeners.delete(listener);
-        },
-        refresh: () => {},
-      };
-      Object.assign(window, {
-        updateMatch: (patch: object) => {
-          state = { ...state, ...patch };
-          listeners.forEach((listener) => listener());
-        },
-        overwolf: {
-          windows: {
-            getMainWindow: () => ({ counterlockStore: bridge }),
-            getCurrentWindow: (callback: (value: unknown) => void) =>
-              callback({
-                success: true,
-                window: { id: name, name, left: 123, top: 45 },
-              }),
-            changePosition: () => {},
-            dragMove: () => {},
-            hide: () => {},
-          },
-          games: {
-            getRunningGameInfo: (callback: (value: unknown) => void) =>
-              callback({ classId: 24482, isRunning: true }),
-            onGameInfoUpdated: {
-              addListener: () => {},
-              removeListener: () => {},
-            },
-          },
-          settings: {
-            hotkeys: {
-              get: (callback: (value: unknown) => void) =>
-                callback({
-                  success: true,
-                  globals: [{ name: "toggle_counterlock", binding: "Alt + S" }],
-                }),
-            },
-          },
-        },
-      });
-      localStorage.setItem("scout.overlay.opacity", "75");
-      localStorage.setItem("scout.overlay.recommended-build", "true");
-      localStorage.setItem("scout.overlay.counter-items", "true");
-    },
-    { name, gameMode, itemId: item.id },
-  );
-}
+import { item, nativeWindow, updateMatch } from "./helpers";
 
 async function buildResponses(page: Page) {
   await page.route("**/analytics/hero-build-stats/7?**", (route) =>
@@ -166,11 +70,7 @@ test("counter window uses its native window identity and responds to live roster
   await expect(page.locator(".hud-build")).toHaveCount(0);
   await page.getByLabel("Counter target").selectOption("player_1");
   await expect(page.locator(".hud-items")).toContainText("Metal Skin");
-  await page.evaluate(() =>
-    (window as unknown as { updateMatch: (patch: object) => void }).updateMatch(
-      { players: [] },
-    ),
-  );
+  await updateMatch(page, { players: [] });
   await expect(page.locator(".hud-empty")).toHaveText(
     "Waiting for enemy heroes.",
   );
@@ -198,7 +98,7 @@ test("desktop retains counter and lookup state across tabs and exposes game-only
     .getByRole("button", { name: "Player lookup", exact: true })
     .click();
   await page.getByLabel("Steam ID", { exact: true }).fill("100000000");
-  await page.getByRole("button", { name: "Match overview" }).click();
+  await page.getByRole("button", { name: "Live" }).click();
   await expect(page.getByLabel("Item budget")).toHaveValue("1600");
   await page
     .getByRole("button", { name: "Player lookup", exact: true })
@@ -211,7 +111,7 @@ test("desktop retains counter and lookup state across tabs and exposes game-only
     .click();
   await expect(page.getByLabel("Recommended build in overlay")).toBeChecked();
   await page.getByLabel("Recommended build in overlay").uncheck();
-  await page.getByRole("button", { name: "Match overview" }).click();
+  await page.getByRole("button", { name: "Live" }).click();
   await expect(page.locator(".build-panel")).toBeVisible();
 });
 
