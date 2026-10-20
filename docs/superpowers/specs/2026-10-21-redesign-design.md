@@ -244,6 +244,15 @@ background brush art and keep the portrait. The builder decides where.
   auto-switch when a match loads, green or red dot while in a match, and
   the not-running / waiting states (restyled).
 - **Web tabs:** Home · Heroes · Items (unchanged set).
+- **Website layout is full-screen, not a centred card** (owner decision).
+  - The header is full width and sticky.
+  - Page banners (hero, profile, match report) and art run edge to edge.
+  - Content spans the browser window with side padding (about 56px on
+    desktop widths) rather than sitting in a framed, fixed-width box.
+  - Grids grow with the window: hero cards add columns, and main-build
+    item tiles stretch to fill each row of 8.
+  - Phone layouts keep their existing breakpoints.
+  - The desktop app is unaffected; it fills its own window.
 - **Footer:** restyled. Keep the attribution, catalog date and data-source
   link.
 - Remove the "TOGGLE OVERLAY" hotkey hint from the nav. Show it in overlay
