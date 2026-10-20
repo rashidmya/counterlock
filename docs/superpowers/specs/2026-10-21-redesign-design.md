@@ -327,9 +327,11 @@ Top to bottom:
 1. **Header:** large hero art (portrait over brush background), name, tier,
    win rate and pick rate, with the rank filter. "← All heroes" goes back
    to the Heroes page.
-   - **The four abilities sit as round icons beside the hero's name**
-     (owner request, modelled on lockbuilds.com/heroes/bebop). Each has a
-     small 1–4 key badge.
+   - **The four abilities sit as a row of round icons under the hero's
+     name** (owner request, modelled on lockbuilds.com/heroes/bebop). The
+     order is: name, then the red tagline ribbon, then the ability row,
+     then win rate, pick rate, matches and rank. Each icon has a small 1–4
+     key badge.
    - Hovering or focusing an icon (tap on touch screens) opens a tooltip
      card showing:
      - the ability icon, name and cooldown;
