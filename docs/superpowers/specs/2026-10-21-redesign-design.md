@@ -553,6 +553,16 @@ The prototype implements all of this. Use it as the reference.
   stat at the end of the selected time range. The title adapts: "Most
   souls", "Most damage taken", "Fewest deaths", "Highest accuracy %".
   Clicking a row switches "Viewing as".
+- **Size:** the graph must not take over the screen (owner feedback on
+  the website).
+  - Draw it at its real pixel width with a fixed, modest plot height:
+    about 190–260px, roughly 24% of its width, plus about 66px of marker
+    lanes. Don't scale a fixed viewBox up to the window width, because text
+    and lines grow with it.
+  - The ranking panel sits beside it at about 230px.
+  - Redraw on resize. On a 1600px-wide browser, the whole Graph block
+    (tabs, filters, chart, markers, footnote) fits in about 480px of
+    height.
 - Data resolution: snapshots are every 3 min to 15:00, then every 5 min.
   Lines connect the snapshots, and the footnote says so.
 
