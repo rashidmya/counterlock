@@ -33,8 +33,9 @@ behind players at your rank, and why.
 
 1. A new visual language, **"Deadlock noir"**, applied to every page and
    window (details below).
-2. New navigation: **Home · Live · Heroes · Items** in the desktop app and
-   **Home · Heroes · Items** on the website. Player search moves into Home.
+2. New navigation: **Home · Live · Tier list · Heroes · Items** in the
+   desktop app and **Home · Tier list · Heroes · Items** on the website.
+   Player search moves into Home.
 3. A hero page that leads with **builds**: main build, popular builds as
    their authors laid them out, then counter items.
 4. A **match report** for any match, with a souls timeline against the
@@ -127,9 +128,14 @@ behind players at your rank, and why.
   ("street poster"): the **slanted red ribbon** and the **bold uppercase
   section headers**. Hero cards stay exactly as in C.
 - Scope: desktop app, website and overlays; look, layout and navigation.
-- Navigation: desktop **Home · Live · Heroes · Items**; web
-  **Home · Heroes · Items**. Live keeps its own tab (app only). Items keeps
-  its own tab. Player lookup moves into Home.
+- Navigation: desktop **Home · Live · Tier list · Heroes · Items**; web
+  **Home · Tier list · Heroes · Items**. **Tier list and Heroes are separate
+  pages.** Live keeps its own tab (app only). Items keeps its own tab.
+  Player lookup moves into Home.
+- Hero page: **Build** and **Popular builds** are **tabs**.
+- Website: **full-screen layout**, not a centred card. Components must not
+  be oversized on the website: the prototype was scaled down at the
+  owner's request.
 - Profile tabs: **Overview · Matches · Performance · Heroes · Live**
   ("Performance", not "Improvement").
 - Profile **Live tab on the website too**, so you can check what someone is
@@ -239,18 +245,23 @@ background brush art and keep the portrait. The builder decides where.
   - Desktop app only: the header keeps the window drag handle, settings and
     close buttons. While in a match, a red **LIVE** badge appears next to
     the Live tab.
-- **Desktop tabs:** Home · Live · Heroes · Items. Player lookup is removed
+- **Desktop tabs:** Home · Live · Tier list · Heroes · Items. Player lookup is removed
   as a tab; its job moves to Home's search. Live behaviour is unchanged:
   auto-switch when a match loads, green or red dot while in a match, and
   the not-running / waiting states (restyled).
-- **Web tabs:** Home · Heroes · Items (unchanged set).
+- **Web tabs:** Home · Tier list · Heroes · Items. The website gains a
+  `/tier-list` route; `/heroes` becomes the roster.
 - **Website layout is full-screen, not a centred card** (owner decision).
   - The header is full width and sticky.
   - Page banners (hero, profile, match report) and art run edge to edge.
-  - Content spans the browser window with side padding (about 56px on
+  - Content spans the browser window with side padding (about 48px on
     desktop widths) rather than sitting in a framed, fixed-width box.
-  - Grids grow with the window: hero cards add columns, and main-build
-    item tiles stretch to fill each row of 8.
+  - Grids grow with the window by **adding columns, not by enlarging
+    components**. Hero cards stay about 140–160px wide.
+  - Keep sizes moderate. The owner found the first full-screen version's
+    components too large. In the prototype, page titles are about 40px,
+    hero banners about 250px tall, and main-build item tiles keep a fixed
+    size (≤96px columns) instead of stretching.
   - Phone layouts keep their existing breakpoints.
   - The desktop app is unaffected; it fills its own window.
 - **Footer:** restyled. Keep the attribution, catalog date and data-source
@@ -287,11 +298,23 @@ background brush art and keep the portrait. The builder decides where.
     account flow move to "My profile".
   - Update the web Playwright tests that expect the redirect.
 
-### Heroes (tier list)
+### Tier list
 
-- The page title is "The Heroes" with the ribbon "Tier list · last 30
-  days". Hero cards are grouped by tier S to D, keeping the existing role
-  filter, sort and rank filter, restyled.
+- A separate page and tab from Heroes (owner decision).
+- Title "Tier List", with the ribbon "Last 30 days · by win rate".
+- Keeps today's role filter, sort and rank filter, restyled.
+- One row per tier, S to D: a large serif tier letter on the left, then a
+  panel of **compact portrait tiles**. Each tile is about 92px square,
+  with the name in serif small caps and "win rate · pick rate" under it.
+  The rows are denser than the Heroes cards on purpose.
+- Clicking a hero opens the hero page.
+- Home's "Top of the city" links here.
+
+### Heroes
+
+- The full roster, A to Z, as the C-style hero cards with no tier letter.
+  The stat line reads "role · win rate".
+- A search box and a role filter.
 - Clicking a hero opens the hero page.
 
 ### Hero page
@@ -299,8 +322,14 @@ background brush art and keep the portrait. The builder decides where.
 Top to bottom:
 
 1. **Header:** large hero art (portrait over brush background), name, tier,
-   win rate and pick rate, with the rank filter.
-2. **Main build:** three rows labelled **Early (0–10 min)**, **Mid (10–20
+   win rate and pick rate, with the rank filter. "← All heroes" goes back
+   to the Heroes page.
+
+Items 2 and 3 sit under one **tab bar: Build · Popular builds** (owner
+decision). Build is selected by default. The Popular builds tab shows a
+count badge and has its own row of build tabs inside it, one per build.
+
+2. **Main build** (the **Build** tab): three rows labelled **Early (0–10 min)**, **Mid (10–20
    min)** and **Late (20+ min)**, with **8 items each**. This is a **new
    data source** (my call). Today's `BuildPanel` / `useMeasuredBuild` shows
    one community build as authored, which is what popular builds now do,
@@ -319,8 +348,9 @@ Top to bottom:
    - When a phase has fewer than 8 items, show what exists and say why.
    - The **Live tab's build panel uses the same logic**, so the two never
      disagree.
-3. **Popular builds:** a short list of the hero's most popular community
-   builds, one at a time (tabs or a carousel; builder's call).
+3. **Popular builds** (the **Popular builds** tab): a short list of the
+   hero's most popular community builds, one at a time, picked from a row
+   of build-name tabs.
    - Source: `GET /v1/builds?hero_id=…&only_latest=true&sort_by=…`. Each
      build's `hero_build.details.mod_categories` is an array of
      author-named categories, each with any number of items.
@@ -504,7 +534,7 @@ Build and ship in this order. Each phase gets its own plan.
 - Exact sizes, spacing and breakpoints, and token tuning, as long as the
   approved look holds.
 - Home composition below the search box.
-- Popular-builds UI pattern (tabs or carousel), how many builds to show,
+- How many popular builds to show,
   sort, and language handling.
 - The default Performance range, metric order, and how metadata requests
   are batched.
