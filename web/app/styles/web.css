@@ -1,0 +1,65 @@
+@import "../../../src/app/styles/index.css";
+
+.app.web {
+  display: block;
+  height: auto;
+  min-height: 100vh;
+  overflow: visible;
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+  background: #0f151b;
+}
+.web > header {
+  -webkit-app-region: no-drag;
+}
+.web .brand {
+  color: inherit;
+}
+.web .brand:hover {
+  text-decoration: none;
+}
+.web .tabs a {
+  display: flex;
+  align-items: center;
+  padding: 0 0 1px;
+  color: #909b9c;
+  font-size: 12px;
+  border-bottom: 2px solid transparent;
+}
+.web .tabs a:hover {
+  color: #edcf92;
+  text-decoration: none;
+}
+.web .tabs a.active {
+  color: #dfc48c;
+  border-color: #dfc48c;
+}
+.web .page {
+  display: block;
+  min-height: 60vh;
+}
+.web footer {
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 10px;
+}
+.web footer > span {
+  display: block;
+  line-height: 1.5;
+}
+.web footer a {
+  text-decoration: underline;
+}
+.web-not-found {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: 40px 30px;
+}
+.web-not-found a {
+  color: #dfc48c;
+}
+.web-loading {
+  padding: 30px;
+}
