@@ -450,24 +450,122 @@ This was verified while building the prototype.
 It returns the average and standard deviation per time step for net worth,
 K/D/A, damage, healing and more.
 
-Sections:
+**Whose match it is ("Viewing as").** The report works for any match, not
+only the viewer's own (owner requirement). The viewer may be looking at
+a friend's game or a stranger's.
 
-1. **Banner:** win or loss, hero art, K/D/A, souls/min, MVP placing and
-   duration.
-2. **Souls timeline:** your souls over time against the rank-average line,
-   with a ±1 standard deviation band. Deaths, item purchases and objectives
-   (towers, walkers, Mid Boss) are marked along the time axis.
-3. **Verdicts:** souls/min as "+12% vs average Haze at Emissary". The same
-   style applies to damage and healing where the curve supports it.
+- A **"Viewing as"** selector at the top lists all 12 players ("Amber ·
+  Haze · moealali777 (you)") plus **"Whole match (no player)"**.
+- Every perspective-dependent part follows it: the banner (win or loss
+  from that player's side), the verdicts, best and worst stretches,
+  impact, permanent buffs, the gold highlight in the graph and the
+  scoreboard row.
+- Wording follows it too: "You" only when the selected player is the
+  remembered "me" account; otherwise the player's name ("somdr's share of
+  the team's total").
+- A one-line note says whose match is shown, e.g. "You're viewing
+  somdr's match. Labels and verdicts are from their point of view."
+- **Default perspective:**
+  - the remembered "me" account if it played in the match;
+  - otherwise the profile the viewer came from;
+  - otherwise the `?player=` URL parameter;
+  - otherwise "Whole match".
+- **Teams are named Amber and Sapphire,** never "your team" or "enemy",
+  except in labels tied to the selected perspective.
+- Every scoreboard row and every graph ranking row has a **"View as"**
+  shortcut.
+- **Sharing:**
+  - A **"Copy link"** button copies a website URL:
+    `/matches/:matchId?player=<account_id>`, or no parameter for the whole
+    match. Friends from the same game can open it and switch to themselves.
+  - The website gains a `/matches/:matchId` route. It is not pre-rendered:
+    the SPA fallback is used, as for players.
+  - The desktop app copies the same website URL.
+
+Sections, top to bottom:
+
+1. **Banner:**
+   - for the selected player: win or loss, hero art, player name, K/D/A,
+     souls, souls/min, last hits and duration;
+   - for "Whole match": the winning team, duration, team souls and the
+     kill score.
+2. **Verdicts:** souls/min, hero damage and last hits as "+12% vs average
+   <hero> at <rank>". Shown only when a player is selected.
+3. **Graph** (renamed from "Souls timeline"; owner request). It has stat
+   tabs, filters, hover detail and a ranking. Details are in the next
+   section.
 4. **Best and worst stretches:** two or three short sentences generated
-   from where the player's curve crosses or leaves the band, plus clusters
-   of deaths. For example: "Strongest 10–20 min. Fell behind after 25 min.
-   3 deaths between 27:00 and 31:00." Rule-based, never invented.
-5. **Impact:** the player's share of the team's hero damage, objective
-   damage, healing and kills plus assists (kill participation).
-6. **Last hits and permanent buffs** (`last_hits`, `power_up_buffs`), with
-   a rank average where available.
-7. **Scoreboard:** today's `MatchDetail` scoreboard, restyled.
+   from where the player's souls curve crosses or leaves the band, plus
+   clusters of deaths. For example: "Strongest 10–20 min. Fell behind
+   after 25 min. 3 deaths between 27:00 and 31:00." Rule-based, never
+   invented.
+5. **Impact:** the selected player's share of the team's hero damage,
+   objective damage, healing and kill participation.
+6. **Permanent buffs** (`power_up_buffs`), against the rank average.
+7. **Scoreboard:** both teams, adding a **damage taken** column and the
+   "View as" link. The selected player's row is highlighted.
+
+### The Graph
+
+The prototype implements all of this. Use it as the reference.
+
+- **Stat tabs** (the most important stats, one click each): Souls, Hero
+  damage, Damage taken, Objective damage, Healing, Last hits, Kills,
+  Deaths and Hero hits.
+- **"More stats…" dropdown** for everything else the snapshots record:
+  Accuracy %, Headshots, Assists, Damage mitigated, Creep damage, Jungle
+  (neutral) damage, Denies, Level, Spirit power, Weapon power, Max health,
+  Melee kills, Healing prevented, Healing to teammates and Power-ups
+  picked up.
+- **Data sources,** all from the per-player `stats` snapshots in match
+  metadata (verified on a real match):
+  - `net_worth`, `player_damage`, `player_damage_taken`, `boss_damage`,
+    `player_healing`, `creep_kills`, `kills`, `deaths`, `assists`,
+    `hero_bullets_hit`;
+  - `shots_hit` / `shots_missed`, `damage_mitigated`, `creep_damage`,
+    `neutral_damage`, `denies`, `level`, `tech_power`, `weapon_power`,
+    `max_health`, `melee_kills`, `heal_prevented`, `teammate_healing`;
+  - `custom_user_stats`: id 3 is enemy-hero headshots, ids 33 and 46 are
+    power-ups. Names come from the match-level `custom_user_stats` id →
+    name table; look ids up by name, not by fixed number.
+- **Filters:**
+  - **Show:**
+    - Player vs avg: the selected player's line against the rank-average
+      curve with a ±1 standard deviation band. Only for stats the
+      benchmark curve has; otherwise it says "no rank average for this
+      stat".
+    - Team totals: Amber vs Sapphire.
+    - Team lead: Amber minus Sapphire, around a zero line.
+    - Everyone: all 12 players.
+  - **Values:** Total / Per minute. Rate stats like accuracy and level
+    ignore per-minute.
+  - **Time:** Whole match / 0–10 / 10–20 / 20+ (zooms the x-axis).
+  - **Markers:** Deaths, Items (3,200+ souls purchases) and Objectives
+    (towers, walkers and Mid Boss, coloured by team). Each can be toggled.
+- **Everyone mode:**
+  - Team colours: blues for Amber, reds for Sapphire, gold for the
+    selected player.
+  - A legend of hero chips toggles each line, with "Show all", "Amber
+    only" and "Sapphire only".
+- **Hover:** a crosshair with a tooltip listing every visible line's value
+  at that minute, sorted, plus the rank average when shown.
+- **Ranking panel** beside the chart: all 12 players ranked for the current
+  stat at the end of the selected time range. The title adapts: "Most
+  souls", "Most damage taken", "Fewest deaths", "Highest accuracy %".
+  Clicking a row switches "Viewing as".
+- Data resolution: snapshots are every 3 min to 15:00, then every 5 min.
+  Lines connect the snapshots, and the footnote says so.
+
+**Not available in v1: parries and melee hits.**
+- These aren't in match metadata. They exist only in a match's **replay
+  (demo) file**, through the async `POST /v1/matches/demo/query`
+  (`CCitadel_Ability_MeleeParry`, `MeleeHitEvent`).
+- That path takes about 55s per query and is limited to 200 per hour per
+  IP. Not every match has a replay: a test returned "No demo available"
+  for a 4-day-old match. My test queries were also rejected on table
+  naming, so it's unverified.
+- **Melee kills** (from snapshots) are included instead. Parries and melee
+  hits are left for a later phase once the demo query is proven.
 
 ### Performance tab
 
