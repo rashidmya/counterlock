@@ -302,7 +302,10 @@ background brush art and keep the portrait. The builder decides where.
 
 - A separate page and tab from Heroes (owner decision).
 - Title "Tier List", with the ribbon "Last 30 days · by win rate".
-- Keeps today's role filter, sort and rank filter, restyled.
+- **Only a role filter** (All · Assassin · Brawler · Marksman · Mystic),
+  per the owner. No sort or rank selector on this page: tiers are by win
+  rate over the last 30 days across all ranks (the builder may pick a
+  sensible default rank band and say so in one line).
 - One row per tier, S to D: a large serif tier letter on the left, then a
   panel of **compact portrait tiles**. Each tile is about 92px square,
   with the name in serif small caps and "win rate · pick rate" under it.
@@ -324,6 +327,27 @@ Top to bottom:
 1. **Header:** large hero art (portrait over brush background), name, tier,
    win rate and pick rate, with the rank filter. "← All heroes" goes back
    to the Heroes page.
+   - **The four abilities sit as round icons beside the hero's name**
+     (owner request, modelled on lockbuilds.com/heroes/bebop). Each has a
+     small 1–4 key badge.
+   - Hovering or focusing an icon (tap on touch screens) opens a tooltip
+     card showing:
+     - the ability icon, name and cooldown;
+     - the description, with highlighted terms in gold;
+     - up to three key-number boxes with property icons (from
+       `tooltip_details.info_sections[].properties_block` →
+       `important_property`);
+     - a line of other properties (`basic_properties`), with zero values
+       hidden;
+     - the three upgrade boxes, labelled ◆1, ◆2 and ◆5.
+   - Data: `GET /v1/assets/items/by-hero-id/{id}` (abilities have
+     `properties`, `tooltip_details` and `upgrades[].property_upgrades`).
+     Extend `scripts/refresh-catalog.mjs` to bundle what the tooltip needs,
+     or fetch it at runtime (builder's call). When the catalog's upgrade
+     text is empty (it is for some abilities), build it from
+     `property_upgrades` with the property's label and postfix.
+   - This replaces the separate "Abilities" section further down the
+     page.
 
 Items 2 and 3 sit under one **tab bar: Build · Popular builds** (owner
 decision). Build is selected by default. The Popular builds tab shows a
@@ -373,8 +397,9 @@ count badge and has its own row of build tabs inside it, one per build.
      `src/features/counters/`, labelled as such.
    - Desktop app in a match: the enemy heroes come from the GEP roster.
    - Otherwise: pick up to 6 enemy heroes from a portrait picker.
-5. **The rest of today's hero detail,** restyled: abilities, skill order,
-   strong against, countered by, best with and best items.
+5. **The rest of today's hero detail,** restyled: skill order, strong
+   against, countered by, best with and best items. Abilities moved into
+   the header.
    - Today's `HeroBuild` section is removed; the main build and popular
      builds replace it.
    - Today's data-driven "Counter items" section answers a different
