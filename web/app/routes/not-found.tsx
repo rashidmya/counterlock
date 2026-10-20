@@ -1,11 +1,5 @@
-import { Link } from "react-router";
+import { NotFound } from "../NotFound";
 
-export default function NotFound() {
-  return (
-    <section className="web-not-found">
-      <h1>Page not found</h1>
-      <p className="muted">That page doesn't exist on Counterlock.</p>
-      <Link to="/">Back to Counterlock</Link>
-    </section>
-  );
+export default function NotFoundRoute() {
+  return <NotFound />;
 }

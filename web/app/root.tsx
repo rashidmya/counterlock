@@ -7,8 +7,9 @@ import {
   ScrollRestoration,
 } from "react-router";
 import type { Route } from "./+types/root";
+import { RankQueryProvider } from "./RankQuery";
 import { WebShell } from "./WebShell";
-import NotFound from "./routes/not-found";
+import { NotFound } from "./NotFound";
 import "./styles/web.css";
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -32,9 +33,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <WebShell>
-      <Outlet />
-    </WebShell>
+    <RankQueryProvider>
+      <WebShell>
+        <Outlet />
+      </WebShell>
+    </RankQueryProvider>
   );
 }
 

@@ -13,5 +13,6 @@ export default defineConfig({
     command: "npm run web:build && npm run web:preview",
     url: "http://127.0.0.1:5187",
     reuseExistingServer: false,
+    timeout: 180_000,
   },
 });
