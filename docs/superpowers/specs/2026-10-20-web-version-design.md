@@ -58,7 +58,7 @@ Owner decided:
 - Home: visitors search their own Steam account.
 
 My calls (owner approved the playback):
-- **Stack: React Router v7 in framework mode on Vite**, with
+- **Stack: React Router (current major, v8.x) in framework mode on Vite**, with
   `ssr: false` and `prerender` listing every static route. Docs:
   https://reactrouter.com/how-to/pre-rendering — "pre-renders all static
   routes for deployment to a static file server". Not Next.js: the app is
@@ -206,7 +206,7 @@ player IDs/search text to a third-party API. So:
 - Real game art everywhere it exists (as in the app).
 - Deadlock API from the browser only, through the shared client
   (`src/shared/api/DeadlockApi.ts`), with its caching and cooldowns.
-- New dependencies allowed: React Router v7 and its dev/build packages
+- New dependencies allowed: React Router v8 (`react-router`, `@react-router/dev`)
   (and the matching Vite plugin), nothing else unless clearly needed.
   Check current React Router docs (Context7 `/websites/reactrouter`) before
   implementing.
