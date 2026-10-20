@@ -7,6 +7,7 @@ import { readOverlayOpacity } from "@/features/overlay/preferences";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { catalog } from "@/shared/catalog";
 import { Icon } from "@/shared/ui/Icon";
+import { assetUrl } from "@/shared/ui/assets";
 import { bridge, inOverwolf, waiting } from "@/platform/overwolf/store-bridge";
 import {
   kWindowNames,
@@ -28,6 +29,7 @@ import {
   matchKey,
   shouldAutoSwitch,
 } from "@/features/live/utils/live-status";
+import { LinkProvider } from "./links";
 import type { Page, Route } from "./navigation";
 
 const tabs: { page: Page; label: string }[] = [
@@ -94,7 +96,7 @@ export function DesktopApp({
       )}
       <header onMouseDown={dragCurrentWindow}>
         <div className="brand">
-          <img src="../icon.svg" alt="" />
+          <img src={assetUrl("icon.svg")} alt="" />
           <div>
             COUNTER<b>LOCK</b>
             <small>KNOW THE MATCH. MAKE YOUR MOVE.</small>
@@ -165,34 +167,43 @@ export function DesktopApp({
           }}
         />
       )}
-      {visited.includes("home") && (
-        <div className="page" hidden={route.page !== "home"}>
-          <HomePage navigate={navigate} />
-        </div>
-      )}
-      {visited.includes("live") && (
-        <div className="page" hidden={route.page !== "live"}>
-          <LivePage
-            {...{ state, status, showBuild, showCounters, counters, navigate }}
-            refresh={bridge.refresh}
-          />
-        </div>
-      )}
-      {visited.includes("heroes") && (
-        <div className="page" hidden={route.page !== "heroes"}>
-          <HeroesPage {...{ route, navigate, query, setQuery }} />
-        </div>
-      )}
-      {visited.includes("items") && (
-        <div className="page" hidden={route.page !== "items"}>
-          <ItemsPage {...{ route, navigate, query, setQuery }} />
-        </div>
-      )}
-      {visited.includes("lookup") && (
-        <div className="page" hidden={route.page !== "lookup"}>
-          <PlayerLookup model={lookup} />
-        </div>
-      )}
+      <LinkProvider value={{ navigate }}>
+        {visited.includes("home") && (
+          <div className="page" hidden={route.page !== "home"}>
+            <HomePage navigate={navigate} />
+          </div>
+        )}
+        {visited.includes("live") && (
+          <div className="page" hidden={route.page !== "live"}>
+            <LivePage
+              {...{
+                state,
+                status,
+                showBuild,
+                showCounters,
+                counters,
+                navigate,
+              }}
+              refresh={bridge.refresh}
+            />
+          </div>
+        )}
+        {visited.includes("heroes") && (
+          <div className="page" hidden={route.page !== "heroes"}>
+            <HeroesPage {...{ route, navigate, query, setQuery }} />
+          </div>
+        )}
+        {visited.includes("items") && (
+          <div className="page" hidden={route.page !== "items"}>
+            <ItemsPage {...{ route, navigate, query, setQuery }} />
+          </div>
+        )}
+        {visited.includes("lookup") && (
+          <div className="page" hidden={route.page !== "lookup"}>
+            <PlayerLookup model={lookup} />
+          </div>
+        )}
+      </LinkProvider>
       <footer>
         <span>
           <span className="footer-dot" /> DEADLOCK API + OVERWOLF

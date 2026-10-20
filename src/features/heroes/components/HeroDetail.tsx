@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import type { Navigate } from "@/app/navigation";
+import { RouteLink } from "@/app/links";
 import { useAsync, type AsyncState } from "@/shared/api/useAsync";
 import { catalog, heroById, itemById } from "@/shared/catalog";
 import {
@@ -94,11 +94,9 @@ const perfEntries = (
 export function HeroDetail({
   heroId,
   query,
-  navigate,
 }: {
   heroId: number;
   query: AnalyticsQuery;
-  navigate: Navigate;
 }) {
   const hero = heroById.get(heroId);
   const deps = [heroId, query.minBadge];
@@ -120,16 +118,12 @@ export function HeroDetail({
   if (!hero)
     return (
       <div className="hero-detail">
-        <button type="button" onClick={() => navigate({ page: "heroes" })}>
-          ← All heroes
-        </button>
+        <RouteLink route={{ page: "heroes" }}>← All heroes</RouteLink>
         <p className="muted">Hero not found.</p>
       </div>
     );
 
   const summary = summaries.data?.find((row) => row.heroId === heroId);
-  const openHero = (id: number) => navigate({ page: "heroes", heroId: id });
-  const openItem = (itemId: number) => navigate({ page: "items", itemId });
   const abilityIds = hero.abilityIds ?? [];
 
   const pairs = matchups(counters.data ?? [], heroId);
@@ -168,7 +162,6 @@ export function HeroDetail({
           hero={hero}
           summary={summary}
           total={catalog.heroes.length}
-          navigate={navigate}
         />
         {summaries.error && (
           <p className="notice warning" role="status">
@@ -202,17 +195,17 @@ export function HeroDetail({
           <div className="detail-grid">
             <Section title="Strong against">
               <Body state={counters} empty={strong.length === 0}>
-                <MatchupList rows={strong} onOpen={openHero} />
+                <MatchupList rows={strong} />
               </Body>
             </Section>
             <Section title="Countered by">
               <Body state={counters} empty={weak.length === 0}>
-                <MatchupList rows={weak} onOpen={openHero} />
+                <MatchupList rows={weak} />
               </Body>
             </Section>
             <Section title="Best with">
               <Body state={synergy} empty={partners.length === 0}>
-                <MatchupList rows={partners} onOpen={openHero} />
+                <MatchupList rows={partners} />
               </Body>
             </Section>
             <Section title="Best items">
@@ -220,7 +213,7 @@ export function HeroDetail({
                 state={merge(heroItems, summaries)}
                 empty={best.length === 0}
               >
-                <ItemList entries={best} onOpen={openItem} />
+                <ItemList entries={best} />
                 <p className="data-note">
                   Expensive items show higher win rates partly because players
                   who are ahead can afford them.
@@ -232,7 +225,7 @@ export function HeroDetail({
                 state={{ ...counterState, error: undefined }}
                 empty={counterEntries.length === 0}
               >
-                <ItemList entries={counterEntries} onOpen={openItem} />
+                <ItemList entries={counterEntries} />
                 <p className="data-note">
                   {fallback
                     ? "Based on hero traits"

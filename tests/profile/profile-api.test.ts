@@ -11,6 +11,7 @@ import {
   fetchSummaryHeroStats,
   fetchSteamProfiles,
   heroStatsQueries,
+  searchSteamAccounts,
 } from "@/features/profile/services/profile-api";
 
 function fakeApi(routes: Record<string, unknown>) {
@@ -261,5 +262,46 @@ describe("fetchSteamProfiles and fetchRank", () => {
     });
     expect(await fetchRank(5, api)).toEqual(row);
     expect(await fetchRank(6, api)).toBeNull();
+  });
+});
+
+describe("searchSteamAccounts", () => {
+  const path = "/v1/players/steam-search?search_query=fargareko";
+
+  it("maps matching profiles", async () => {
+    const { api, calls } = fakeApi({
+      [path]: [
+        { account_id: 5, personaname: "Fargareko", avatarmedium: "a.jpg" },
+        { personaname: "No id" },
+      ],
+    });
+    expect(await searchSteamAccounts("fargareko", api)).toEqual([
+      { accountId: 5, name: "Fargareko", avatar: "a.jpg" },
+    ]);
+    expect(calls).toEqual([path]);
+  });
+
+  it("encodes the query and trims it", async () => {
+    const { api, calls } = fakeApi({
+      "/v1/players/steam-search?search_query=a%20b%26c": [],
+    });
+    await searchSteamAccounts("  a b&c ", api);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("does not request for queries shorter than 2 characters", async () => {
+    const { api, calls } = fakeApi({});
+    expect(await searchSteamAccounts(" a ", api)).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it("returns at most 10 results", async () => {
+    const { api } = fakeApi({
+      [path]: Array.from({ length: 15 }, (_, i) => ({
+        account_id: i + 1,
+        personaname: `P${i}`,
+      })),
+    });
+    expect(await searchSteamAccounts("fargareko", api)).toHaveLength(10);
   });
 });

@@ -1,4 +1,4 @@
-import type { Navigate } from "@/app/navigation";
+import { RouteLink } from "@/app/links";
 import { heroById, itemById } from "@/shared/catalog";
 import { gameIcons } from "@/shared/ui/gameIcons";
 import { ItemIcon } from "@/shared/ui/ItemIcon";
@@ -15,13 +15,11 @@ function TeamTable({
   won,
   players,
   accountId,
-  navigate,
 }: {
   title: string;
   won: boolean;
   players: ScoreboardPlayer[];
   accountId: number;
-  navigate: Navigate;
 }) {
   return (
     <div className={`scoreboard-team ${won ? "winner" : ""}`}>
@@ -48,11 +46,9 @@ function TeamTable({
                   className={`score-row ${local ? "local" : ""}`}
                 >
                   <td>
-                    <button
+                    <RouteLink
                       className="hero-link"
-                      onClick={() =>
-                        navigate({ page: "heroes", heroId: player.heroId })
-                      }
+                      route={{ page: "heroes", heroId: player.heroId }}
                     >
                       <Picture
                         className="hero-portrait"
@@ -60,7 +56,7 @@ function TeamTable({
                         label={name}
                       />
                       {name}
-                    </button>
+                    </RouteLink>
                     {local && <b className="you">YOU</b>}
                   </td>
                   <td>
@@ -92,11 +88,9 @@ function TeamTable({
 export function MatchDetail({
   matchId,
   accountId,
-  navigate,
 }: {
   matchId: number;
   accountId: number;
-  navigate: Navigate;
 }) {
   const { data, loading } = useAsync(() => fetchScoreboard(matchId), [matchId]);
   if (loading) return <p className="match-detail muted">Loading match…</p>;
@@ -111,13 +105,13 @@ export function MatchDetail({
           title="WINNERS"
           won
           players={team(true)}
-          {...{ accountId, navigate }}
+          accountId={accountId}
         />
         <TeamTable
           title="LOSERS"
           won={false}
           players={team(false)}
-          {...{ accountId, navigate }}
+          accountId={accountId}
         />
       </div>
       <p className="data-note">

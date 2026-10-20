@@ -1,3 +1,4 @@
+import { RouteLink } from "@/app/links";
 import { Picture } from "@/shared/ui/Picture";
 import type { Tier } from "../utils/analytics";
 
@@ -13,20 +14,14 @@ export interface HeroCard {
 const percent = (rate: number | null) =>
   rate === null ? "—" : `${(rate * 100).toFixed(1)}%`;
 
-export function HeroGrid({
-  cards,
-  onOpen,
-}: {
-  cards: HeroCard[];
-  onOpen(heroId: number): void;
-}) {
+export function HeroGrid({ cards }: { cards: HeroCard[] }) {
   return (
     <div className="hero-grid">
       {cards.map((card) => (
-        <button
+        <RouteLink
           key={card.heroId}
           className="hero-card"
-          onClick={() => onOpen(card.heroId)}
+          route={{ page: "heroes", heroId: card.heroId }}
         >
           <Picture
             className="hero-portrait hero-card-portrait"
@@ -42,7 +37,7 @@ export function HeroGrid({
           {card.tier && (
             <span className={`tier-letter tier-${card.tier}`}>{card.tier}</span>
           )}
-        </button>
+        </RouteLink>
       ))}
     </div>
   );

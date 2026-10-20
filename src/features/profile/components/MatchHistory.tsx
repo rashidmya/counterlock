@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Navigate } from "@/app/navigation";
+import { RouteLink } from "@/app/links";
 import { heroById } from "@/shared/catalog";
 import { gameIcons } from "@/shared/ui/gameIcons";
 import { Picture } from "@/shared/ui/Picture";
@@ -16,13 +16,11 @@ export function MatchHistory({
   filter,
   onFilter,
   accountId,
-  navigate,
 }: {
   matches: HistoryMatch[];
   filter: HistoryFilter;
   onFilter(filter: HistoryFilter): void;
   accountId: number;
-  navigate: Navigate;
 }) {
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [open, setOpen] = useState<number | null>(null);
@@ -44,11 +42,9 @@ export function MatchHistory({
           return (
             <li key={match.matchId} className="match-entry">
               <div className="match-row">
-                <button
+                <RouteLink
                   className="hero-link"
-                  onClick={() =>
-                    navigate({ page: "heroes", heroId: match.heroId })
-                  }
+                  route={{ page: "heroes", heroId: match.heroId }}
                 >
                   <Picture
                     className="hero-portrait"
@@ -56,7 +52,7 @@ export function MatchHistory({
                     label={name}
                   />
                   {name}
-                </button>
+                </RouteLink>
                 <button
                   className="match-toggle"
                   aria-expanded={expanded}
@@ -80,10 +76,7 @@ export function MatchHistory({
                 </button>
               </div>
               {expanded && (
-                <MatchDetail
-                  matchId={match.matchId}
-                  {...{ accountId, navigate }}
-                />
+                <MatchDetail matchId={match.matchId} accountId={accountId} />
               )}
             </li>
           );

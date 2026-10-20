@@ -44,6 +44,8 @@ export const SUMMARY_HERO_STATS = "game_mode=normal&match_mode=ranked,unranked";
 
 const MIN_MATE_GAMES = 3;
 const MAX_MATES = 5;
+const MIN_SEARCH_LENGTH = 2;
+const MAX_SEARCH_RESULTS = 10;
 
 type Row = Record<string, unknown>;
 const isNumber = (value: unknown): value is number =>
@@ -59,11 +61,29 @@ export async function fetchSteamProfiles(
   api: DeadlockApi = deadlockApi,
 ): Promise<SteamProfile[]> {
   if (!ids.length) return [];
+  return parseSteamProfiles(
+    await api.get<unknown>(
+      `/v1/players/steam?account_ids=${ids.join(",")}`,
+      TTL.profile,
+    ),
+  );
+}
+
+export async function searchSteamAccounts(
+  query: string,
+  api: DeadlockApi = deadlockApi,
+): Promise<SteamProfile[]> {
+  const term = query.trim();
+  if (term.length < MIN_SEARCH_LENGTH) return [];
   const data = await api.get<unknown>(
-    `/v1/players/steam?account_ids=${ids.join(",")}`,
+    `/v1/players/steam-search?search_query=${encodeURIComponent(term)}`,
     TTL.profile,
   );
-  return rows(data).flatMap((row) =>
+  return parseSteamProfiles(data).slice(0, MAX_SEARCH_RESULTS);
+}
+
+const parseSteamProfiles = (data: unknown): SteamProfile[] =>
+  rows(data).flatMap((row) =>
     isNumber(row.account_id) && typeof row.personaname === "string"
       ? [
           {
@@ -77,7 +97,6 @@ export async function fetchSteamProfiles(
         ]
       : [],
   );
-}
 
 export async function fetchRank(
   id: number,

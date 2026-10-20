@@ -1,4 +1,4 @@
-import type { Navigate } from "@/app/navigation";
+import { RouteLink } from "@/app/links";
 import type { AsyncState } from "@/shared/api/useAsync";
 import { useAsync } from "@/shared/api/useAsync";
 import { catalog, heroById } from "@/shared/catalog";
@@ -93,13 +93,11 @@ export function OverviewTab({
   history,
   filter,
   onFilter,
-  navigate,
 }: {
   accountId: number;
   history: AsyncState<HistoryMatch[]>;
   filter: HistoryFilter;
   onFilter(filter: HistoryFilter): void;
-  navigate: Navigate;
 }) {
   const matches = history.data;
   const summaryMatches = matches?.filter(isSummaryMatch) ?? [];
@@ -160,12 +158,10 @@ export function OverviewTab({
               const hero = heroById.get(row.heroId);
               const name = hero?.name ?? `Hero ${row.heroId}`;
               return (
-                <button
+                <RouteLink
                   key={row.heroId}
                   className="top-hero"
-                  onClick={() =>
-                    navigate({ page: "heroes", heroId: row.heroId })
-                  }
+                  route={{ page: "heroes", heroId: row.heroId }}
                 >
                   <Picture
                     className="hero-portrait large"
@@ -179,7 +175,7 @@ export function OverviewTab({
                     </b>{" "}
                     · {row.games} games
                   </span>
-                </button>
+                </RouteLink>
               );
             })}
           </div>
@@ -187,7 +183,7 @@ export function OverviewTab({
       )}
       <Teammates accountId={accountId} />
       {!!matches?.length && (
-        <MatchHistory {...{ matches, filter, onFilter, accountId, navigate }} />
+        <MatchHistory {...{ matches, filter, onFilter, accountId }} />
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { LinkScope } from "@/app/links";
 import type { Navigate, Route } from "@/app/navigation";
 import { useAsync } from "@/shared/api/useAsync";
 import { catalog, itemById } from "@/shared/catalog";
@@ -59,13 +60,14 @@ export function ItemsPage({
   );
   if (route.itemId !== undefined)
     return (
-      <ItemDetail
-        key={route.itemId}
-        item={itemById.get(route.itemId)}
-        perf={table.get(route.itemId)}
-        loading={stats.loading || heroes.loading}
-        navigate={navigate}
-      />
+      <LinkScope navigate={navigate}>
+        <ItemDetail
+          key={route.itemId}
+          item={itemById.get(route.itemId)}
+          perf={table.get(route.itemId)}
+          loading={stats.loading || heroes.loading}
+        />
+      </LinkScope>
     );
 
   const needle = search.trim().toLowerCase();
@@ -89,83 +91,83 @@ export function ItemsPage({
     item: row.item,
     note: sort === "cost" ? undefined : percent(row[sort]),
   }));
-  const open = (itemId: number) => navigate({ page: "items", itemId });
   const failed = stats.error ?? heroes.error;
   return (
-    <section className="items-page">
-      <div className="items-toolbar">
-        <input
-          type="search"
-          aria-label="Search items"
-          placeholder="Search items"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-        <div className="filter-buttons" role="group" aria-label="Category">
-          {categories.map((option) => (
-            <button
-              key={option.value}
-              className={category === option.value ? "active" : ""}
-              aria-pressed={category === option.value}
-              onClick={() => setCategory(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <div className="items-selects">
-          <label className="select-field">
-            Sort
-            <select
-              aria-label="Sort"
-              value={sort}
-              onChange={(event) => setSort(event.target.value as SortMode)}
-            >
-              {sorts.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <RankFilter
-            value={query.minBadge}
-            onChange={(minBadge) => setQuery({ ...query, minBadge })}
+    <LinkScope navigate={navigate}>
+      <section className="items-page">
+        <div className="items-toolbar">
+          <input
+            type="search"
+            aria-label="Search items"
+            placeholder="Search items"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
           />
+          <div className="filter-buttons" role="group" aria-label="Category">
+            {categories.map((option) => (
+              <button
+                key={option.value}
+                className={category === option.value ? "active" : ""}
+                aria-pressed={category === option.value}
+                onClick={() => setCategory(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="items-selects">
+            <label className="select-field">
+              Sort
+              <select
+                aria-label="Sort"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as SortMode)}
+              >
+                {sorts.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <RankFilter
+              value={query.minBadge}
+              onChange={(minBadge) => setQuery({ ...query, minBadge })}
+            />
+          </div>
         </div>
-      </div>
-      {(stats.loading || heroes.loading) && (
-        <p className="muted">Loading item stats…</p>
-      )}
-      {failed && (
-        <p className="notice warning" role="status">
-          Item stats unavailable: {failed}
-          <button
-            type="button"
-            onClick={() => {
-              if (stats.error) stats.retry();
-              if (heroes.error) heroes.retry();
-            }}
-          >
-            Retry
-          </button>
-        </p>
-      )}
-      {tiles.length === 0 ? (
-        <p className="muted">No items match.</p>
-      ) : (
-        <ItemShopGrid
-          tiles={tiles}
-          layout={sort === "cost" ? "shop" : "flat"}
-          onOpen={open}
-        />
-      )}
-      {stats.data && (
-        <p className="data-note">
-          Expensive items show higher win rates partly because players who are
-          ahead can afford them.
-        </p>
-      )}
-    </section>
+        {(stats.loading || heroes.loading) && (
+          <p className="muted">Loading item stats…</p>
+        )}
+        {failed && (
+          <p className="notice warning" role="status">
+            Item stats unavailable: {failed}
+            <button
+              type="button"
+              onClick={() => {
+                if (stats.error) stats.retry();
+                if (heroes.error) heroes.retry();
+              }}
+            >
+              Retry
+            </button>
+          </p>
+        )}
+        {tiles.length === 0 ? (
+          <p className="muted">No items match.</p>
+        ) : (
+          <ItemShopGrid
+            tiles={tiles}
+            layout={sort === "cost" ? "shop" : "flat"}
+          />
+        )}
+        {stats.data && (
+          <p className="data-note">
+            Expensive items show higher win rates partly because players who are
+            ahead can afford them.
+          </p>
+        )}
+      </section>
+    </LinkScope>
   );
 }

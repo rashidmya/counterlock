@@ -7,9 +7,13 @@ import { timeAgo } from "../utils/format";
 export function ProfileHeader({
   account,
   onChange,
+  subtitle,
+  actionLabel = "Change",
 }: {
   account: ProfileAccount;
   onChange(): void;
+  subtitle?: string;
+  actionLabel?: string;
 }) {
   const { data } = useAsync(
     () => fetchSteamProfiles([account.accountId]),
@@ -23,13 +27,14 @@ export function ProfileHeader({
       <div className="profile-identity">
         <h1>{name}</h1>
         <small>
-          {account.source === "manual"
-            ? "Entered manually"
-            : `Seen on this PC · ${timeAgo(account.seenAt)}`}
+          {subtitle ??
+            (account.source === "manual"
+              ? "Entered manually"
+              : `Seen on this PC · ${timeAgo(account.seenAt)}`)}
         </small>
       </div>
       <button className="text-button" onClick={onChange}>
-        Change
+        {actionLabel}
       </button>
     </div>
   );

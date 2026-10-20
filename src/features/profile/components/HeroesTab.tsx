@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Navigate } from "@/app/navigation";
+import { RouteLink } from "@/app/links";
 import type { AsyncState } from "@/shared/api/useAsync";
 import { useAsync } from "@/shared/api/useAsync";
 import { heroById } from "@/shared/catalog";
@@ -49,13 +49,11 @@ export function HeroesTab({
   history,
   filter,
   onFilter,
-  navigate,
 }: {
   accountId: number;
   history: AsyncState<HistoryMatch[]>;
   filter: HistoryFilter;
   onFilter(filter: HistoryFilter): void;
-  navigate: Navigate;
 }) {
   const [sort, setSort] = useState<{
     label: string;
@@ -138,11 +136,9 @@ export function HeroesTab({
                 {sorted.map((line) => (
                   <tr key={line.heroId} className="hero-row">
                     <td>
-                      <button
+                      <RouteLink
                         className="hero-link"
-                        onClick={() =>
-                          navigate({ page: "heroes", heroId: line.heroId })
-                        }
+                        route={{ page: "heroes", heroId: line.heroId }}
                       >
                         <Picture
                           className="hero-portrait"
@@ -150,7 +146,7 @@ export function HeroesTab({
                           label={line.name}
                         />
                         {line.name}
-                      </button>
+                      </RouteLink>
                     </td>
                     <td>{line.games}</td>
                     <td>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Item } from "@/shared/catalog/types";
+import { assetUrl } from "./assets";
 
 export function ItemIcon({
   item,
@@ -9,7 +10,7 @@ export function ItemIcon({
   className?: string;
 }) {
   const [failed, setFailed] = useState<string[]>([]);
-  const localImage = item.localImage ? `../${item.localImage}` : undefined;
+  const localImage = item.localImage ? assetUrl(item.localImage) : undefined;
   const src = [localImage, item.image].find(
     (url): url is string => !!url && !failed.includes(url),
   );

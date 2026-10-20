@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { LinkScope } from "@/app/links";
 import type { Navigate, Route } from "@/app/navigation";
 import { useAsync } from "@/shared/api/useAsync";
 import { catalog } from "@/shared/catalog";
@@ -43,12 +44,9 @@ export function HeroesPage({
   const summaries = useAsync(() => fetchHeroSummaries(query), [query.minBadge]);
   if (route.heroId !== undefined)
     return (
-      <HeroDetail
-        key={route.heroId}
-        heroId={route.heroId}
-        query={query}
-        navigate={navigate}
-      />
+      <LinkScope navigate={navigate}>
+        <HeroDetail key={route.heroId} heroId={route.heroId} query={query} />
+      </LinkScope>
     );
 
   const summaryById = new Map(summaries.data?.map((s) => [s.heroId, s]));
@@ -65,7 +63,6 @@ export function HeroesPage({
         tier: summary?.tier,
       };
     });
-  const open = (heroId: number) => navigate({ page: "heroes", heroId });
   const groups: { label: string; cards: HeroCard[] }[] =
     sort === "tier"
       ? [
@@ -93,60 +90,62 @@ export function HeroesPage({
           },
         ];
   return (
-    <section className="heroes-page">
-      <div className="heroes-toolbar">
-        <div className="filter-buttons" role="group" aria-label="Role">
-          {roles.map((option) => (
-            <button
-              key={option.value}
-              className={role === option.value ? "active" : ""}
-              aria-pressed={role === option.value}
-              onClick={() => setRole(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <div className="heroes-selects">
-          <label className="select-field">
-            Sort
-            <select
-              aria-label="Sort"
-              value={sort}
-              onChange={(event) => setSort(event.target.value as SortMode)}
-            >
-              {sorts.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <RankFilter
-            value={query.minBadge}
-            onChange={(minBadge) => setQuery({ ...query, minBadge })}
-          />
-        </div>
-      </div>
-      {summaries.loading && <p className="muted">Loading hero stats…</p>}
-      {summaries.error && (
-        <p className="notice warning" role="status">
-          Hero stats unavailable: {summaries.error}
-          <button type="button" onClick={summaries.retry}>
-            Retry
-          </button>
-        </p>
-      )}
-      {!summaries.loading &&
-        groups.map((group) => (
-          <div key={group.label} className="hero-group">
-            {group.label && <h2 className="tier-heading">{group.label}</h2>}
-            <HeroGrid cards={group.cards} onOpen={open} />
+    <LinkScope navigate={navigate}>
+      <section className="heroes-page">
+        <div className="heroes-toolbar">
+          <div className="filter-buttons" role="group" aria-label="Role">
+            {roles.map((option) => (
+              <button
+                key={option.value}
+                className={role === option.value ? "active" : ""}
+                aria-pressed={role === option.value}
+                onClick={() => setRole(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
-        ))}
-      {summaries.data && (
-        <p className="data-note">Tiers are based on win rate.</p>
-      )}
-    </section>
+          <div className="heroes-selects">
+            <label className="select-field">
+              Sort
+              <select
+                aria-label="Sort"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as SortMode)}
+              >
+                {sorts.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <RankFilter
+              value={query.minBadge}
+              onChange={(minBadge) => setQuery({ ...query, minBadge })}
+            />
+          </div>
+        </div>
+        {summaries.loading && <p className="muted">Loading hero stats…</p>}
+        {summaries.error && (
+          <p className="notice warning" role="status">
+            Hero stats unavailable: {summaries.error}
+            <button type="button" onClick={summaries.retry}>
+              Retry
+            </button>
+          </p>
+        )}
+        {!summaries.loading &&
+          groups.map((group) => (
+            <div key={group.label} className="hero-group">
+              {group.label && <h2 className="tier-heading">{group.label}</h2>}
+              <HeroGrid cards={group.cards} />
+            </div>
+          ))}
+        {summaries.data && (
+          <p className="data-note">Tiers are based on win rate.</p>
+        )}
+      </section>
+    </LinkScope>
   );
 }

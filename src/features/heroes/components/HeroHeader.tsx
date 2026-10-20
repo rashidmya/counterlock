@@ -1,4 +1,4 @@
-import type { Navigate } from "@/app/navigation";
+import { RouteLink } from "@/app/links";
 import type { Hero } from "@/shared/catalog/types";
 import { Picture } from "@/shared/ui/Picture";
 import type { HeroSummary } from "../utils/analytics";
@@ -25,12 +25,10 @@ export function HeroHeader({
   hero,
   summary,
   total,
-  navigate,
 }: {
   hero: Hero;
   summary?: HeroSummary;
   total: number;
-  navigate: Navigate;
 }) {
   const { role, tags } = identity(hero);
   const art = hero.backgroundImage
@@ -60,13 +58,9 @@ export function HeroHeader({
         )}
       </div>
       <div className="hero-header-body">
-        <button
-          type="button"
-          className="hero-back"
-          onClick={() => navigate({ page: "heroes" })}
-        >
+        <RouteLink className="hero-back" route={{ page: "heroes" }}>
           ← All heroes
-        </button>
+        </RouteLink>
         <div className="hero-identity">
           {role && <span className="hero-role">{role}</span>}
           {role && tags && <span className="hero-rule" aria-hidden="true" />}

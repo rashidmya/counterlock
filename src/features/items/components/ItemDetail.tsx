@@ -1,4 +1,4 @@
-import type { Navigate } from "@/app/navigation";
+import { RouteLink } from "@/app/links";
 import type { Item } from "@/shared/catalog/types";
 import {
   buildsFrom,
@@ -19,15 +19,7 @@ function clock(seconds?: number) {
 const capitalize = (text: string) =>
   text.charAt(0).toUpperCase() + text.slice(1);
 
-function Links({
-  title,
-  items,
-  onOpen,
-}: {
-  title: string;
-  items: Item[];
-  onOpen(itemId: number): void;
-}) {
+function Links({ title, items }: { title: string; items: Item[] }) {
   return (
     <section className="item-links">
       <h2>{title}</h2>
@@ -36,14 +28,14 @@ function Links({
       ) : (
         <div>
           {items.map((item) => (
-            <button
+            <RouteLink
               key={item.id}
               className="item-link"
-              onClick={() => onOpen(item.id)}
+              route={{ page: "items", itemId: item.id }}
             >
               <ItemIcon item={item} />
               {item.name}
-            </button>
+            </RouteLink>
           ))}
         </div>
       )}
@@ -55,21 +47,15 @@ export function ItemDetail({
   item,
   perf,
   loading = false,
-  navigate,
 }: {
   item?: Item;
   perf?: ItemPerf;
   loading?: boolean;
-  navigate: Navigate;
 }) {
   const back = (
-    <button
-      type="button"
-      className="item-back"
-      onClick={() => navigate({ page: "items" })}
-    >
+    <RouteLink className="item-back" route={{ page: "items" }}>
       ← All items
-    </button>
+    </RouteLink>
   );
   if (!item)
     return (
@@ -78,7 +64,6 @@ export function ItemDetail({
         <p className="muted">Item not found.</p>
       </div>
     );
-  const open = (itemId: number) => navigate({ page: "items", itemId });
   const shown = (value: string) => (loading && !perf ? "…" : value);
   return (
     <div className="item-detail">
@@ -125,8 +110,8 @@ export function ItemDetail({
           Expensive items show higher win rates partly because players who are
           ahead can afford them.
         </p>
-        <Links title="Builds from" items={buildsFrom(item)} onOpen={open} />
-        <Links title="Builds into" items={buildsInto(item)} onOpen={open} />
+        <Links title="Builds from" items={buildsFrom(item)} />
+        <Links title="Builds into" items={buildsInto(item)} />
       </div>
     </div>
   );

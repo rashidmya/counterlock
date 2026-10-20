@@ -1,3 +1,4 @@
+import { RouteLink } from "@/app/links";
 import type { Item } from "@/shared/catalog/types";
 import { categoryIcon } from "@/shared/ui/gameIcons";
 import { ItemIcon } from "@/shared/ui/ItemIcon";
@@ -13,22 +14,14 @@ const categories = [
   { value: "spirit", label: "Spirit" },
 ];
 
-function Tile({
-  tile,
-  badge,
-  onOpen,
-}: {
-  tile: ShopTile;
-  badge: boolean;
-  onOpen(itemId: number): void;
-}) {
+function Tile({ tile, badge }: { tile: ShopTile; badge: boolean }) {
   const { item, note } = tile;
   const icon = badge ? categoryIcon(item.category) : undefined;
   return (
-    <button
+    <RouteLink
       className="item-tile"
+      route={{ page: "items", itemId: item.id }}
       title={`${item.name} · ${item.cost.toLocaleString("en-US")} souls`}
-      onClick={() => onOpen(item.id)}
     >
       <span className="item-tile-art">
         <ItemIcon item={item} />
@@ -36,24 +29,22 @@ function Tile({
       </span>
       <strong>{item.name}</strong>
       {note && <small>{note}</small>}
-    </button>
+    </RouteLink>
   );
 }
 
 export function ItemShopGrid({
   tiles,
   layout,
-  onOpen,
 }: {
   tiles: ShopTile[];
   layout: "shop" | "flat";
-  onOpen(itemId: number): void;
 }) {
   if (layout === "flat")
     return (
       <div className="item-tiles shop-flat">
         {tiles.map((tile) => (
-          <Tile key={tile.item.id} tile={tile} badge onOpen={onOpen} />
+          <Tile key={tile.item.id} tile={tile} badge />
         ))}
       </div>
     );
@@ -79,12 +70,7 @@ export function ItemShopGrid({
                   {own
                     .filter((tile) => tile.item.cost === cost)
                     .map((tile) => (
-                      <Tile
-                        key={tile.item.id}
-                        tile={tile}
-                        badge={false}
-                        onOpen={onOpen}
-                      />
+                      <Tile key={tile.item.id} tile={tile} badge={false} />
                     ))}
                 </div>
               </div>
