@@ -377,7 +377,10 @@ already used by `MatchDetail`). The metadata includes:
 - `accolades`, `mvp_rank`, `last_hits`, `power_up_buffs`.
 
 The benchmark is
-`GET /v1/analytics/player-performance-curve?hero_ids=…&min_average_badge=…&max_average_badge=…`.
+`GET /v1/analytics/player-performance-curve?hero_ids=…&min_average_badge=…&max_average_badge=…&resolution=0`.
+`resolution=0` is required. It gives absolute game time in seconds (180s
+steps, then 300s), while the default buckets by percent of match length.
+This was verified while building the prototype.
 It returns the average and standard deviation per time step for net worth,
 K/D/A, damage, healing and more.
 
