@@ -1,11 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
-
-const PNG = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAHnOcQAAAAABJRU5ErkJggg==",
-  "base64",
-);
-const cors = { "access-control-allow-origin": "*" };
+import { PNG, cors, heroStats, itemRow } from "./fixtures";
 
 const slugify = (name: string) =>
   name
@@ -16,26 +11,6 @@ const shopItems = catalog.items
   .filter((entry) => entry.image && entry.cost > 0)
   .slice(0, 12);
 const [bestA, bestB] = shopItems;
-const heroStats = catalog.heroes.map((hero, index) => {
-  const matches = 20000;
-  const wins = matches * (0.4 + index * 0.005);
-  return {
-    hero_id: hero.id,
-    wins,
-    losses: matches - wins,
-    matches,
-    total_kills: 8 * matches,
-    total_deaths: 5 * matches,
-    total_assists: 10 * matches,
-  };
-});
-const itemRow = (itemId: number, rate: number) => ({
-  item_id: itemId,
-  wins: 10000 * rate,
-  losses: 10000 * (1 - rate),
-  matches: 10000,
-});
-
 async function mockApi(page: Page, requests: string[] = []) {
   await page.route("https://assets-bucket.deadlock-api.com/**", (route) =>
     route.fulfill({ body: PNG, contentType: "image/png", headers: cors }),

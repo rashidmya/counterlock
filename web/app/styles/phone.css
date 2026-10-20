@@ -1,0 +1,362 @@
+/* Phone layouts for the website only; everything is scoped under `.web`. */
+
+.app.web
+  :is(
+    .heroes-page,
+    .items-page,
+    .item-detail,
+    .hero-detail,
+    .profile,
+    .profile-empty
+  ) {
+  overflow: visible;
+}
+.app.web
+  :is(
+    .overview,
+    .heroes-tab,
+    .performance,
+    .hero-detail-body,
+    .item-detail-card
+  ) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 640px) {
+  .app.web header {
+    height: 64px;
+    padding: 0 16px;
+  }
+  .app.web .brand {
+    font-size: 21px;
+  }
+  .app.web .brand small {
+    display: none;
+  }
+  .app.web nav {
+    height: 48px;
+    margin: 0 16px;
+  }
+  .app.web .tabs {
+    gap: 26px;
+  }
+  .app.web .tabs a {
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .app.web .page {
+    min-height: 50vh;
+  }
+  .app.web footer {
+    padding: 16px;
+    font-size: 11px;
+  }
+  .app.web :is(input, select) {
+    font-size: 16px;
+  }
+
+  .app.web
+    :is(
+      .web-home,
+      .web-about,
+      .web-not-found,
+      .heroes-page,
+      .items-page,
+      .item-detail,
+      .hero-detail,
+      .profile,
+      .profile-empty
+    ) {
+    padding: 20px 16px;
+  }
+  .app.web .web-hero h1 {
+    font-size: 30px;
+  }
+  .app.web .web-home-links {
+    gap: 22px;
+  }
+  .app.web .web-home-links a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .app.web .web-search input {
+    min-height: 46px;
+    max-width: none;
+  }
+  .app.web .web-search-results {
+    max-width: none;
+  }
+  .app.web .web-search-results a {
+    min-height: 48px;
+  }
+  .app.web .web-search-direct small {
+    overflow-wrap: anywhere;
+  }
+
+  .app.web .eyebrow,
+  .app.web .tier-heading,
+  .app.web .detail-heading,
+  .app.web .cost-heading,
+  .app.web .item-links h2 {
+    font-size: 11px;
+  }
+  .app.web .muted,
+  .app.web .data-note,
+  .app.web .hero-card small,
+  .app.web .select-field {
+    font-size: 12px;
+  }
+
+  .app.web .heroes-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .app.web .items-toolbar {
+    gap: 10px;
+  }
+  .app.web .items-toolbar input[type="search"] {
+    width: 100%;
+    min-height: 44px;
+    padding: 6px 10px;
+    font-size: 16px;
+  }
+  .app.web :is(.heroes-selects, .items-selects) {
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-left: 0;
+  }
+  .app.web .select-field select {
+    min-height: 40px;
+    font-size: 14px;
+  }
+  .app.web .filter-buttons {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .app.web .filter-buttons button {
+    min-height: 36px;
+    padding: 6px 14px;
+    font-size: 13px;
+  }
+  .app.web .hero-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app.web .hero-card {
+    min-height: 54px;
+    font-size: 14px;
+  }
+
+  .app.web .hero-detail-card > .notice {
+    margin: 10px 14px 0;
+  }
+  .app.web .hero-header {
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    padding: 20px 16px;
+  }
+  .app.web .hero-frame {
+    width: 168px;
+    height: 224px;
+  }
+  .app.web .hero-header-body {
+    width: 100%;
+  }
+  .app.web .hero-back {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    font-size: 12px;
+  }
+  .app.web .hero-identity {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    margin-top: 4px;
+    font-size: 11px;
+    letter-spacing: 1.8px;
+  }
+  .app.web .hero-header h1 {
+    font-size: 40px;
+  }
+  .app.web .hero-tagline {
+    font-size: 14px;
+  }
+  .app.web .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+  }
+  .app.web .hero-stats > div {
+    padding: 0;
+    border-left: 0;
+    font-size: 10px;
+  }
+  .app.web .hero-detail-body {
+    padding: 14px 14px 18px;
+  }
+  .app.web .ability-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app.web .ability-card {
+    padding: 10px;
+  }
+  .app.web .ability-card strong {
+    font-size: 13px;
+  }
+  .app.web .ability-card small {
+    font-size: 11px;
+  }
+  .app.web .matchup {
+    min-height: 40px;
+    font-size: 13px;
+  }
+  .app.web .matchup small {
+    font-size: 11px;
+  }
+  .app.web .hero-build .hero-build-summary,
+  .app.web .hero-detail .build-empty {
+    font-size: 12px;
+  }
+
+  .app.web .item-tile strong {
+    font-size: 11px;
+  }
+  .app.web .item-tile small {
+    font-size: 10px;
+  }
+  .app.web .shop-column .item-tiles,
+  .app.web .shop-flat {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  }
+  .app.web .shop-columns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+  .app.web .shop-column h2 {
+    font-size: 15px;
+  }
+  .app.web .item-detail-card {
+    padding: 16px;
+  }
+  .app.web .item-back {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    font-size: 12px;
+  }
+  .app.web .item-head h1 {
+    font-size: 26px;
+  }
+  .app.web .item-meta {
+    font-size: 12px;
+  }
+  .app.web .item-description {
+    font-size: 14px;
+  }
+  .app.web .item-stat {
+    font-size: 14px;
+  }
+  .app.web .stat-box small {
+    font-size: 10px;
+  }
+  .app.web .item-link {
+    min-height: 44px;
+    font-size: 13px;
+  }
+
+  .app.web .profile-header {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+  .app.web .section-head {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .app.web .section-head .eyebrow {
+    white-space: nowrap;
+  }
+  .app.web .profile-identity {
+    flex: 1;
+    min-width: 0;
+  }
+  .app.web .profile-identity h1 {
+    font-size: 24px;
+    overflow-wrap: anywhere;
+  }
+  .app.web .profile-header .text-button,
+  .app.web .web-this-is-me {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    margin: 0;
+    padding: 0;
+    font-size: 13px;
+  }
+  .app.web .profile-header .text-button {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+  .app.web .web-this-is-me {
+    margin: -4px 0 4px;
+  }
+  .app.web .subtabs button {
+    min-height: 44px;
+    padding: 0;
+    font-size: 14px;
+  }
+  .app.web .stat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app.web .stat-card.rank-card {
+    grid-column: 1 / -1;
+  }
+  .app.web .stat-card small,
+  .app.web .chart-card small {
+    font-size: 10px;
+  }
+  .app.web .top-heroes {
+    gap: 6px;
+  }
+  .app.web .top-hero {
+    padding: 8px 4px;
+    text-align: center;
+  }
+  .app.web .match-row {
+    flex-wrap: wrap;
+    gap: 0;
+  }
+  .app.web .hero-link {
+    flex: 1 1 100%;
+    padding: 10px 0 0;
+    font-size: 14px;
+  }
+  .app.web .match-toggle {
+    flex: 1 1 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px 6px;
+    padding: 8px 0 12px;
+    font-size: 12px;
+  }
+  .app.web .match-date {
+    text-align: left;
+  }
+  .app.web .show-more {
+    min-height: 40px;
+    font-size: 13px;
+  }
+  .app.web .scoreboard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app.web .scoreboard-team {
+    overflow-x: auto;
+  }
+  .app.web .scoreboard-team table {
+    min-width: 440px;
+  }
+  .app.web .hero-table th button {
+    min-height: 36px;
+  }
+}

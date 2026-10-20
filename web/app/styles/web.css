@@ -1,4 +1,5 @@
 @import "../../../src/app/styles/index.css";
+@import "./phone.css";
 
 .app.web {
   display: block;

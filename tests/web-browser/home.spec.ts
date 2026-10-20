@@ -1,56 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
-import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
+import { FARGO, PNG, cors, heroStats, historyRow } from "./fixtures";
 
-const PNG = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAHnOcQAAAAABJRU5ErkJggg==",
-  "base64",
-);
-const cors = { "access-control-allow-origin": "*" };
 const KEY = "counterlock.web.account";
-const FARGO = 400239835;
 const OTHER = 100000000;
 const names: Record<number, string> = {
   [FARGO]: "Fargo Fixture",
   [OTHER]: "Other Persona",
   777: "Farquhar Fixture",
 };
-const heroStats = catalog.heroes.map((hero, index) => {
-  const matches = 20000;
-  const wins = matches * (0.4 + index * 0.005);
-  return {
-    hero_id: hero.id,
-    wins,
-    losses: matches - wins,
-    matches,
-    total_kills: 8 * matches,
-    total_deaths: 5 * matches,
-    total_assists: 10 * matches,
-  };
-});
 const profile = (id: number) => ({
   account_id: id,
   personaname: names[id],
   avatarmedium: "https://api.deadlock-api.com/v1/assets/avatar.png",
 });
-const historyRow = (matchId: number, won: boolean) => ({
-  account_id: FARGO,
-  match_id: matchId,
-  hero_id: catalog.heroes[0].id,
-  hero_level: 20,
-  start_time: Math.floor(Date.now() / 1000) - 3600,
-  game_mode: 1,
-  match_mode: 4,
-  player_team: 0,
-  player_kills: 10,
-  player_deaths: 5,
-  player_assists: 7,
-  denies: 3,
-  last_hits: 120,
-  net_worth: 30000,
-  match_duration_s: 1800,
-  match_result: won ? 0 : 1,
-});
-
 interface Mocks {
   search?: (term: string) => unknown | Promise<unknown>;
   searchStatus?: number;
