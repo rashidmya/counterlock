@@ -1,0 +1,513 @@
+# Counterlock redesign: design
+
+Date: 2026-10-21
+Status: draft for approval
+
+## Intent
+
+Counterlock works, but it looks like a spreadsheet: small 13px text, muted
+panels and tables, almost no game art. The owner compared it with other
+Deadlock trackers (tracklock.gg, lockbuilds.com, deadlocklab.com). His
+reaction: **"theirs look like they belong to the game."** This redesign
+gives Counterlock character so it feels like part of Deadlock. It applies to
+the **desktop app, the website and the in-game overlays**, and changes the
+**look, the layout and the navigation**.
+
+It also reshapes the app around how the owner actually uses it:
+
+- **Before a game:** check the **tier list** for strong heroes, then open
+  your hero and look at **builds**: a main build, a few popular builds to
+  compare, and items to mix in against the enemy team.
+- **After a game:** see **how that game went** (timeline, best and worst
+  stretches, souls/min against players at your rank, impact), and whether
+  you're **improving** over time.
+- **During a game:** glance at your **performance** in the overlays, not at
+  builds.
+
+Success: opening Counterlock feels like opening something from Deadlock's
+world. Before a game, you can get from the tier list to your hero's build in
+two clicks. After a game, you can see at a glance where you were ahead of or
+behind players at your rank, and why.
+
+## Goals
+
+1. A new visual language, **"Deadlock noir"**, applied to every page and
+   window (details below).
+2. New navigation: **Home · Live · Heroes · Items** in the desktop app and
+   **Home · Heroes · Items** on the website. Player search moves into Home.
+3. A hero page that leads with **builds**: main build, popular builds as
+   their authors laid them out, then counter items.
+4. A **match report** for any match, with a souls timeline against the
+   average player on that hero at that rank.
+5. A **Performance** profile tab showing trends across recent games against
+   the average at the player's rank.
+6. A **Live** profile tab, in the app and on the website, showing a
+   player's current match when one can be found.
+7. **Five in-game overlay panels** to replace the current build and counter
+   overlays.
+
+## Non-goals
+
+- Reading Deadlock's process memory, or any other unofficial live data
+  source. The owner decided against it: VAC ban risk, and it breaks Overwolf
+  rules.
+- The live **spectator-broadcast** data feed (`/v1/matches/demo/live/query`)
+  for the overlays. The owner chose to ship with Overwolf's data only. It
+  could come later.
+- **Last hits** and **permanent buffs** in the overlays. Overwolf doesn't
+  send them live. They go in the match report instead.
+- A **Mid Boss respawn timer**. Overwolf has no event for when the boss
+  dies, and the owner chose to drop it rather than use a manual hotkey.
+- A light theme or theme switcher.
+- User accounts, "Sign in with Steam", a backend or a server-side API proxy
+  (same as the web-version design).
+
+## Anti-goals
+
+- **Copying another tracker's look.** The owner chose a look based on
+  Deadlock's own art (option C) over the lockbuilds-like and tracklock-like
+  options. Borrow only the specific A elements listed below.
+- **Boxy three-number stat rows on hero cards.** The owner tried them
+  (blend option 1) and preferred the original C card with one quiet stat
+  line.
+- **Trimming or regrouping popular builds** into early/mid/late or 24
+  items. Show them exactly as authored.
+- **Saying "Not in a game"** when the truth is "we couldn't find a live
+  match" (see the profile Live tab).
+- Carried over from earlier designs, still in force:
+  - no chips or pills for hero tags;
+  - no fake or demo data in production;
+  - never match players by nickname;
+  - one shared copy of the feature code for app and website, never a fork;
+  - derived numbers (tiers, counter items, "vs average") are labelled with
+    how they're derived, in one line.
+
+## Constraints (from the existing project)
+
+- React 19 + TypeScript + Vite. The Overwolf app is in `src/` (multi-page
+  Vite, no router). The website is in `web/` (React Router v8 framework
+  mode, `ssr: false` + `prerender`, static hosting). The website reuses
+  feature components from `src/features/*` through the `@/` alias and the
+  `LinkProvider` / `RouteLink` seam in `src/app/links.tsx`. Keep that seam.
+- Styling is plain global CSS composed in `src/app/styles/index.css`
+  (import order matters), plus `web/app/styles/web.css` and `phone.css`.
+  There's no CSS-variable token system yet: hex values are hardcoded across
+  files.
+- Desktop window: default 1260×900, minimum 850×650 (`public/manifest.json`).
+  The website supports phone widths (≤640px) and must keep doing so.
+- Data comes from the Deadlock API (`https://api.deadlock-api.com`, no key).
+  Analytics endpoints share **200 req/min per IP**. Reuse the shared client
+  in `src/shared/api/DeadlockApi.ts` (cache, timeout, `Retry-After`).
+- Live in-game data comes **only** from Overwolf GEP for Deadlock (checked
+  2026-10-21, https://dev.overwolf.com/ow-native/live-game-data-gep/supported-games/deadlock/):
+  - `roster`: per player: hero, team, level, kills, deaths, assists,
+    `hero_damage`, `object_damage`, `hero_healing`, `souls`, health,
+    assigned lane, `is_local`;
+  - `items`;
+  - `incoming_damage`: only while the in-game damage panel is open;
+  - `team_score`, `match_id`;
+  - events: `match_start`, `match_end`, `kill`, `death`, `assist`,
+    `match_clock` (every second), `game_paused`, `tower_destroyed`.
+
+  There is no last-hits, buff or Mid Boss data. Check the Overwolf docs
+  again before building anything that touches them (existing owner rule).
+- Use real game art and icons wherever possible (existing owner rule).
+  Hero art comes from the asset CDN, e.g.
+  `…/images/heroes/haze_card.webp` (portrait bust) and
+  `…/images/heroes/backgrounds/haze_bg.webp` (painted brush-stroke banner);
+  both URLs are in `catalog.json` as `cardImage` and `backgroundImage`.
+- `tsc` rejects unused locals. Existing unit and Playwright tests must pass,
+  updated where structure changes.
+
+## Decisions
+
+**Owner decided:**
+
+- Visual direction **C, "Deadlock noir"**, plus two elements from A
+  ("street poster"): the **slanted red ribbon** and the **bold uppercase
+  section headers**. Hero cards stay exactly as in C.
+- Scope: desktop app, website and overlays; look, layout and navigation.
+- Navigation: desktop **Home · Live · Heroes · Items**; web
+  **Home · Heroes · Items**. Live keeps its own tab (app only). Items keeps
+  its own tab. Player lookup moves into Home.
+- Profile tabs: **Overview · Matches · Performance · Heroes · Live**
+  ("Performance", not "Improvement").
+- Profile **Live tab on the website too**, so you can check what someone is
+  playing.
+- Hero page: **main build** with Early 0–10 min, Mid 10–20 min and Late
+  20+ min, **8 items each**. Then **popular builds shown as authored**:
+  every category with its author's name and all of its items. Then
+  **counter items** against the enemy heroes. In the app, the enemy heroes
+  are read from the match being loaded into.
+- Match report benchmark: **average player on that hero at my rank**.
+- Performance tab: K/D/A, souls, impact, hero damage, objective damage and
+  anything else the data offers, each against the average at the player's
+  rank.
+- Overlays: replace the build and counter overlays with **five separate,
+  individually movable panels**: hero damage, objective damage, healing,
+  you vs. average, and spawn timers.
+- Overlay "you vs. average" stats: souls/min, K/D/A, level and kill
+  participation, each with ▲ or ▼.
+- Delivery: one design (this document), then build in six phases in the
+  order below.
+
+**My calls** (marked so the owner can check them):
+
+- Fonts: **Playfair Display SC** (page titles, hero names, tier letters),
+  **Rajdhani** (uppercase section headers, nav labels, ribbons, stat
+  labels and numbers), **DM Sans** (body). Body size goes up from 13px to
+  14px.
+- On the website, the **counter items** section lets you pick enemy heroes
+  yourself. In the desktop app it also lets you pick when you're not in a
+  match.
+- Profile Live tab empty state: **"No live match found"**, plus one line
+  explaining that live matches for other players are only visible when the
+  game lists them (top ~200 matches). For your own account in the desktop
+  app, use the real GEP state: in a match, or "Not in a game".
+- The rank band for "average at my rank" is the player's **rank tier**
+  (all six sub-ranks), taken from the match's `ranked_display_badge` or the
+  player's current rank. The builder may narrow or widen it if the sample
+  is too thin.
+- Popular builds prefer **English-language** builds (the API returns many
+  Chinese builds). The builder can offer a language toggle.
+- After a match ends in the desktop app, the newest match appears at the
+  top of Home and Overview with an "Open match report" link. The app
+  doesn't switch tabs automatically.
+
+## Visual language: "Deadlock noir"
+
+Reference mockups are local and not committed. They're in
+`.superpowers/brainstorm/2237531-1792527688/content/`:
+
+- `visual-direction.html`: option **C** is the approved look;
+- `blend.html`: option 1's ribbon and section headers are the approved
+  borrowings, its stat row is rejected;
+- `navigation-today.html`;
+- `overlay.html`: superseded by the five-panel decision.
+
+**Tokens.** Introduce CSS custom properties in one file (e.g.
+`src/app/styles/tokens.css`, imported first) and replace hardcoded hexes as
+each page is restyled. Starting palette (builder may tune):
+
+| Token | Value | Use |
+|---|---|---|
+| ink | `#0c0b0a` | page background |
+| surface / surface-2 | `#12100e` / `#171512` | header, cards, panels |
+| line / line-soft | `#3a3226` / `#2a241c` | borders, dividers |
+| cream | `#ece0c4` | primary text |
+| muted / dim | `#a89d86` / `#7d7462` | secondary text |
+| gold | `#d9a441` | accent, active nav, section bars, links |
+| tier-gold | `#f2c66d` | tier letters |
+| poster-red | `#c8432f` | ribbon, LIVE badge |
+| good / bad | `#7fd39a` / `#e07a5f` | win rate, ▲ / ▼ |
+| ally / enemy | `#5a8f9c` / `#9c5a4a` | team colours in meters and scoreboards |
+
+**Texture.** A very faint horizontal scan-line overlay on page backgrounds,
+about 1.5% white, every 4px.
+
+**Components**
+
+- **Hero card** (as mockup C):
+  - a tall card, with the hero's `backgroundImage` brush stroke behind the
+    `cardImage` portrait;
+  - a large serif gold tier letter top-left;
+  - the name in serif small caps over a dark gradient at the bottom;
+  - one quiet stat line: win rate (green) · pick rate.
+- **Page title:** large Playfair Display SC, with an optional **slanted red
+  ribbon** under it (Rajdhani, uppercase, rotated about −2°, hard black
+  shadow), e.g. "Tier list · last 30 days".
+- **Section header** (from A): a gold left bar, uppercase Rajdhani title, a
+  thin cream-to-transparent rule, and an optional gold "ALL HEROES →" link
+  on the right.
+- **Stat label/value:** Rajdhani uppercase label in muted, Rajdhani bold
+  value in cream; green or red only for good or bad.
+- **Panels and tables:** surface background, `line` borders, square or
+  barely rounded corners (≤4px). Tables keep their data density but use the
+  new type and colours.
+- **Rank badges, item icons and ability icons:** real game art, as today.
+
+Small surfaces (phone layouts, overlays, compact rows) may drop the
+background brush art and keep the portrait. The builder decides where.
+
+## Navigation and shell
+
+- **Header:** the "Counterlock" wordmark in Playfair Display SC (with
+  "lock" in gold), then the nav links in uppercase Rajdhani (active link
+  cream with a gold underline), then **My profile** on the right: avatar
+  plus name once the app knows the user, otherwise a prompt to find your
+  account.
+  - Desktop app only: the header keeps the window drag handle, settings and
+    close buttons. While in a match, a red **LIVE** badge appears next to
+    the Live tab.
+- **Desktop tabs:** Home · Live · Heroes · Items. Player lookup is removed
+  as a tab; its job moves to Home's search. Live behaviour is unchanged:
+  auto-switch when a match loads, green or red dot while in a match, and
+  the not-running / waiting states (restyled).
+- **Web tabs:** Home · Heroes · Items (unchanged set).
+- **Footer:** restyled. Keep the attribution, catalog date and data-source
+  link.
+- Remove the "TOGGLE OVERLAY" hotkey hint from the nav. Show it in overlay
+  settings instead (my call).
+
+## Pages
+
+### Home
+
+- **Search at the top:** one large box to find any player by Steam name,
+  SteamID64, account ID, `[U:1:n]` or profile URL. Reuse
+  `web/app/SteamSearch.tsx` / `useSteamSearch.ts` in both the app and the
+  website; this replaces `PlayerLookup`.
+- **Below it:**
+  - when the app knows who you are: your profile summary and your **latest
+    match**, with a link to its match report;
+  - always: the "top heroes right now" strip of hero cards.
+
+  Exact composition is left to the builder (my guess at the layout, not
+  owner-approved detail).
+- **Profile is its own page, not Home** (my call, in both the app and the
+  website). Home is the search page plus the summary above. The full
+  five-tab profile opens from **My profile** in the header, from a search
+  result, or from any player link.
+  - Website: the profile stays at `/players/:accountId`. `/` **no longer
+    redirects** to the remembered player; it shows the remembered player's
+    summary instead. "Remember me" and "Switch account" stay, on the
+    profile header and on the Home summary.
+  - Desktop app: the profile is a page reached through those links (no
+    tab of its own), with an "← Back" link, the same way hero and item
+    detail work today. Today's Home-is-profile behaviour and the auto-detect
+    account flow move to "My profile".
+  - Update the web Playwright tests that expect the redirect.
+
+### Heroes (tier list)
+
+- The page title is "The Heroes" with the ribbon "Tier list · last 30
+  days". Hero cards are grouped by tier S to D, keeping the existing role
+  filter, sort and rank filter, restyled.
+- Clicking a hero opens the hero page.
+
+### Hero page
+
+Top to bottom:
+
+1. **Header:** large hero art (portrait over brush background), name, tier,
+   win rate and pick rate, with the rank filter.
+2. **Main build:** three rows labelled **Early (0–10 min)**, **Mid (10–20
+   min)** and **Late (20+ min)**, with **8 items each**. This is a **new
+   data source** (my call). Today's `BuildPanel` / `useMeasuredBuild` shows
+   one community build as authored, which is what popular builds now do,
+   and the unused `recommendedBuild()` splits by item cost from the static
+   catalog.
+   - Call `GET /v1/analytics/item-stats?hero_id=…&min_bought_at_s=…&max_bought_at_s=…`
+     with the page's rank filter (`min_average_badge` / `max_average_badge`)
+     once per phase: 0–600s, 600–1200s and 1200s onwards (verified: the
+     endpoint supports these filters).
+   - Take the **8 most-bought items** per phase, ordered by
+     `avg_buy_time_s`.
+   - Drop items already listed in an earlier phase, and don't list an item
+     next to its own upgrade in the same phase.
+   - Label it in one line, e.g. "Most-bought items in each phase · your
+     rank filter · last 30 days".
+   - When a phase has fewer than 8 items, show what exists and say why.
+   - The **Live tab's build panel uses the same logic**, so the two never
+     disagree.
+3. **Popular builds:** a short list of the hero's most popular community
+   builds, one at a time (tabs or a carousel; builder's call).
+   - Source: `GET /v1/builds?hero_id=…&only_latest=true&sort_by=…`. Each
+     build's `hero_build.details.mod_categories` is an array of
+     author-named categories, each with any number of items.
+   - Render **every category with its author's name and every item, in the
+     author's order.** Show the build name, author and last-updated date.
+   - Pick a popularity sort the API supports, e.g. favourites or weekly
+     favourites (builder checks the `sort_by` options).
+4. **Counter items:** items to mix in against the enemy team, for the hero
+   you're playing. This is **data-driven** (my call), using
+   `GET /v1/analytics/item-stats?hero_id=<this hero>&enemy_hero_ids=<picked>`
+   with the rank filter (the API describes this as "what items beat
+   hero(es) X").
+   - Rank items by win rate, with a minimum-matches threshold, and leave
+     out items already in the main build.
+   - Show them as cards (reuse the "Consider first" card style). Each card
+     says which picked enemies it does well against.
+   - Label it in one line, e.g. "Highest win rate for Haze players when
+     these heroes are on the enemy team".
+   - Where data is thin, fall back to the existing rules-based reasons in
+     `src/features/counters/`, labelled as such.
+   - Desktop app in a match: the enemy heroes come from the GEP roster.
+   - Otherwise: pick up to 6 enemy heroes from a portrait picker.
+5. **The rest of today's hero detail,** restyled: abilities, skill order,
+   strong against, countered by, best with and best items.
+   - Today's `HeroBuild` section is removed; the main build and popular
+     builds replace it.
+   - Today's data-driven "Counter items" section answers a different
+     question ("what beats *this* hero?"). It stays, renamed to "Items
+     that beat <Hero>" so it isn't confused with section 4 (my call).
+
+### Items
+
+The same browser as today (search, Weapon/Vitality/Spirit filter, sort,
+rank filter, item detail), restyled in the noir language. No functional
+change.
+
+### Profile
+
+Header: avatar, name, rank badge, the existing "This is me / Switch account"
+control on the web, with a hero-art banner from the most-played hero (my
+call). Tabs: **Overview · Matches · Performance · Heroes · Live**.
+
+- **Overview:** today's overview, restyled, plus the latest-match card.
+- **Matches:** today's match history list, restyled. Each row opens the
+  **match report**.
+- **Performance:** see below. It replaces today's Performance tab content
+  and may keep any of today's charts that still fit.
+- **Heroes:** today's per-hero table, restyled.
+- **Live:** see below.
+
+### Match report
+
+Opened from any match row, for any player. Data comes from
+`GET /v1/matches/{id}/metadata` (cached/S3 limits are generous; it's
+already used by `MatchDetail`). The metadata includes:
+
+- per-player `stats` snapshots: souls (`net_worth`), damage, healing,
+  kills, creep kills and more, recorded every 180s up to 15 min, then
+  every 300s;
+- `death_details` (time, killer, position);
+- `items` with purchase times;
+- `objectives` and `mid_boss` with times;
+- `accolades`, `mvp_rank`, `last_hits`, `power_up_buffs`.
+
+The benchmark is
+`GET /v1/analytics/player-performance-curve?hero_ids=…&min_average_badge=…&max_average_badge=…`.
+It returns the average and standard deviation per time step for net worth,
+K/D/A, damage, healing and more.
+
+Sections:
+
+1. **Banner:** win or loss, hero art, K/D/A, souls/min, MVP placing and
+   duration.
+2. **Souls timeline:** your souls over time against the rank-average line,
+   with a ±1 standard deviation band. Deaths, item purchases and objectives
+   (towers, walkers, Mid Boss) are marked along the time axis.
+3. **Verdicts:** souls/min as "+12% vs average Haze at Emissary". The same
+   style applies to damage and healing where the curve supports it.
+4. **Best and worst stretches:** two or three short sentences generated
+   from where the player's curve crosses or leaves the band, plus clusters
+   of deaths. For example: "Strongest 10–20 min. Fell behind after 25 min.
+   3 deaths between 27:00 and 31:00." Rule-based, never invented.
+5. **Impact:** the player's share of the team's hero damage, objective
+   damage, healing and kills plus assists (kill participation).
+6. **Last hits and permanent buffs** (`last_hits`, `power_up_buffs`), with
+   a rank average where available.
+7. **Scoreboard:** today's `MatchDetail` scoreboard, restyled.
+
+### Performance tab
+
+- Covers recent games over a selectable range (keep today's range filter
+  idea). Metrics include K/D/A, souls/min, hero damage per minute,
+  objective damage per minute, healing per minute, kill participation, last
+  hits and impact share. Add anything else the metadata supports; that
+  choice is left to the builder.
+- Each metric gets a trend line across games against the average at the
+  player's rank for that hero. A summary marks it as improving, flat or
+  slipping (▲ / – / ▼).
+- **Data:** `/v1/players/{id}/match-history` provides K/D/A, `net_worth`,
+  `last_hits`, duration and `ranked_display_badge` per match. Damage and
+  healing need per-match metadata, so fetch metadata for the games in range
+  and cache it. The builder decides the default range and how to batch
+  requests within limits.
+
+### Profile Live tab (app and website)
+
+- **Your own account, in the desktop app:** use GEP. In a match, show the
+  live match: today's `MatchOverview` content, restyled. Otherwise show
+  "Not in a game".
+- **Any other case** (other players, or the website): use
+  `GET /v1/matches/active`. It returns about the top 150–200 matches from
+  the in-game Watch list, each with players (account, hero, team), team
+  net worth, duration, objectives and spectator count. If the account is in
+  one, show both teams' heroes, the net-worth lead, duration and the
+  objectives state. If not, show **"No live match found"** and the one-line
+  explanation.
+- Refresh while the tab is open (e.g. every 30–60s; builder's call).
+
+### Live tab (desktop app)
+
+Same behaviour and content as today (states, rosters, ranks, build panel,
+counter panel), restyled. Builds and counters stay here and on the hero
+page; they are only removed from the overlays.
+
+## In-game overlays
+
+Replace `CompactBuild` / `CompactCounters` and the `in_game` /
+`counter_overlay` windows with **five separate overlay windows**. Each one
+can be **moved independently** and **turned on or off** in overlay
+settings. They share the existing show/hide hotkey and opacity setting.
+Positions persist between sessions.
+
+1. **Hero damage:** bars for all 12 players, from the GEP roster's
+   `hero_damage`.
+2. **Objective damage:** the same, from `object_damage`.
+3. **Healing:** the same, from `hero_healing`.
+
+   In all three meters: your team in `ally`, enemies in `enemy`, you in
+   `gold`, a hero portrait per bar, sorted by value.
+4. **You vs. average:** souls/min, K/D/A, level and kill participation,
+   each with ▲ or ▼ against the rank-average curve for your hero at the
+   current match minute.
+   - Souls/min = roster `souls` ÷ match clock. Check whether roster `souls`
+     is current unspent souls or total net worth; the benchmark must
+     compare like with like.
+   - Kill participation = (your kills + assists) ÷ team kills, summed from
+     the roster.
+   - Fetch the benchmark once per match (hero + rank band) and interpolate
+     between time steps.
+5. **Spawn timers:** countdowns for things that spawn on a **fixed
+   schedule**, computed from GEP `match_clock` and paused on
+   `game_paused`. Which timers, and their times, must be confirmed against
+   the current Deadlock patch during the build. No Mid Boss respawn timer.
+
+Style: compact noir panels, ink background at the user's opacity setting,
+Rajdhani numbers and labels, small serif wordmark or none. They must stay
+readable over gameplay. The builder decides the default positions and
+sizes. Manifest changes (new windows) must follow the Overwolf docs.
+
+## Delivery phases
+
+Build and ship in this order. Each phase gets its own plan.
+
+1. **New look + navigation:** tokens, fonts, texture, components, shell,
+   new tabs, Home search (replacing Player lookup), and restyling of every
+   existing page and state, in the app and on the website (including phone
+   layouts). No new data features.
+2. **Hero page builds:** main build moved and restyled, popular builds as
+   authored, counter items with enemy picker / live roster.
+3. **Match report.**
+4. **Performance tab.**
+5. **Profile Live tab** (app + web).
+6. **Overlay panels** (five windows, settings, removal of the old
+   overlays).
+
+## Left to the builder
+
+- Exact sizes, spacing and breakpoints, and token tuning, as long as the
+  approved look holds.
+- Home composition below the search box.
+- Popular-builds UI pattern (tabs or carousel), how many builds to show,
+  sort, and language handling.
+- The default Performance range, metric order, and how metadata requests
+  are batched.
+- Default overlay positions and sizes.
+- Where small surfaces drop the brush-stroke art.
+
+## Risks and things to verify during the build
+
+- **Overwolf data is untested on Windows** (README). In particular, check
+  whether GEP `roster` updates every player's damage/healing often enough
+  for live meters, and what `souls` means.
+- **The spawn-timer schedule** depends on the patch.
+- **`/v1/matches/active` covers only top matches,** so most profiles will
+  show "No live match found".
+- **The rank-average curve** may be thin for rare heroes at extreme ranks.
+  Widen the badge range and say so when that happens.
+- **New fonts** must load in Overwolf's CEF (bundle them locally rather
+  than rely on Google Fonts if needed).
