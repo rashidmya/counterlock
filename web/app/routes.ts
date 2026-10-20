@@ -8,5 +8,7 @@ export default [
   route("items", "routes/items.tsx"),
   route("items/:slug", "routes/item.tsx"),
   route("about", "routes/about.tsx"),
+  route("sitemap.xml", "routes/sitemap.ts"),
+  route("robots.txt", "routes/robots.ts"),
   route("*", "routes/not-found.tsx"),
 ] satisfies RouteConfig;

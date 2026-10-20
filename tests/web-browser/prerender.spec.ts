@@ -55,3 +55,25 @@ test("one page per catalog hero and item, including special-character names", ()
   expect(existsSync(join(client, "heroes/mo-krill/index.html"))).toBe(true);
   expect(existsSync(join(client, "heroes/the-doorman/index.html"))).toBe(true);
 });
+
+test("sitemap lists static, hero and item pages but no player pages", () => {
+  const xml = read("sitemap.xml");
+  expect(xml).toContain("<loc>https://counterlock.example/heroes/haze</loc>");
+  expect(xml).toContain("<loc>https://counterlock.example/about</loc>");
+  expect(xml).not.toContain("/players/");
+  expect(xml.match(/<loc>/g)).toHaveLength(
+    4 + catalog.heroes.length + catalog.items.length,
+  );
+});
+
+test("robots.txt points at the sitemap", () => {
+  expect(read("robots.txt")).toContain(
+    "Sitemap: https://counterlock.example/sitemap.xml",
+  );
+});
+
+test("about page is pre-rendered with its title and privacy copy", () => {
+  const html = read("about/index.html");
+  expect(head(html)).toContain("<title>About | Counterlock</title>");
+  expect(body(html)).toContain("localStorage");
+});

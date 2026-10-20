@@ -149,3 +149,25 @@
   margin: -4px 0 12px;
   color: #dfc48c;
 }
+
+.web-about {
+  display: grid;
+  gap: 12px;
+  max-width: 680px;
+  padding: 32px 30px;
+}
+.web-about h1,
+.web-about h2,
+.web-about p {
+  margin: 0;
+}
+.web-about h2 {
+  margin-top: 10px;
+  font-size: 18px;
+}
+.web-about p {
+  line-height: 1.6;
+}
+.web-about a {
+  color: #dfc48c;
+}

@@ -52,3 +52,16 @@ test("unknown URLs return 404 and render the not-found page", async ({
     page.getByRole("link", { name: "Back to Counterlock" }),
   ).toHaveAttribute("href", "/");
 });
+
+test("about page covers attribution and privacy", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("footer").getByRole("link", { name: "About" }).click();
+  await expect(page).toHaveURL(/\/about$/);
+  await expect(page).toHaveTitle("About | Counterlock");
+  const main = page.locator("main");
+  await expect(main.getByRole("heading", { name: "About" })).toBeVisible();
+  await expect(main).toContainText("not affiliated with Valve");
+  await expect(main).toContainText("localStorage");
+  await expect(main).toContainText("Switch account");
+  await expect(main).toContainText("Google Fonts");
+});
