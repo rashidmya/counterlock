@@ -8,7 +8,7 @@ This is a working development prototype. The browser UI, API handling and simula
 
 ## Try the browser preview
 
-Requires Node.js 22.12+ or 24+.
+Requires Node.js 22.22+ (the Overwolf app alone needs 22.12+, but the website's React Router 8.5 needs 22.22+, and `package.json` enforces it with `engines`).
 
 ```sh
 npm ci
@@ -65,6 +65,37 @@ The separate catalog phase-recommendation utility remains available under `featu
 
 Home and the hero and item pages use Deadlock API aggregates, so figures reflect community data for the filters shown, not a complete record. Hero tiers are relative to the current win-rate distribution, not an official ranking. Each hero detail view makes several analytics requests and the Deadlock API limits analytics to 200 requests per minute per IP, so very rapid browsing can hit the cooldown.
 
+## Website
+
+Counterlock also builds as a public static website: Home (profile), Heroes and Items, with real URLs, pre-rendered hero and item pages and share previews. It has no **Live** page, overlay, hotkeys or **Player lookup** tab; on the web, Home searches for a Steam account by name or ID instead. It lives in `web/` (React Router v8 framework mode on Vite, `ssr: false` with `prerender`) and reuses the feature code in `src/`, so the Overwolf app is unaffected.
+
+```sh
+npm run web:dev        # dev server
+npm run web:build      # static site into web/build/client
+npm run web:preview    # serve the build on http://localhost:5187
+npm run web:typecheck  # typegen + tsc for web/
+npm run test:web       # browser tests against the built site
+```
+
+`web:build` pre-renders `/`, `/heroes`, `/items`, `/about`, every hero and item page, `sitemap.xml` and `robots.txt`. Pre-rendered HTML holds catalog facts only; statistics load in the browser. Player profiles (`/players/:accountId`) are not pre-rendered and render in the browser. After the build, `web/scripts/postbuild.mjs` writes `_redirects` and `404.html` into the output.
+
+Set `VITE_SITE_URL` (for example `https://counterlock.example`, no trailing slash) at build time. It is the absolute origin used for canonical links, Open Graph tags, the sitemap and `robots.txt`; it defaults to `https://counterlock.example`.
+
+### Deploy to Cloudflare Pages
+
+| Setting          | Value                                                      |
+| ---------------- | ---------------------------------------------------------- |
+| Build command    | `npm run web:build`                                        |
+| Output directory | `web/build/client`                                         |
+| `NODE_VERSION`   | `22.22.0` or newer (React Router 8.5 requires Node 22.22+) |
+| `VITE_SITE_URL`  | the site's public origin                                   |
+
+The only host-specific piece is the fallback for non-pre-rendered routes. The build writes `_redirects` with `/players/* /__spa-fallback.html 200`, which Cloudflare Pages and Netlify both read. For other hosts, configure the same two behaviours: serve `/__spa-fallback.html` with status 200 for `/players/*`, and serve `404.html` (a copy of the same shell, which renders the site's not-found page) with status 404 for unknown paths. Static files, including the pre-rendered `index.html` files, are served as they are.
+
+### Website privacy
+
+The website has no backend, analytics or cookies. The remembered Steam account is stored only in the visitor's browser, in `localStorage` under `counterlock.web.account`; **Switch account** clears it. Search text and public player IDs are sent to Deadlock API to fetch statistics. Hero portraits, rank images and fonts load from their providers, so those providers also see the visitor's request. The `/about` page and the footer on every page say so.
+
 ## Maintain the catalog and rules
 
 ```sh
@@ -110,8 +141,11 @@ Before a public release, test in Windows with a live match: game startup and shu
 | `src/shared/catalog/`                             | Typed catalog access (heroes, roles, abilities, items), metadata types and the dated JSON snapshot |
 | `src/shared/ui/`                                  | Reusable icons, images, item artwork and overlay item tiles                                        |
 | `src/background/`, `src/desktop/`, `src/in_game/` | Stable HTML and minimal TypeScript entrypoints used by the manifest                                |
+| `web/`                                            | Website: React Router app, routes, SEO, phone styles, static-host scripts; reuses `src/` features  |
 | `tests/`                                          | Unit suites grouped by feature, browser integration tests, and demo fixtures                       |
 | `public/`                                         | Manifest, app icons and bundled item artwork                                                       |
+
+Seams shared by the Overwolf app and the website: `src/app/links.tsx` (navigation and real links each app supplies), `src/shared/ui/assets.ts` (asset URLs that work at any URL depth), `src/shared/catalog/slugs.ts` (hero and item URL slugs) and `ProfileView` in `src/features/profile/` (the profile UI, given an account by either app).
 
 Use `@/` imports across feature boundaries and relative imports within a feature. The alias is configured consistently in TypeScript, Vite and Vitest. Types belong to the feature that owns them; shared code must not depend on app composition. Keep Overwolf lifecycle operations in the platform layer and leave game parsing and recommendation calculations independent of React.
 
