@@ -326,7 +326,7 @@ export function useDesktopMe(): MeAdapter & { account: ProfileAccount | null } /
 **Behaviour:**
 - `HomeView` top: `PageTitle` eyebrow "Deadlock stats & builds", title "Know the match.", ribbon "Make your move"; `PlayerSearch` (label "Find a player"); faint hero brush art behind the top area (decorative, `aria-hidden`).
 - "You" section (`SectionHeader` "You", action "My profile →" when known): `YouCard` when `me.meId`; otherwise a line "Search for your Steam account above, open it and press This is me."
-- "Top of the city" section (`SectionHeader` "Top of the city", action "Tier list →" to `{ page: "tierlist" }`): `HeroGrid variant="tier"` of the 6 best heroes by `position` from `fetchHeroSummaries({ minBadge: 0 })`; loading/error lines as today ("Loading…", "Hero stats are unavailable right now.").
+- "Top of the city" section (`section.home-top`, `SectionHeader` "Top of the city", action "Tier list →" to `{ page: "tierlist" }`): `HeroGrid variant="tier"` of the 6 best heroes by `position` from `fetchHeroSummaries({ minBadge: 0 })`; loading/error lines as today ("Loading…", "Hero stats are unavailable right now.").
 - Desktop Home = `HomeView` with `useDesktopMe()`; no `onPick`. Web Home = `HomeView` with `useRememberedMe()` and `onPick = (id) => { if (readRemembered() === null) writeRemembered(id) }`; **no redirect** to the remembered player; `PageMeta` unchanged.
 - Desktop tabs: Home · Live · Tier list · Heroes · Items.
 
