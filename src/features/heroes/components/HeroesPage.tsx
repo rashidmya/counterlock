@@ -33,11 +33,13 @@ export function HeroesPage({
   navigate,
   query,
   setQuery,
+  catalogWhileLoading = false,
 }: {
   route: Route;
   navigate: Navigate;
   query: AnalyticsQuery;
   setQuery(query: AnalyticsQuery): void;
+  catalogWhileLoading?: boolean;
 }) {
   const [role, setRole] = useState<RoleFilter>("all");
   const [sort, setSort] = useState<SortMode>("tier");
@@ -134,6 +136,11 @@ export function HeroesPage({
               Retry
             </button>
           </p>
+        )}
+        {summaries.loading && catalogWhileLoading && (
+          <div className="hero-group">
+            <HeroGrid cards={sortRows(cards, "name", "asc")} />
+          </div>
         )}
         {!summaries.loading &&
           groups.map((group) => (

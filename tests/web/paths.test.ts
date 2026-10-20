@@ -20,6 +20,11 @@ describe("web paths", () => {
     expect(routeToPath({ page: "lookup" })).toBe("/");
   });
 
+  it("sends an unknown hero or item to its list", () => {
+    expect(routeToPath({ page: "heroes", heroId: -1 })).toBe("/heroes");
+    expect(routeToPath({ page: "items", itemId: -1 })).toBe("/items");
+  });
+
   it("builds player paths", () => {
     expect(playerPath(42)).toBe("/players/42");
   });

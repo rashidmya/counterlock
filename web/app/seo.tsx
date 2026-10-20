@@ -6,6 +6,7 @@ export const SITE_URL: string = (
 ).replace(/\/+$/, "");
 
 const SITE_NAME = "Counterlock";
+const DEFAULT_IMAGE = `${SITE_URL}/icon.png`;
 const MAX_DESCRIPTION = 160;
 
 export interface PageMetaInput {
@@ -26,7 +27,7 @@ export function metaTags({
   title,
   description,
   path,
-  image,
+  image = DEFAULT_IMAGE,
   type = "website",
 }: PageMetaInput): { title: string; tags: MetaTag[]; canonical: string } {
   const canonical = SITE_URL + path;
@@ -38,16 +39,16 @@ export function metaTags({
     { property: "og:type", content: type },
     { property: "og:site_name", content: SITE_NAME },
   ];
-  if (image) tags.push({ property: "og:image", content: image });
   tags.push(
+    { property: "og:image", content: image },
     {
       name: "twitter:card",
-      content: image ? "summary_large_image" : "summary",
+      content: image === DEFAULT_IMAGE ? "summary" : "summary_large_image",
     },
     { name: "twitter:title", content: title },
     { name: "twitter:description", content: description },
+    { name: "twitter:image", content: image },
   );
-  if (image) tags.push({ name: "twitter:image", content: image });
   return { title, tags, canonical };
 }
 
@@ -102,7 +103,10 @@ export function itemMetaInput(itemId: number): PageMetaInput {
   return {
     title: `${item.name} — stats, builds & win rate | ${SITE_NAME}`,
     description: limit(
-      `${item.name} — ${capitalise(item.category)} item, ${item.cost} souls. ${detail}`,
+      `${item.name} — ${capitalise(item.category)} item, ${item.cost.toLocaleString("en-US")} souls. ${detail}`.replace(
+        /\s+([.,;:!?])/g,
+        "$1",
+      ),
     ),
     path: routeToPath({ page: "items", itemId }),
     image: item.image,

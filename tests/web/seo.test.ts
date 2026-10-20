@@ -76,7 +76,7 @@ describe("item metadata", () => {
   });
 
   it("describes name, category, cost and description", () => {
-    expect(input.description).toContain("Leech — Vitality item, 6400 souls.");
+    expect(input.description).toContain("Leech — Vitality item, 6,400 souls.");
     expect(input.description).toContain("Reduces the effect");
     expect(input.description.length).toBeLessThanOrEqual(160);
   });
@@ -85,7 +85,7 @@ describe("item metadata", () => {
     const bare = item("Monster Rounds");
     expect(bare.description).toBe("");
     expect(itemMetaInput(bare.id).description).toBe(
-      `Monster Rounds — Weapon item, ${bare.cost} souls. ${bare.stats![0].label} ${bare.stats![0].value}, ${bare.stats![1].label} ${bare.stats![1].value}`,
+      `Monster Rounds — Weapon item, ${bare.cost.toLocaleString("en-US")} souls. ${bare.stats![0].label} ${bare.stats![0].value}, ${bare.stats![1].label} ${bare.stats![1].value}`,
     );
   });
 
@@ -100,6 +100,11 @@ describe("item metadata", () => {
     expect(description).toMatch(/\S…$/);
   });
 
+  it("has no space before punctuation for any item", () => {
+    for (const i of catalog.items)
+      expect(itemMetaInput(i.id).description).not.toMatch(/\s[.,;:!?]/);
+  });
+
   it("never exceeds 160 characters for any item", () => {
     for (const i of catalog.items) {
       const description = itemMetaInput(i.id).description;
@@ -112,11 +117,13 @@ describe("item metadata", () => {
 describe("metaTags", () => {
   const base = { title: "T", description: "D", path: "/about" };
 
-  it("uses the summary card and omits images without one", () => {
+  it("uses the summary card and the site icon without an image", () => {
     const { tags } = metaTags(base);
     expect(tag(tags, "twitter:card")).toBe("summary");
-    expect(tag(tags, "og:image")).toBeUndefined();
-    expect(tag(tags, "twitter:image")).toBeUndefined();
+    expect(tag(tags, "og:image")).toBe("https://counterlock.example/icon.png");
+    expect(tag(tags, "twitter:image")).toBe(
+      "https://counterlock.example/icon.png",
+    );
     expect(tag(tags, "og:type")).toBe("website");
     expect(tag(tags, "og:site_name")).toBe("Counterlock");
   });

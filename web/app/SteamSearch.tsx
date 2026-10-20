@@ -1,17 +1,18 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { Picture } from "@/shared/ui/Picture";
 import { playerPath } from "./paths";
-import { writeRemembered } from "./remembered";
+import { readRemembered, writeRemembered } from "./remembered";
 import { useSteamSearch } from "./useSteamSearch";
 
 export function SteamSearch() {
   const navigate = useNavigate();
+  const browsing = (useLocation().state as { browse?: boolean } | null)?.browse;
   const [text, setText] = useState("");
   const { results, loading, error, directId } = useSteamSearch(text);
   const searched = text.trim().length >= 2;
   const open = (id: number) => {
-    writeRemembered(id);
+    if (!browsing || readRemembered() === null) writeRemembered(id);
     return playerPath(id);
   };
   return (
@@ -70,7 +71,10 @@ export function SteamSearch() {
                     src={profile.avatar}
                     label={profile.name}
                   />
-                  <span>{profile.name}</span>
+                  <span className="web-search-name">
+                    {profile.name}
+                    <small>Account {profile.accountId}</small>
+                  </span>
                 </Link>
               </li>
             ))}

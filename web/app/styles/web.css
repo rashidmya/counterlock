@@ -139,10 +139,16 @@
   border-color: #dfc48c;
   text-decoration: none;
 }
-.web-search-direct {
-  display: grid !important;
-  gap: 2px !important;
+.web-search-results a.web-search-direct {
+  display: grid;
+  gap: 2px;
 }
+.web-search-name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.web-search-name small,
 .web-search-direct small {
   color: #889697;
 }

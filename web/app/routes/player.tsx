@@ -7,13 +7,13 @@ import { ProfileView } from "@/features/profile/components/ProfileView";
 import { fetchSteamProfiles } from "@/features/profile/services/profile-api";
 import { useAsync } from "@/shared/api/useAsync";
 import {
+  BROWSE_STATE,
   clearRemembered,
   readRemembered,
   writeRemembered,
 } from "../remembered";
 import { PageMeta } from "../seo";
 import { playerPath } from "../paths";
-import { BROWSE_STATE } from "../remembered";
 
 function Player({ id }: { id: number }) {
   const { navigate } = useLinks();

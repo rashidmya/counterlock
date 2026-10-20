@@ -18,6 +18,7 @@ export default function HeroesRoute() {
         navigate={navigate}
         query={query}
         setQuery={setQuery}
+        catalogWhileLoading
       />
     </>
   );

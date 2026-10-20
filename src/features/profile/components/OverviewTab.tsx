@@ -47,7 +47,7 @@ function RankCard({ accountId }: { accountId: number }) {
       ) : (
         <strong className="unavailable">{loading ? "…" : "Unavailable"}</strong>
       )}
-      <em>From your latest recorded ranked match</em>
+      <em>From the latest recorded ranked match</em>
     </div>
   );
 }

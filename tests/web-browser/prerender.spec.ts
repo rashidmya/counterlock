@@ -49,6 +49,25 @@ test("list pages are pre-rendered with their titles", () => {
   );
 });
 
+test("the hero list is pre-rendered from the catalog without live numbers", () => {
+  const html = body(read("heroes/index.html"));
+  expect(html).toContain('href="/heroes/haze"');
+  expect(html).toContain('href="/heroes/mo-krill"');
+  expect(html).toContain("Haze");
+  expect(html).not.toMatch(/\d+\.\d%/);
+});
+
+test("the build output has no Overwolf-only or data-sidecar files", () => {
+  for (const name of [
+    "manifest.json",
+    "icon.ico",
+    "icon-gray.png",
+    "sitemap.xml.data",
+    "robots.txt.data",
+  ])
+    expect(existsSync(join(client, name)), name).toBe(false);
+});
+
 test("one page per catalog hero and item, including special-character names", () => {
   expect(pages("heroes")).toHaveLength(catalog.heroes.length);
   expect(pages("items")).toHaveLength(catalog.items.length);

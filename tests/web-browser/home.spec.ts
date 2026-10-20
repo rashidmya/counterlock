@@ -7,6 +7,8 @@ const names: Record<number, string> = {
   [FARGO]: "Fargo Fixture",
   [OTHER]: "Other Persona",
   777: "Farquhar Fixture",
+  888: "Twin Persona",
+  889: "Twin Persona",
 };
 const profile = (id: number) => ({
   account_id: id,
@@ -132,6 +134,19 @@ test("search lists matches, a result opens and remembers the profile", async ({
   expect(await stored(page)).toBe(`{"accountId":${FARGO}}`);
 });
 
+test("results with the same name show distinct account ids", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto("/");
+  await hydrated(page);
+  await search(page).fill("twin");
+  const rows = page.locator(".web-search-results li a");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText("Account 888");
+  await expect(rows.nth(1)).toContainText("Account 889");
+});
+
 test("search results can be chosen with the keyboard", async ({ page }) => {
   await mockApi(page);
   await page.goto("/");
@@ -208,6 +223,30 @@ test("another player's profile offers 'This is me' and 'Find another player'", a
   await expect(page.getByRole("button", { name: "This is me" })).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Not you? Switch account" }),
+  ).toBeVisible();
+});
+
+test("picking a result while browsing keeps the remembered account", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.addInitScript(
+    ([key, id]) => localStorage.setItem(key, JSON.stringify({ accountId: id })),
+    [KEY, FARGO] as const,
+  );
+  await page.goto(`/players/${OTHER}`);
+  await page.getByRole("button", { name: "Find another player" }).click();
+  await expect(search(page)).toBeVisible();
+  await search(page).fill("farq");
+  await page.getByRole("link", { name: /Farquhar Fixture/ }).click();
+  await expect(page).toHaveURL(/\/players\/777$/);
+  await expect(page.locator(".profile-header h1")).toHaveText(
+    "Farquhar Fixture",
+  );
+  expect(await stored(page)).toBe(`{"accountId":${FARGO}}`);
+  await expect(page.getByRole("button", { name: "This is me" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Find another player" }),
   ).toBeVisible();
 });
 

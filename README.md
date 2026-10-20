@@ -94,7 +94,7 @@ The only host-specific piece is the fallback for non-pre-rendered routes. The bu
 
 ### Website privacy
 
-The website has no backend, analytics or cookies. The remembered Steam account is stored only in the visitor's browser, in `localStorage` under `counterlock.web.account`; **Switch account** clears it. Search text and public player IDs are sent to Deadlock API to fetch statistics. Hero portraits, rank images and fonts load from their providers, so those providers also see the visitor's request. The `/about` page and the footer on every page say so.
+The website has no backend, analytics or cookies. The remembered Steam account is stored only in the visitor's browser, in `localStorage` under `counterlock.web.account`; **Switch account** clears it. Search text and public player IDs are sent to Deadlock API to fetch statistics. Fonts load from Google Fonts, hero and item images load from the Deadlock API asset CDN, and Steam avatars load from Steam, so those providers also see the visitor's request. The /about page explains this; every page's footer links to it.
 
 ## Maintain the catalog and rules
 
