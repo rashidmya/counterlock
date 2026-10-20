@@ -254,8 +254,15 @@ background brush art and keep the portrait. The builder decides where.
 - **Website layout is full-screen, not a centred card** (owner decision).
   - The header is full width and sticky.
   - Page banners (hero, profile, match report) and art run edge to edge.
-  - Content spans the browser window with side padding (about 48px on
-    desktop widths) rather than sitting in a framed, fixed-width box.
+  - **Content is capped and centred** (owner feedback: full-width content
+    was too wide).
+    - Header, page content and footer use a side gutter of
+      `max(64px, (100vw - 1320px) / 2)`, so content never exceeds about
+      1320px and always has at least 64px either side.
+    - Page banners (hero, profile, match report) keep their background
+      running edge to edge, but their text and art align to the same
+      gutter.
+    - There is no framed box around the page.
   - Grids grow with the window by **adding columns, not by enlarging
     components**. Hero cards stay about 140–160px wide.
   - Keep sizes moderate. The owner found the first full-screen version's
