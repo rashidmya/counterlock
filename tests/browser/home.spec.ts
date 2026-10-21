@@ -311,6 +311,9 @@ test("top of the city lists six heroes linking to the Heroes tab", async ({
   ).toBeVisible();
   await expect(top.locator(".hero-card")).toHaveCount(6);
   await expect(top.locator(".hero-card .tier-letter").first()).toBeVisible();
+  await expect(top.locator(".data-note")).toHaveText(
+    "Tiers by win rate over the last 30 days, all ranks.",
+  );
   await top.locator(".hero-card").first().click();
   await expect(
     page.getByRole("button", { name: "Heroes", exact: true }),

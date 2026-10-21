@@ -210,6 +210,9 @@ test("header shows art, tier letter, identity, tagline ribbon and stats", async 
   await expect(tagline).toHaveClass(/\bribbon\b/);
   await expect(tagline).toHaveText(haze.tagline!);
   await expect(header.locator(".hero-tier")).toHaveText("S");
+  await expect(header.locator(".data-note")).toHaveText(
+    "Tier and stats are for the last 30 days at the selected rank.",
+  );
   const stats = header.locator(".hero-stats");
   await expect(stats).toContainText("70.0%");
   await expect(stats).toContainText("WIN RATE");

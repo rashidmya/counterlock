@@ -98,6 +98,9 @@ test("the landing page hydrates cleanly and links into the site", async ({
   await expect(page.locator(".home-top a.hero-card")).toHaveCount(6);
   const card = page.locator(".home-top a.hero-card").first();
   await expect(card).toHaveAttribute("href", /^\/heroes\/[a-z-]+$/);
+  await expect(page.locator(".home-top .data-note")).toHaveText(
+    "Tiers by win rate over the last 30 days, all ranks.",
+  );
   await expect(card).toContainText(/\d+\.\d%/);
   await expect(card.locator("img.hero-card-portrait")).toBeVisible();
   const main = page.locator("main");

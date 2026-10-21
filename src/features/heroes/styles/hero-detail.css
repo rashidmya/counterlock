@@ -321,6 +321,10 @@
   font: 600 12px var(--font-label);
   letter-spacing: 0.14em;
 }
+.hero-header-body > .data-note {
+  margin-top: 14px;
+  padding: 0;
+}
 .hero-stats strong {
   display: block;
   color: var(--cream);

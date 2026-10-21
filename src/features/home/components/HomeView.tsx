@@ -71,7 +71,12 @@ export function HomeView({ me }: { me: MeAdapter }) {
         )}
         {top.data &&
           (top.data.length ? (
-            <HeroGrid cards={top.data} variant="tier" />
+            <>
+              <HeroGrid cards={top.data} variant="tier" />
+              <p className="data-note">
+                Tiers by win rate over the last 30 days, all ranks.
+              </p>
+            </>
           ) : (
             <p className="muted">Hero stats are unavailable right now.</p>
           ))}

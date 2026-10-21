@@ -80,6 +80,11 @@ export function HeroHeader({
             onChange={(minBadge) => setQuery({ ...query, minBadge })}
           />
         </div>
+        {summary && (
+          <p className="data-note">
+            Tier and stats are for the last 30 days at the selected rank.
+          </p>
+        )}
       </div>
       <div className="hero-art">
         <OptionalImage src={hero.backgroundImage} className="hero-art-bg" />
