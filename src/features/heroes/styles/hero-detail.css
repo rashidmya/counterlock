@@ -197,7 +197,7 @@
   max-width: min(400px, calc(100vw - 32px));
   padding: 14px;
   border: 1px solid var(--gold);
-  background: rgb(from var(--surface) r g b / 0.98);
+  background: var(--surface);
   box-shadow: 0 12px 40px rgb(0 0 0 / 0.6);
   color: var(--cream);
   font-size: 13px;

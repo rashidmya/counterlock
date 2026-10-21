@@ -194,12 +194,6 @@
   }
 }
 
-@media (max-width: 1100px) {
-  .app.web .brand small {
-    display: none;
-  }
-}
-
 /* Too narrow for one row: wordmark and My profile above, nav below. */
 @media (max-width: 900px) {
   .app.web > header {

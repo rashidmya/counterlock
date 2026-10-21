@@ -129,6 +129,29 @@ test("header is one 60px row with the nav inline", async ({ page }) => {
   expect(mine.x).toBeGreaterThanOrEqual(nav.x + nav.width);
 });
 
+test("the brand is the wordmark only, with no logo image or tagline", async ({
+  page,
+}) => {
+  for (const width of [1280, 800, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    const brand = page.locator("header .brand");
+    await expect(brand).toHaveText("Counterlock");
+    await expect(brand.locator("img, small")).toHaveCount(0);
+    await expect(page.getByText("Know the match. Make your move.")).toHaveCount(
+      0,
+    );
+    const overflow = await page.evaluate(() => ({
+      page: document.documentElement.scrollWidth - window.innerWidth,
+      header:
+        document.querySelector("header")!.scrollWidth -
+        document.querySelector("header")!.clientWidth,
+    }));
+    expect(overflow.page).toBeLessThanOrEqual(0);
+    expect(overflow.header).toBeLessThanOrEqual(0);
+  }
+});
+
 test("page titles are 40px and hero cards ~180px on the web", async ({
   page,
 }) => {

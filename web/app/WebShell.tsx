@@ -2,7 +2,6 @@ import { Link, NavLink, Outlet, useNavigate } from "react-router";
 import { LinkProvider } from "@/app/links";
 import type { Route } from "@/app/navigation";
 import { MyProfileLabel } from "@/features/profile/components/MyProfileLabel";
-import { assetUrl } from "@/shared/ui/assets";
 import { routeToPath } from "./paths";
 import { useRememberedMe } from "./remembered";
 
@@ -20,11 +19,9 @@ export function WebShell({ children }: { children?: React.ReactNode }) {
     <div className="app web">
       <header>
         <Link className="brand" to="/">
-          <img src={assetUrl("icon.svg")} alt="" />
-          <div>
-            COUNTER<b>LOCK</b>
-            <small>KNOW THE MATCH. MAKE YOUR MOVE.</small>
-          </div>
+          <span>
+            Counter<b>lock</b>
+          </span>
         </Link>
         <nav>
           <div className="tabs">

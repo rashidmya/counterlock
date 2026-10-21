@@ -25,20 +25,9 @@ header {
   font: 900 23px var(--font-title);
   letter-spacing: 0.02em;
 }
-.brand img {
-  height: 42px;
-  width: 42px;
-}
 .brand b {
   color: var(--gold);
   font-weight: inherit;
-}
-.brand small {
-  display: block;
-  color: var(--dim);
-  font: 600 9px var(--font-label);
-  letter-spacing: 0.18em;
-  margin-top: 3px;
 }
 .header-right {
   display: flex;

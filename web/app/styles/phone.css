@@ -22,12 +22,7 @@
   }
   .app.web .brand {
     min-height: 52px;
-    gap: 9px;
     font-size: 19px;
-  }
-  .app.web .brand img {
-    width: 34px;
-    height: 34px;
   }
   .app.web .my-profile {
     flex: 0 1 auto;
