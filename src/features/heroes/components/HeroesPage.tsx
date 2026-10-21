@@ -9,7 +9,6 @@ import { fetchHeroSummaries } from "../services/hero-analytics";
 import type { AnalyticsQuery } from "../utils/analytics";
 import { HeroDetail } from "./HeroDetail";
 import { HeroGrid, type HeroCard } from "./HeroGrid";
-import { RankFilter } from "./RankFilter";
 import { RoleButtons, type RoleFilter } from "./TierList";
 
 function HeroRoster({
@@ -92,15 +91,12 @@ export function HeroesPage({
       {route.heroId === undefined ? (
         <HeroRoster {...{ role, setRole, search, setSearch }} />
       ) : (
-        <>
-          <div className="hero-rank-bar">
-            <RankFilter
-              value={query.minBadge}
-              onChange={(minBadge) => setQuery({ ...query, minBadge })}
-            />
-          </div>
-          <HeroDetail key={route.heroId} heroId={route.heroId} query={query} />
-        </>
+        <HeroDetail
+          key={route.heroId}
+          heroId={route.heroId}
+          query={query}
+          setQuery={setQuery}
+        />
       )}
     </LinkScope>
   );

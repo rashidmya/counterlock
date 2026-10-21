@@ -54,7 +54,7 @@ test("a pre-rendered hero page hydrates without console errors", async ({
   await mockApi(page);
   await page.goto("/heroes/haze");
   await expect(page.locator(".hero-header h1")).toHaveText("Haze");
-  await expect(page.locator(".hero-header .tier-banner")).toBeVisible();
+  await expect(page.locator(".hero-header .hero-tier")).toBeVisible();
   expect(problems).toEqual([]);
 });
 

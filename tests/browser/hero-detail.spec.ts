@@ -191,53 +191,161 @@ const section = (page: Page, title: string) =>
     has: page.getByRole("heading", { name: title, exact: true }),
   });
 
-test("header shows card art, tier banner, plain-text identity line and stats", async ({
+test("header shows art, tier letter, identity, tagline ribbon and stats", async ({
   page,
 }) => {
   await openHaze(page);
   const header = page.locator(".hero-header");
   await expect(header.locator('img[src*="haze_card.webp"]')).toBeVisible();
-  await expect(header).toHaveCSS("background-image", /haze_bg\.webp/);
-  const identity = header.locator(".hero-identity");
-  await expect(identity.locator(".hero-role")).toHaveText("ASSASSIN");
-  await expect(identity.locator(".hero-tags")).toHaveText("STEALTHY / LETHAL");
-  await expect(
-    identity.locator('[class*="chip"], [class*="pill"]'),
-  ).toHaveCount(0);
-  await expect(identity.locator(".hero-rule")).toHaveCount(1);
-  await expect(header.locator(".hero-tagline")).toHaveText(haze.tagline!);
-  await expect(header.locator(".tier-banner")).toContainText("TIER");
-  await expect(header.locator(".tier-banner")).toContainText("S");
-  await expect(header.locator(".hero-rank")).toHaveText(
-    `#1 OF ${catalog.heroes.length}`,
+  await expect(header.locator('img[src*="haze_bg.webp"]')).toBeVisible();
+  await expect(header.locator(".hero-role")).toHaveText("ASSASSIN");
+  await expect(header.locator(".hero-tags")).toHaveText("STEALTHY · LETHAL");
+  await expect(header.locator('[class*="chip"], [class*="pill"]')).toHaveCount(
+    0,
   );
+  const tagline = header.locator(".hero-tagline");
+  await expect(tagline).toHaveClass(/\bribbon\b/);
+  await expect(tagline).toHaveText(haze.tagline!);
+  await expect(header.locator(".hero-tier")).toHaveText("S");
   const stats = header.locator(".hero-stats");
   await expect(stats).toContainText("70.0%");
   await expect(stats).toContainText("WIN RATE");
   await expect(stats).toContainText(/\d+\.\d%\s*PICK RATE/);
   await expect(stats).toContainText("50K");
-  await expect(stats).toContainText("3.6");
-  await expect(stats).toContainText("AVG KDA");
+  await expect(stats).toContainText("MATCHES");
+  await expect(stats.getByRole("combobox", { name: "Rank" })).toBeVisible();
+  await expect(header.locator(".tier-banner")).toHaveCount(0);
+  await expect(header.locator(".hero-rank")).toHaveCount(0);
+  await expect(header.locator(".hero-rule")).toHaveCount(0);
+  await expect(stats).not.toContainText("AVG KDA");
+  expect(
+    await header.evaluate(
+      (node) =>
+        [node, ...node.querySelectorAll("*")].filter((el) =>
+          el.hasAttribute("style"),
+        ).length,
+    ),
+  ).toBe(0);
 });
 
-test("abilities render four numbered cards in signature order with art and tooltips", async ({
+test("ability row shows four icons in signature order", async ({ page }) => {
+  await openHaze(page);
+  const icons = page.locator(".ability-icon");
+  await expect(icons).toHaveCount(4);
+  for (const [index, ability] of abilities.entries()) {
+    const icon = icons.nth(index);
+    await expect(icon.locator(".ability-key")).toHaveText(String(index + 1));
+    await expect(icon.locator("img")).toHaveAttribute("src", ability.image!);
+    await expect(
+      page.getByRole("button", { name: ability.name, exact: true }),
+    ).toHaveCount(1);
+  }
+  await expect(page.locator(".ability-card")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Abilities", exact: true }),
+  ).toHaveCount(0);
+});
+
+test("ability tooltip shows cooldown, key stats, minor stats and three upgrades", async ({
   page,
 }) => {
   await openHaze(page);
-  const cards = page.locator(".ability-card");
-  await expect(cards).toHaveCount(4);
-  for (const [index, ability] of abilities.entries()) {
-    const card = cards.nth(index);
-    await expect(card.locator(".ability-number")).toHaveText(String(index + 1));
-    await expect(card.locator("strong")).toHaveText(ability.name);
-    await expect(card.locator("img")).toHaveAttribute("src", ability.image!);
-    await expect(card.locator("small")).toHaveText(ability.quip);
+  const [first] = abilities;
+  const tip = page.locator(".ability-tip").first();
+  await expect(tip).toBeHidden();
+  await page.locator(".ability-icon").first().hover();
+  await expect(tip).toBeVisible();
+  await expect(tip).toHaveAttribute("role", "tooltip");
+  await expect(tip.locator("b").first()).toHaveText(first.name);
+  await expect(tip.locator("img").first()).toHaveAttribute("src", first.image!);
+  expect(first.cooldown).toBeTruthy();
+  await expect(tip.locator(".ability-cooldown")).toHaveText(
+    `⟳ ${first.cooldown}`,
+  );
+  await expect(tip.locator(".ability-key-stats > *")).toHaveCount(
+    first.keyStats.length,
+  );
+  for (const stat of first.keyStats) {
+    await expect(tip.locator(".ability-key-stats")).toContainText(stat.value);
+    await expect(tip.locator(".ability-key-stats")).toContainText(stat.label);
   }
-  const title = await cards.nth(1).getAttribute("title");
-  expect(title).toContain(abilities[1].description);
-  expect(title).toContain(`T1: ${abilities[1].upgrades[0]}`);
-  expect(title).toContain(`T2: ${abilities[1].upgrades[1]}`);
-  expect(title).toContain(`T3: ${abilities[1].upgrades[2]}`);
+  for (const stat of first.minorStats)
+    await expect(tip.locator(".ability-minor-stats")).toContainText(
+      `${stat.label} ${stat.value}`,
+    );
+  const upgrades = tip.locator(".ability-upgrades > *");
+  await expect(upgrades).toHaveCount(3);
+  for (const [index, label] of ["◆ 1", "◆ 2", "◆ 5"].entries()) {
+    await expect(upgrades.nth(index)).toContainText(label);
+    await expect(upgrades.nth(index)).toContainText(first.upgrades[index]);
+  }
+  for (const highlight of first.highlights)
+    await expect(
+      tip.locator("p.ability-desc b.hl", { hasText: highlight }),
+    ).toHaveCount(1);
+  await expect(tip.locator("p.ability-desc")).toContainText(
+    first.description.replace(/\s+/g, " "),
+  );
+  await expect(page.locator(".ability-icon").first()).toHaveAttribute(
+    "aria-describedby",
+    (await tip.getAttribute("id"))!,
+  );
+
+  await page.mouse.move(1, 1);
+  await expect(tip).toBeHidden();
+});
+
+test("ability tooltip opens on focus and click and closes on Escape", async ({
+  page,
+}) => {
+  await openHaze(page);
+  const icons = page.locator(".ability-icon");
+  const tips = page.locator(".ability-tip");
+  await page.locator(".hero-back").focus();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await expect(icons.nth(1)).toBeFocused();
+  await expect(tips.nth(1)).toBeVisible();
+  await expect(page.locator(".ability-tip:visible")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(tips.nth(1)).toBeHidden();
+
+  await page.keyboard.press("Shift+Tab");
+  await expect(tips.nth(0)).toBeVisible();
+  await page.locator(".hero-back").focus();
+  await expect(tips.nth(0)).toBeHidden();
+
+  await icons.nth(2).click();
+  await expect(tips.nth(2)).toBeVisible();
+  await expect(page.locator(".ability-tip:visible")).toHaveCount(1);
+  await icons.nth(3).hover();
+  await expect(tips.nth(3)).toBeVisible();
+  await expect(page.locator(".ability-tip:visible")).toHaveCount(1);
+  await page.locator(".hero-header h1").click();
+  await expect(page.locator(".ability-tip:visible")).toHaveCount(0);
+});
+
+test.describe("touch", () => {
+  test.use({ hasTouch: true });
+
+  test("ability tooltip toggles on tap and closes on an outside tap", async ({
+    page,
+  }) => {
+    await openHaze(page);
+    const icons = page.locator(".ability-icon");
+    const tips = page.locator(".ability-tip");
+    await icons.nth(2).tap();
+    await expect(tips.nth(2)).toBeVisible();
+    await icons.nth(3).tap();
+    await expect(tips.nth(3)).toBeVisible();
+    await expect(page.locator(".ability-tip:visible")).toHaveCount(1);
+    await icons.nth(3).tap();
+    await expect(page.locator(".ability-tip:visible")).toHaveCount(0);
+    await icons.nth(0).tap();
+    await expect(tips.nth(0)).toBeVisible();
+    await page.locator(".hero-header h1").tap();
+    await expect(page.locator(".ability-tip:visible")).toHaveCount(0);
+  });
 });
 
 test("skill order grid has a row per ability and a numbered cell per step", async ({
@@ -335,7 +443,7 @@ test("thin data shows Not enough data and heuristic counter items", async ({
   await expect(counter).toContainText("Based on hero traits");
   await expect(counter).not.toContainText("Not enough data");
   expect(await counter.locator(".item-tile").count()).toBeGreaterThan(0);
-  await expect(page.locator(".ability-card")).toHaveCount(4);
+  await expect(page.locator(".ability-icon")).toHaveCount(4);
 });
 
 test("All heroes returns to the list with its role filter kept", async ({
@@ -359,6 +467,6 @@ test("a hero without a tagline omits that line", async ({ page }) => {
   await expect(page.locator(".hero-tagline")).toHaveCount(0);
   await expect(page.locator(".hero-role")).toHaveText("MARKSMAN");
   await expect(page.locator(".hero-tags")).toHaveText(
-    mina.tags.map((tag) => tag.toUpperCase()).join(" / "),
+    mina.tags.map((tag) => tag.toUpperCase()).join(" · "),
   );
 });

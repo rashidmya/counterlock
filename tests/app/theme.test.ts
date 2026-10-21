@@ -43,12 +43,10 @@ const LEGACY = new Set([
   "src/features/roster/styles/roster.css",
   "src/features/roster/styles/inventory.css",
   "src/features/player-lookup/styles/lookup.css",
-  "src/features/heroes/styles/hero-detail.css",
   "src/features/items/styles/items.css",
   "src/features/live/styles/live.css",
   "src/features/profile/styles/profile.css",
   "web/app/styles/web.css",
-  "src/features/heroes/components/HeroHeader.tsx",
   "src/features/profile/components/PerformanceTab.tsx",
   "src/shared/ui/LineChart.tsx",
 ]);

@@ -49,7 +49,7 @@ test.describe("phone width (375px)", () => {
     [
       "/heroes/haze",
       async (page) => {
-        await expect(page.locator(".hero-header .tier-banner")).toBeVisible();
+        await expect(page.locator(".hero-header .hero-tier")).toBeVisible();
         await expect(
           page.locator(".detail-section .item-tile").first(),
         ).toBeVisible();
@@ -84,6 +84,19 @@ test.describe("phone width (375px)", () => {
       expect(scroll).toBeLessThanOrEqual(375);
       expect(await clipped(page, 375)).toEqual([]);
 
+      if (path === "/heroes/haze") {
+        const tip = page.locator(".ability-tip").nth(3);
+        await page.locator(".ability-icon").nth(3).click();
+        await expect(tip).toBeVisible();
+        const box = (await tip.boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(375);
+        expect((await overflow(page)).scroll).toBeLessThanOrEqual(375);
+        expect(await clipped(page, 375)).toEqual([]);
+        await page.keyboard.press("Escape");
+        await expect(tip).toBeHidden();
+      }
+
       const links = page.locator("nav").getByRole("link");
       await expect(links).toHaveCount(4);
       const boxes = await links.evaluateAll((nodes) =>
@@ -100,21 +113,15 @@ test.describe("phone width (375px)", () => {
       }
     });
 
-  test("hero detail stacks: portrait above identity, one column of sections", async ({
+  test("hero detail stacks: identity above the art, one column of sections", async ({
     page,
   }) => {
     await mockApi(page);
     await page.goto("/heroes/haze");
     await expect(page.locator(".matchup").first()).toBeVisible();
-    const frame = await page.locator(".hero-frame").boundingBox();
+    const art = await page.locator(".hero-art").boundingBox();
     const body = await page.locator(".hero-header-body").boundingBox();
-    expect(body!.y).toBeGreaterThanOrEqual(frame!.y + frame!.height);
-    const cards = await page
-      .locator(".ability-card")
-      .evaluateAll((nodes) =>
-        nodes.map((node) => Math.round(node.getBoundingClientRect().left)),
-      );
-    expect(new Set(cards).size).toBe(1);
+    expect(art!.y).toBeGreaterThanOrEqual(body!.y + body!.height);
     const sections = await page
       .locator(".detail-grid .detail-section")
       .evaluateAll((nodes) =>
@@ -165,15 +172,16 @@ test.describe("phone width (375px)", () => {
   });
 });
 
-test("at desktop width the hero portrait and identity sit side by side", async ({
+test("at desktop width the hero art sits to the right of the identity column", async ({
   page,
 }) => {
   await mockApi(page);
   await page.goto("/heroes/haze");
-  await expect(page.locator(".hero-header .tier-banner")).toBeVisible();
-  const frame = await page.locator(".hero-frame").boundingBox();
+  await expect(page.locator(".hero-header .hero-tier")).toBeVisible();
+  const portrait = await page
+    .locator('.hero-art img[src*="haze_card.webp"]')
+    .boundingBox();
   const body = await page.locator(".hero-header-body").boundingBox();
-  expect(body!.x).toBeGreaterThanOrEqual(frame!.x + frame!.width);
-  expect(Math.abs(body!.y - frame!.y)).toBeLessThan(40);
+  expect(portrait!.x).toBeGreaterThanOrEqual(body!.x + body!.width);
   expect((await overflow(page)).scroll).toBeLessThanOrEqual(1260);
 });

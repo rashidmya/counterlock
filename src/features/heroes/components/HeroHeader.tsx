@@ -1,7 +1,11 @@
 import { RouteLink } from "@/app/links";
 import type { Hero } from "@/shared/catalog/types";
+import { OptionalImage } from "@/shared/ui/OptionalImage";
 import { Picture } from "@/shared/ui/Picture";
-import type { HeroSummary } from "../utils/analytics";
+import { Ribbon } from "@/shared/ui/PageTitle";
+import type { AnalyticsQuery, HeroSummary } from "../utils/analytics";
+import { AbilityRow } from "./AbilityRow";
+import { RankFilter } from "./RankFilter";
 
 const percent = (rate: number) => `${(rate * 100).toFixed(1)}%`;
 const compact = new Intl.NumberFormat("en", {
@@ -18,56 +22,44 @@ function identity(hero: Hero) {
         .map((tag) => tag.toUpperCase()),
     ),
   ];
-  return { role, tags: tags.join(" / ") };
+  return { role, tags: tags.join(" · ") };
 }
 
 export function HeroHeader({
   hero,
   summary,
-  total,
+  query,
+  setQuery,
 }: {
   hero: Hero;
   summary?: HeroSummary;
-  total: number;
+  query: AnalyticsQuery;
+  setQuery(query: AnalyticsQuery): void;
 }) {
   const { role, tags } = identity(hero);
-  const art = hero.backgroundImage
-    ? {
-        background: `linear-gradient(90deg,#0f151bf2 35%,#0f151b99 70%,#0f151bcc), url("${hero.backgroundImage}") center/cover`,
-      }
-    : undefined;
   const stat = (value: string | undefined) => value ?? "—";
   return (
-    <div className="hero-header" style={art}>
-      <div className="hero-frame">
-        {summary && (
-          <div className={`tier-banner banner-${summary.tier}`}>
-            <small>TIER</small>
-            <b>{summary.tier}</b>
-          </div>
-        )}
-        <Picture
-          src={hero.cardImage ?? hero.image}
-          label={hero.name}
-          className="hero-card-art"
-        />
-        {summary && (
-          <span className="hero-rank">
-            #{summary.position} OF {total}
-          </span>
-        )}
-      </div>
+    <div className="hero-header">
       <div className="hero-header-body">
         <RouteLink className="hero-back" route={{ page: "heroes" }}>
           ← All heroes
         </RouteLink>
         <div className="hero-identity">
           {role && <span className="hero-role">{role}</span>}
-          {role && tags && <span className="hero-rule" aria-hidden="true" />}
           {tags && <span className="hero-tags">{tags}</span>}
         </div>
-        <h1>{hero.name}</h1>
-        {hero.tagline && <p className="hero-tagline">{hero.tagline}</p>}
+        <div className="hero-title-row">
+          {summary && (
+            <span className={`hero-tier tier-letter tier-${summary.tier}`}>
+              {summary.tier}
+            </span>
+          )}
+          <h1>{hero.name}</h1>
+        </div>
+        {hero.tagline && (
+          <Ribbon className="hero-tagline">{hero.tagline}</Ribbon>
+        )}
+        <AbilityRow abilityIds={hero.abilityIds ?? []} />
         <div className="hero-stats">
           <div>
             <strong className="win">
@@ -83,10 +75,16 @@ export function HeroHeader({
             <strong>{stat(summary && compact.format(summary.matches))}</strong>
             MATCHES
           </div>
-          <div>
-            <strong>{stat(summary && summary.kda.toFixed(1))}</strong>
-            AVG KDA
-          </div>
+          <RankFilter
+            value={query.minBadge}
+            onChange={(minBadge) => setQuery({ ...query, minBadge })}
+          />
+        </div>
+      </div>
+      <div className="hero-art">
+        <OptionalImage src={hero.backgroundImage} className="hero-art-bg" />
+        <div className="hero-art-pic">
+          <Picture src={hero.cardImage ?? hero.image} label={hero.name} />
         </div>
       </div>
     </div>

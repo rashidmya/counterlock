@@ -1,7 +1,8 @@
 import { useMemo, type ReactNode } from "react";
 import { RouteLink } from "@/app/links";
 import { useAsync, type AsyncState } from "@/shared/api/useAsync";
-import { catalog, heroById, itemById } from "@/shared/catalog";
+import { SectionHeader } from "@/shared/ui/SectionHeader";
+import { heroById, itemById } from "@/shared/catalog";
 import {
   fetchAbilityOrder,
   fetchHeroSummaries,
@@ -19,7 +20,6 @@ import {
   type AnalyticsQuery,
   type ItemPerf,
 } from "../utils/analytics";
-import { AbilityCards } from "./AbilityCards";
 import { HeroBuild } from "./HeroBuild";
 import { HeroHeader } from "./HeroHeader";
 import { ItemList, type ItemEntry } from "./ItemList";
@@ -40,20 +40,20 @@ const merge = (...states: AsyncState<unknown>[]) => ({
 function Section({
   title,
   meta,
-  wide,
+  size,
   children,
 }: {
   title: string;
   meta?: string;
-  wide?: boolean;
+  size?: "half" | "wide";
   children: ReactNode;
 }) {
   return (
-    <section className={`detail-section ${wide ? "wide" : ""}`}>
-      <div className="detail-heading">
-        <h2>{title}</h2>
-        {meta && <span>{meta}</span>}
-      </div>
+    <section className={`detail-section ${size ?? ""}`.trim()}>
+      <SectionHeader
+        title={title}
+        action={meta && <span className="section-meta">{meta}</span>}
+      />
       {children}
     </section>
   );
@@ -94,9 +94,11 @@ const perfEntries = (
 export function HeroDetail({
   heroId,
   query,
+  setQuery,
 }: {
   heroId: number;
   query: AnalyticsQuery;
+  setQuery(query: AnalyticsQuery): void;
 }) {
   const hero = heroById.get(heroId);
   const deps = [heroId, query.minBadge];
@@ -118,7 +120,9 @@ export function HeroDetail({
   if (!hero)
     return (
       <div className="hero-detail">
-        <RouteLink route={{ page: "heroes" }}>← All heroes</RouteLink>
+        <RouteLink className="hero-back" route={{ page: "heroes" }}>
+          ← All heroes
+        </RouteLink>
         <p className="muted">Hero not found.</p>
       </div>
     );
@@ -157,88 +161,81 @@ export function HeroDetail({
 
   return (
     <div className="hero-detail">
-      <div className="hero-detail-card">
-        <HeroHeader
-          hero={hero}
-          summary={summary}
-          total={catalog.heroes.length}
-        />
-        {summaries.error && (
-          <p className="notice warning" role="status">
-            Hero stats unavailable: {summaries.error}
-            <button type="button" onClick={summaries.retry}>
-              Retry
-            </button>
-          </p>
-        )}
-        <div className="hero-detail-body">
-          <Section title="Abilities">
-            <AbilityCards abilityIds={abilityIds} />
-          </Section>
-          <Section
-            title="Skill order"
-            meta={
-              common
-                ? `MOST COMMON · ${percent(common.winRate)} WIN RATE · ${common.matches.toLocaleString()} GAMES`
-                : undefined
-            }
-          >
-            <Body state={order} empty={!common}>
-              {common && (
-                <SkillOrder abilityIds={abilityIds} order={common.abilities} />
-              )}
+      <HeroHeader
+        hero={hero}
+        summary={summary}
+        query={query}
+        setQuery={setQuery}
+      />
+      {summaries.error && (
+        <p className="notice warning" role="status">
+          Hero stats unavailable: {summaries.error}
+          <button type="button" onClick={summaries.retry}>
+            Retry
+          </button>
+        </p>
+      )}
+      <div className="hero-detail-body">
+        <Section
+          title="Skill order"
+          meta={
+            common
+              ? `MOST COMMON · ${percent(common.winRate)} WIN RATE · ${common.matches.toLocaleString()} GAMES`
+              : undefined
+          }
+        >
+          <Body state={order} empty={!common}>
+            {common && (
+              <SkillOrder abilityIds={abilityIds} order={common.abilities} />
+            )}
+          </Body>
+        </Section>
+        <Section title="Build" meta="MOST-PLAYED COMMUNITY BUILD">
+          <HeroBuild heroId={heroId} />
+        </Section>
+        <div className="detail-grid">
+          <Section title="Strong against">
+            <Body state={counters} empty={strong.length === 0}>
+              <MatchupList rows={strong} />
             </Body>
           </Section>
-          <Section title="Build" meta="MOST-PLAYED COMMUNITY BUILD">
-            <HeroBuild heroId={heroId} />
+          <Section title="Countered by">
+            <Body state={counters} empty={weak.length === 0}>
+              <MatchupList rows={weak} />
+            </Body>
           </Section>
-          <div className="detail-grid">
-            <Section title="Strong against">
-              <Body state={counters} empty={strong.length === 0}>
-                <MatchupList rows={strong} />
-              </Body>
-            </Section>
-            <Section title="Countered by">
-              <Body state={counters} empty={weak.length === 0}>
-                <MatchupList rows={weak} />
-              </Body>
-            </Section>
-            <Section title="Best with">
-              <Body state={synergy} empty={partners.length === 0}>
-                <MatchupList rows={partners} />
-              </Body>
-            </Section>
-            <Section title="Best items">
-              <Body
-                state={merge(heroItems, summaries)}
-                empty={best.length === 0}
-              >
-                <ItemList entries={best} />
-                <p className="data-note">
-                  Expensive items show higher win rates partly because players
-                  who are ahead can afford them.
-                </p>
-              </Body>
-            </Section>
-            <Section title="Counter items" wide>
-              <Body
-                state={{ ...counterState, error: undefined }}
-                empty={counterEntries.length === 0}
-              >
-                <ItemList entries={counterEntries} />
-                <p className="data-note">
-                  {fallback
-                    ? "Based on hero traits"
-                    : "Win rate against this hero compared with the item's overall win rate, adjusted for the hero's overall win rate."}
-                </p>
-              </Body>
-            </Section>
-          </div>
-          <p className="data-note">
-            Last 30 days, ranked and unranked. Matchups and pairings need at
-            least 200 games.
-          </p>
+          <Section title="Best with">
+            <Body state={synergy} empty={partners.length === 0}>
+              <MatchupList rows={partners} />
+            </Body>
+          </Section>
+          <Section title="Best items" size="half">
+            <Body state={merge(heroItems, summaries)} empty={best.length === 0}>
+              <ItemList entries={best} />
+              <p className="data-note">
+                Expensive items show higher win rates partly because players who
+                are ahead can afford them.
+              </p>
+            </Body>
+          </Section>
+          <Section title="Counter items" size="half">
+            <Body
+              state={{ ...counterState, error: undefined }}
+              empty={counterEntries.length === 0}
+            >
+              <ItemList entries={counterEntries} />
+              <p className="data-note">
+                {fallback
+                  ? "Based on hero traits"
+                  : "Win rate against this hero compared with the item's overall win rate, adjusted for the hero's overall win rate."}
+              </p>
+            </Body>
+          </Section>
         </div>
+        <p className="data-note">
+          Last 30 days, ranked and unranked. Matchups and pairings need at least
+          200 games.
+        </p>
       </div>
     </div>
   );

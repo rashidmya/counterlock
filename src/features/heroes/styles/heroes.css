@@ -24,11 +24,6 @@
   font: 600 13px var(--font-body);
   color: var(--cream);
 }
-.hero-rank-bar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 14px 30px 0;
-}
 .heroes-page > .data-note {
   margin-top: 14px;
 }
