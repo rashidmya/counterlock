@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-10-21T05:39:47.177Z",
+  "fetchedAt": "2026-10-21T07:28:37.359Z",
   "heroes": [
     {
       "id": 1,
@@ -14171,7 +14171,7 @@
       "upgrades": [
         "-10s Cooldown",
         "+1 Charges",
-        "+40 Impact Damage +13.3333 Burn Damage per Second -5 s Charge Time Improved Spirit Scaling"
+        "+40 Impact Damage +13.33 Burn Damage per Second -5 s Charge Time Improved Spirit Scaling"
       ],
       "highlights": [
         "setting enemies on fire",
@@ -14318,7 +14318,7 @@
       "quip": "Charge into the fray, dragging enemies along",
       "description": "Charge forward, pulling enemies you hit. Pushing a hero into a wall applies stun . If you collide with a hero you move faster during your charge.",
       "upgrades": [
-        "Applies +32.0% Slow for 3s",
+        "Applies +32% Slow for 3s",
         "On Wall Hit: +0.8s Stun Duration",
         "-18s Cooldown On Hero Collide: +1.5 Weapon Damage for 6 s"
       ],
@@ -14399,7 +14399,7 @@
       "upgrades": [
         "-20s Cooldown",
         "+2s Duration",
-        "+2m Radius and +18.0 DPS with improved Spirit scaling"
+        "+2m Radius and +18 DPS with improved Spirit scaling"
       ],
       "highlights": [],
       "cooldown": "42s",
@@ -14551,8 +14551,8 @@
       "description": "Throw a grenade that begins pulsing when it lands. Each pulse expands the radius and applies spirit damage , time slow, and stacking increased damage for Paradox against the victim.",
       "upgrades": [
         "-12s Cooldown",
-        "+20.0 Pulse Damage and increased Spirit scaling",
-        "+4.0% Damage Amp and +1.6s Duration"
+        "+20 Pulse Damage and increased Spirit scaling",
+        "+4% Damage Amp and +1.6s Duration"
       ],
       "highlights": [
         "time slow, and stacking"
@@ -14607,7 +14607,7 @@
       "description": "Create a time warping wall that stops time for all enemy projectiles and bullets that touch it and increases the speed and damage of friendly bullets. Enemies that touch the wall will be briefly slowed .",
       "upgrades": [
         "+3.5s Duration +3m Width +1m Height",
-        "Silences enemies for 2.3s +35.0% Weapon Damage",
+        "Silences enemies for 2.3s +35% Weapon Damage",
         "+2 Ability Charges"
       ],
       "highlights": [
@@ -14659,7 +14659,7 @@
       "description": "Charge up a powerful shot of time energy, dealing spirit damage and applying a Time-Stop to enemies hit. The damage dealt increases with weapon damage . Move speed is increased while charging. While in the air and charging, to timeslow your movement.",
       "upgrades": [
         "+0.4s Max Time-Stop",
-        "-12.0s Cooldown Increases Speed Scaling",
+        "-12s Cooldown Increases Speed Scaling",
         "+2s Charge Hold Duration and +55% Damage Scaling"
       ],
       "highlights": [
@@ -14734,7 +14734,7 @@
       "upgrades": [
         "+1 Charge",
         "On Hit: -15% Bullet Resist and -24% Move Speed for 4s",
-        "+135.0 Damage and +20m Cast Range"
+        "+135 Damage and +20m Cast Range"
       ],
       "highlights": [],
       "cooldown": "26s",
@@ -14807,7 +14807,7 @@
       "description": "While channeling, restore health over time to you and any allies nearby. You can dash and melee without breaking the channel.",
       "upgrades": [
         "Aura provides +4m Move Speed during channel",
-        "-20.0s Cooldown and +1.0s Duration",
+        "-20s Cooldown and +1s Duration",
         "Full move and ability use and additionally heals +2.5% of Max Health per second"
       ],
       "highlights": [
@@ -14879,8 +14879,8 @@
       "description": "Deploy a spirit that provides healing to nearby allies.",
       "upgrades": [
         "+1.5s Duration",
-        "-20.0s Cooldown and provides +100.0% Stamina Recovery",
-        "+2.0% Max HP Regen +3m Heal Radius +40% Spirit Resist"
+        "-20s Cooldown and provides +100% Stamina Recovery",
+        "+2% Max HP Regen +3m Heal Radius +40% Spirit Resist"
       ],
       "highlights": [
         "healing"
@@ -14948,7 +14948,7 @@
       "description": "Cast a wall that applies slow on enemies it passes through. Erupt the wall to divide the terrain in half and damage nearby enemies. After casting, press or Ability 3 to erupt the wall early. Can be Destroyed with Melee Attacks",
       "upgrades": [
         "Amplifies McGinnis's damage by +20% on hit enemies for 7s",
-        "-20.0s Cooldown and +2.0s Duration",
+        "-20s Cooldown and +2s Duration",
         "Deploy 2 Mini Turrets near the wall for 8s +24% Slow"
       ],
       "highlights": [
@@ -14996,8 +14996,8 @@
       "description": "Unleashes a volley of rockets that home in on a targeted location. McGinnis is slowed and is still able to use stamina.",
       "upgrades": [
         "Applies 24% movement and dash slow for 1s",
-        "-45.0s Cooldown and +6.0s Duration",
-        "+2m Radius and +15.0 Damage per Rocket with increased spirit scaling"
+        "-45s Cooldown and +6s Duration",
+        "+2m Radius and +15 Damage per Rocket with increased spirit scaling"
       ],
       "highlights": [],
       "cooldown": "200s",
@@ -15039,8 +15039,8 @@
       "description": "Sacrifice some of your health to launch a bomb that deals damage after a brief arm time. Self damage type is Spirit and can be mitigated.",
       "upgrades": [
         "-5s Cooldown",
-        "+ 2m Radius and + 50.0 Damage.",
-        "Bombs leave a toxic mess on the ground, dealing 30.0% of the original damage per second , for 6s ."
+        "+ 2m Radius and + 50 Damage.",
+        "Bombs leave a toxic mess on the ground, dealing 30% of the original damage per second , for 6s ."
       ],
       "highlights": [
         "Sacrifice some of your health",
@@ -15075,7 +15075,7 @@
       "description": "Sacrifice some of your health to launch blood shards that apply a stack of Malice. Each stack slows the victim and increases the damage they take from you. The slow effect decreases over time.",
       "upgrades": [
         "-3s Cooldown",
-        "+25.199999 Damage and +4 Blood Shards",
+        "+25.2 Damage and +4 Blood Shards",
         "+8% Damage Amp"
       ],
       "highlights": [
@@ -15293,7 +15293,7 @@
       "upgrades": [
         "+55% Bullet Resist while channeling Storm Cloud",
         "+7s Channel Time +10m Final Radius +5m Initial Radius",
-        "+65.0 DPS +4m Flight Speed"
+        "+65 DPS +4m Flight Speed"
       ],
       "highlights": [
         "damages all enemies"
@@ -15326,9 +15326,9 @@
       "quip": "Put an enemy to sleep",
       "description": "Throw a dagger that damages and sleeps the target. Sleeping targets wake up shortly after being damaged. Throwing a Dagger does not break your invisibility. Sleep Dagger does not interrupt enemies' channeling abilities.",
       "upgrades": [
-        "-10.0% Bullet Resist Reduction for 6.0s on wake-up",
-        "+1s Sleep Duration Applies 15.0 Fixation Stacks",
-        "-17.0s Cooldown -40% Move and Dash Speed for 3s on wake-up"
+        "-10% Bullet Resist Reduction for 6s on wake-up",
+        "+1s Sleep Duration Applies 15 Fixation Stacks",
+        "-17s Cooldown -40% Move and Dash Speed for 3s on wake-up"
       ],
       "highlights": [
         "damages",
@@ -15405,7 +15405,7 @@
       "quip": "Deal increasing bullet damage to a target",
       "description": "Shooting a target increases your bullet damage on that target . Gain one stack per bullet hit, three if the hit is a headshot.",
       "upgrades": [
-        "40.0 Spirit damage and 12% slow for 2s to target every 20 stacks",
+        "40 Spirit damage and 12% slow for 2s to target every 20 stacks",
         "+40 Max Stacks and +5s Duration",
         "+0.11 / per Stack Scales with Weapon Damage"
       ],
@@ -15435,8 +15435,8 @@
       "description": "Enter a flurry, firing your weapon at nearby enemies with perfect accuracy and added Bullet Damage.",
       "upgrades": [
         "+7 Bullet Damage",
-        "+10.0% Fire Rate +3m Movespeed",
-        "+40.0% Evasion -65s Cooldown"
+        "+10% Fire Rate +3m Movespeed",
+        "+40% Evasion -65s Cooldown"
       ],
       "highlights": [
         "firing your weapon",
@@ -15529,7 +15529,7 @@
       "upgrades": [
         "+50% base Ammo while flying",
         "+10s Duration",
-        "Hero Kills Refresh Duration. +10.0 Spirit Damage with increased Spirit scaling"
+        "Hero Kills Refresh Duration. +10 Spirit Damage with increased Spirit scaling"
       ],
       "highlights": [
         "fly",
@@ -15560,7 +15560,7 @@
       "description": "Your crow familiar deals impact damage , reduces their bullet resist and applies a bleed that deals damage based on the target's current health .",
       "upgrades": [
         "Reduces Incoming Healing by -35%",
-        "+0.5% Bleed Damage -16.0s Cooldown",
+        "+0.5% Bleed Damage -16s Cooldown",
         "+2s Duration -8% Bullet Resist -8% Spirit Resist"
       ],
       "highlights": [
@@ -15660,7 +15660,7 @@
       "description": "Become a living bomb, dealing spirit damage and applying stun to all nearby enemies after a delay. Once cast, Concussive Combustion cannot be interrupted.",
       "upgrades": [
         "+100 Damage",
-        "-65.0s Cooldown and +100.0% Explosion Lifesteal",
+        "-65s Cooldown and +100% Explosion Lifesteal",
         "+0.9s Stun Duration and +10m Radius"
       ],
       "highlights": [],
@@ -15694,7 +15694,7 @@
       "description": "Dash forward, gaining slow resistance while leaving a flaming trail that deals spirit damage over time . Hold [W] while active to dash farther.",
       "upgrades": [
         "-12s Cooldown",
-        "+1.0s Trail Duration and +20.0 DPS",
+        "+1s Trail Duration and +20 DPS",
         "Enable 2 Ability Charges with 14s Recharge time"
       ],
       "highlights": [],
@@ -15774,7 +15774,7 @@
       "upgrades": [
         "+16 Damage Per Second",
         "Burn Effect: -35% Spirit Damage",
-        "+3.0s Max Burn Duration"
+        "+3s Max Burn Duration"
       ],
       "highlights": [],
       "keyStats": [
@@ -15825,8 +15825,8 @@
       "quip": "Apply an escalating slow",
       "description": "Shoot freezing cold energy out in front of you, damaging targets and progressively reducing their movement and fire rate the longer you sustain the beam on them. You have reduced move speed while using Arctic Beam. The beam may also claim Souls.",
       "upgrades": [
-        "-20.0% to Fire Rate and Move Speed",
-        "+20.0 DPS and increased Spirit Scaling",
+        "-20% to Fire Rate and Move Speed",
+        "+20 DPS and increased Spirit Scaling",
         "-13s Cooldown and Fires 2 additional Arctic Beams within 10m of the last target hit."
       ],
       "highlights": [
@@ -15991,7 +15991,7 @@
       "description": "Pull yourself through the air toward a target. Using Grapple also resets your limit of air jumps and dashes .",
       "upgrades": [
         "-17s Cooldown",
-        "+20m Cast Range and gain +7.0 Weapon Damage for 6s",
+        "+20m Cast Range and gain +7 Weapon Damage for 6s",
         "+1 Charges OnCast : +1 Stamina and +60% Air Control"
       ],
       "highlights": [
@@ -16093,8 +16093,8 @@
       "description": "Strike enemies in front of you with your whip, healing for a portion of the damage dealt.",
       "upgrades": [
         "Apply -28% Move speed for 3s",
-        "Apply -30% Fire Rate -16.0s Cooldown",
-        "+80.0 Damage +25.0 Attack angle +15.0% Heal"
+        "Apply -30% Fire Rate -16s Cooldown",
+        "+80 Damage +25 Attack angle +15% Heal"
       ],
       "highlights": [],
       "cooldown": "26s",
@@ -16311,7 +16311,7 @@
       "description": "Deal damage to nearby enemies and heal yourself based on the damage done. Heal is stronger against enemy heroes.",
       "upgrades": [
         "+35 Damage",
-        "-5.0s Cooldown +1m Radius",
+        "-5s Cooldown +1m Radius",
         "Adds a debuff to enemies that lets Mo & Krill deal +15% Damage to them. Stacks and lasts 16s."
       ],
       "highlights": [
@@ -16347,9 +16347,9 @@
       "quip": "Travel underground, emerging with spin damage",
       "description": "Burrow underground, moving faster, and gaining spirit and bullet armor . Damage from enemy heroes will reduce the speed bonus. When you jump out, deal spirit damage , slow , and knockup .",
       "upgrades": [
-        "+50.0 Spin DPS",
+        "+50 Spin DPS",
         "+4s Burrow time and +2m radius",
-        "-20.0 Cooldown and +4m/s Move Speed"
+        "-20 Cooldown and +4m/s Move Speed"
       ],
       "highlights": [
         "moving faster,",
@@ -16396,7 +16396,7 @@
       "upgrades": [
         "+50 Damage and +5m Range",
         "Slow targets by -24% and reduces dash distances by -26%",
-        "+1.5s Duration and -25.0 Cooldown"
+        "+1.5s Duration and -25 Cooldown"
       ],
       "highlights": [
         "disarms",
@@ -16421,8 +16421,8 @@
       "description": "Hold the target in place, stunning them and dealing damage during the channel. If they die during, or within 3 seconds of Combo ending, you permanently gain max health.",
       "upgrades": [
         "+100% lifesteal",
-        "-30.0s Cooldown and +50.0% Bullet Resist",
-        "+0.7s Duration and +40.0 Damage Per Second and increased scaling"
+        "-30s Cooldown and +50% Bullet Resist",
+        "+0.7s Duration and +40 Damage Per Second and increased scaling"
       ],
       "highlights": [
         "stunning them and dealing damage"
@@ -16589,7 +16589,7 @@
       "description": "Charge up a powerful shot that pierces through enemies. Hold Ability 1 or to hold the shot.",
       "upgrades": [
         "+1 Charges",
-        "+54.0 Damage",
+        "+54 Damage",
         "Improved damage scaling and -3s Charge Delay"
       ],
       "highlights": [
@@ -16743,7 +16743,7 @@
       "upgrades": [
         "+2s Bleed Duration",
         "+2 Charges",
-        "+12.0 Bleed DPS with increased Spirit scaling"
+        "+12 Bleed DPS with increased Spirit scaling"
       ],
       "highlights": [
         "bleeds",
@@ -16872,7 +16872,7 @@
       "description": "Launch a sentient cloak that travels forward and damages enemies . You can press Ability 2 to teleport to its location.",
       "upgrades": [
         "+70 Damage",
-        "+5.0 Weapon Damage for 6s",
+        "+5 Weapon Damage for 6s",
         "+1.6s Lifetime and -10s Cooldown."
       ],
       "highlights": [
@@ -16907,7 +16907,7 @@
       "upgrades": [
         "-5s Cooldown",
         "+90 Damage",
-        "+1.5s Duration +4m Radius -32% Move Speed and Fire Rate for 4.0s"
+        "+1.5s Duration +4m Radius -32% Move Speed and Fire Rate for 4s"
       ],
       "highlights": [
         "Escape",
@@ -16991,7 +16991,7 @@
       "upgrades": [
         "-35s Cooldown",
         "+3s Duration and +4m Radius",
-        "Prevents all healing +13.0 DPS with increased Spirit scaling"
+        "Prevents all healing +13 DPS with increased Spirit scaling"
       ],
       "highlights": [
         "damage over time"
@@ -17061,7 +17061,7 @@
       "upgrades": [
         "+1 Charges",
         "+2m Radius and increased DPS Spirit scaling",
-        "Enemies caught in thorns for 2.0s are Immobilized for +1.6s"
+        "Enemies caught in thorns for 2s are Immobilized for +1.6s"
       ],
       "highlights": [
         "damages",
@@ -17163,7 +17163,7 @@
       "quip": "Damage enemies and make a mess",
       "description": "Throw a ball of goo that deals damage and leaves puddles of goo behind that apply movement slow to enemies in the radius.",
       "upgrades": [
-        "+36.0 Damage and +1.5m Radius",
+        "+36 Damage and +1.5m Radius",
         "-14s Cooldown",
         "+1 Bounce and improved Spirit Scaling"
       ],
@@ -17191,7 +17191,7 @@
       "upgrades": [
         "Increases Move Speed and Stamina Recovery",
         "+25 Health Regen and +1s Duration",
-        "Removes all non-ult Debuffs and -20.0s Cooldown"
+        "Removes all non-ult Debuffs and -20s Cooldown"
       ],
       "highlights": [
         "protects from damage, and increases health regen",
@@ -17270,7 +17270,7 @@
       "upgrades": [
         "+1 Charge and +20 Damage",
         "+1.5m Radius and +60% Lifesteal",
-        "-14.0s Cooldown and now deals Heavy Melee Damage"
+        "-14s Cooldown and now deals Heavy Melee Damage"
       ],
       "highlights": [
         "Parry"
@@ -17425,7 +17425,7 @@
       "description": "After charging for 2s, release pulses that damage enemies and heal you based on the damage done. While channeling Last Stand you have greatly increased bullet and spirit resist .",
       "upgrades": [
         "+4m Radius",
-        "+40.5 DPS -30.0s Cooldown",
+        "+40.5 DPS -30s Cooldown",
         "+4s Duration Unstoppable and +30% Resists while channeling"
       ],
       "highlights": [
@@ -17579,7 +17579,7 @@
       "upgrades": [
         "+32% Movement Slow for 3s",
         "-4s Ability Cooldown",
-        "+8m Cast Range +150.0 Damage and Increases Spirit Power scaling"
+        "+8m Cast Range +150 Damage and Increases Spirit Power scaling"
       ],
       "highlights": [
         "fully-charged sword strike"
@@ -17689,7 +17689,7 @@
       "upgrades": [
         "+7 Weapon Damage",
         "+4m Move Speed and -20 Cooldown",
-        "+3.0s Duration +30% Bullet Resist +30% Spirit Resist"
+        "+3s Duration +30% Bullet Resist +30% Spirit Resist"
       ],
       "highlights": [
         "invincible",
@@ -17832,7 +17832,7 @@
       "upgrades": [
         "+49.5 Petrify Damage",
         "-20s Cooldown",
-        "+ 1.0s Petrify Duration. Petrifies all enemies in the area."
+        "+ 1s Petrify Duration. Petrifies all enemies in the area."
       ],
       "highlights": [
         "Slows",
@@ -17874,7 +17874,7 @@
       "upgrades": [
         "Bolts apply -25% Fire Rate for 5 s.",
         "-13s Cooldown",
-        "+126.0 Max Damage. + 50.0% Assistant Damage."
+        "+126 Max Damage. + 50% Assistant Damage."
       ],
       "highlights": [
         "increasing as it travels",
@@ -17918,7 +17918,7 @@
       "upgrades": [
         "-10s Cooldown",
         "+7s Duration & 5m Range",
-        "+60% Fire Rate and + 12.599999 Assistant Damage"
+        "+60% Fire Rate and + 12.6 Assistant Damage"
       ],
       "highlights": [
         "Assistant",
@@ -18056,7 +18056,7 @@
       "description": "Your bullets apply additional spirit damage . Dealing damage with your abilities builds up to a vicious bite , dealing a burst of bonus spirit damage . Love Bites has a unique cooldown per target.",
       "upgrades": [
         "On Proc: +24% Slow for 3s",
-        "+3.0 Spirit Damage per Bullet & +45.0 Bonus Damage",
+        "+3 Spirit Damage per Bullet & +45 Bonus Damage",
         "-5 Cooldown On Proc: +25% Fire Rate for 5s"
       ],
       "highlights": [
@@ -18125,8 +18125,8 @@
       "description": "",
       "upgrades": [
         "+60 Damage",
-        "+30.0 Heal per Kill -8.0s Cooldown",
-        "+7.0% Missing health damage and increased Heal per Kill Spirit scaling"
+        "+30 Heal per Kill -8s Cooldown",
+        "+7% Missing health damage and increased Heal per Kill Spirit scaling"
       ],
       "highlights": [],
       "cooldown": "16s",
@@ -18186,7 +18186,7 @@
       "description": "Unleash pain, dealing spirit damage over time to both enemies and yourself. The damage continues to increase the longer the ability is channeled, up to a maximum amount.",
       "upgrades": [
         "Enemies receive 20% Move and Dash Slow",
-        "+6 Min DPS and +34.0 Max DPS",
+        "+6 Min DPS and +34 Max DPS",
         "+1m Radius Enemies take +15% Damage"
       ],
       "highlights": [
@@ -18221,9 +18221,9 @@
       "quip": "",
       "description": "Release a wave after taking lethal damage, applying a diminishing slow . After a brief channel you reanimate, dealing spirit damage and applying stun to nearby enemies.",
       "upgrades": [
-        "While On Cooldown: Gain +15% Fire Rate and 6.0 Spirit Damage per Bullet",
+        "While On Cooldown: Gain +15% Fire Rate and 6 Spirit Damage per Bullet",
         "+50% Rebirth Health",
-        "+175 Damage +1.5 Stun -95.0s Cooldown"
+        "+175 Damage +1.5 Stun -95s Cooldown"
       ],
       "highlights": [],
       "cooldown": "240s",
@@ -18285,8 +18285,8 @@
       "description": "Conjure a dragon that appears at the target location before flying forward, dealing spirit damage and leaving a burning path in its trail.",
       "upgrades": [
         "-12s Cooldown",
-        "+1.0 Charge +2s Trail Duration +1m Radius",
-        "+12m Travel Range +100.0 Damage +30.0 DPS"
+        "+1 Charge +2s Trail Duration +1m Radius",
+        "+12m Travel Range +100 Damage +30 DPS"
       ],
       "highlights": [],
       "cooldown": "33s",
@@ -18387,7 +18387,7 @@
       "upgrades": [
         "+150 Heal Amount",
         "Increase width by +4 Steeds -45 Cooldown",
-        "+160.0 Damage +0.5s Stun Duration +70% Max Amp"
+        "+160 Damage +0.5s Stun Duration +70% Max Amp"
       ],
       "highlights": [
         "entire city"
@@ -18557,7 +18557,7 @@
       "quip": "",
       "description": "Charge head-first into an enemy and send them into the air along with Billy. Cooldown reduced by 50% on impact.",
       "upgrades": [
-        "On Impact: +25.0% weapon damage for 5s",
+        "On Impact: +25% weapon damage for 5s",
         "+0.4s Duration",
         "+10% Max Health +16s Duration -13s Cooldown"
       ],
@@ -18584,7 +18584,7 @@
       "upgrades": [
         "-10s Cooldown",
         "+1 Charge and +2m Radius",
-        "-3.0s Charge Time Now deals 50% Heavy Melee Damage"
+        "-3s Charge Time Now deals 50% Heavy Melee Damage"
       ],
       "highlights": [],
       "cooldown": "35s",
@@ -18606,7 +18606,7 @@
       "description": "Swipe at enemies in a cone ahead of you, dealing spirit damage . If the enemy is in close range , deal bonus melee damage .",
       "upgrades": [
         "+40 Damage",
-        "-8.0s Cooldown",
+        "-8s Cooldown",
         "Deals 55% Heavy Melee Damage Silences enemies for 2s if close range"
       ],
       "highlights": [
@@ -18638,7 +18638,7 @@
       "upgrades": [
         "-8% Bullet Resist",
         "-10s Cooldown and +3s Duration",
-        "+1.5% Bleed and -40.0% Incoming Healing"
+        "+1.5% Bleed and -40% Incoming Healing"
       ],
       "highlights": [
         "appear behind their back."
@@ -18807,7 +18807,7 @@
       "description": "Fire a grenade that bounces before exploding, dealing weapon damage and setting enemies on fire. Burning targets deal pure damage to enemies in the area and suffer from reduced healing .",
       "upgrades": [
         "-5s Cooldown",
-        "+1.5m Radius & +1.0s Burn Duration",
+        "+1.5m Radius & +1s Burn Duration",
         "-20% Incoming Healing and allow Charges"
       ],
       "highlights": [
@@ -19789,7 +19789,7 @@
       "description": "Your bench's legs extend, granting bonus move speed , higher jumps, Debuff Resistance and Melee Resistance . Light Melee: Perform a kick that knocks enemies back. Heavy Melee: Perform a ground pound that applies knockup , slow , and deals spirit damage . Hold Crouch / slide to charge a high jump, release to jump.",
       "upgrades": [
         "+2.5m Move Speed",
-        "-7.0s Cooldown",
+        "-7s Cooldown",
         "+15% Resists +50% Melee Lifesteal"
       ],
       "highlights": [
@@ -20177,7 +20177,7 @@
       "upgrades": [
         "+90 Damage",
         "-35s Cooldown",
-        "+0.5s Stun +8.0 Damage / Meter"
+        "+0.5s Stun +8 Damage / Meter"
       ],
       "highlights": [
         "Grab an enemy",
@@ -20288,7 +20288,7 @@
       "upgrades": [
         "-50s Cooldown",
         "-20% Move Speed and Fire Rate +30 DPS",
-        "+3.0s Channel Time +0.5 Spirit Scaling Immune to damage while channeling"
+        "+3s Channel Time +0.5 Spirit Scaling Immune to damage while channeling"
       ],
       "highlights": [
         "looking at you",

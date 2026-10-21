@@ -44,6 +44,12 @@ describe("catalog", () => {
     }
   });
 
+  it("ability upgrade text has no number with 3+ decimals", () => {
+    for (const ability of catalog.abilities)
+      for (const upgrade of ability.upgrades)
+        expect(upgrade, ability.name).not.toMatch(/\d+\.\d{3,}/);
+  });
+
   it("ability upgrades stay positional by tier", () => {
     for (const ability of catalog.abilities)
       expect(ability.upgrades, ability.name).toHaveLength(3);

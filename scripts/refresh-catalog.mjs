@@ -28,6 +28,8 @@ const parseNumber = (raw) => {
   const value = typeof raw === "number" ? raw : Number.parseFloat(raw);
   return Number.isFinite(value) ? Math.round(value * 100) / 100 : undefined;
 };
+const roundDecimals = (text) =>
+  text.replace(/\d+\.\d+/g, (token) => String(parseNumber(token)));
 const withPostfix = (raw, text, postfix = "") => {
   const unit = String(raw)
     .trim()
@@ -76,7 +78,7 @@ const abilityStats = (item) => {
 };
 const upgradeText = (item, index) => {
   const written = plainText(item.description?.[`t${index + 1}_desc`]);
-  if (written) return written;
+  if (written) return roundDecimals(written);
   return (item.upgrades?.[index]?.property_upgrades ?? [])
     .filter((upgrade) => upgrade.upgrade_type !== "EAddToScale")
     .map((upgrade) => {
