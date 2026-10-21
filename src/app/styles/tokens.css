@@ -1,0 +1,37 @@
+:root {
+  --ink: #0c0b0a;
+  --surface: #12100e;
+  --surface-2: #171512;
+  --line: #3a3226;
+  --line-soft: #2a241c;
+  --cream: #ece0c4;
+  --muted: #a89d86;
+  --dim: #7d7462;
+  --gold: #d9a441;
+  --tier-gold: #f2c66d;
+  --poster-red: #c8432f;
+  --good: #7fd39a;
+  --bad: #e07a5f;
+  --ally: #5a8f9c;
+  --enemy: #9c5a4a;
+
+  --weapon: #c97a2c;
+  --vitality: #5e9b4a;
+  --spirit: #8e6fc9;
+
+  --tier-s: #f2c66d;
+  --tier-a: #e9d9a8;
+  --tier-b: #cdbf9f;
+  --tier-c: #a99c82;
+  --tier-d: #8d8271;
+
+  --font-title: "Playfair Display SC", serif;
+  --font-label: "Rajdhani", sans-serif;
+  --font-body: "DM Sans", sans-serif;
+
+  --texture: repeating-linear-gradient(
+    0deg,
+    rgb(255 255 255 / 0.015) 0 2px,
+    transparent 2px 4px
+  );
+}
