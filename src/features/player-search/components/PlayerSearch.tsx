@@ -1,30 +1,31 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { RouteLink, useLinks } from "@/app/links";
 import { Picture } from "@/shared/ui/Picture";
-import { playerPath } from "./paths";
-import { readRemembered, writeRemembered } from "./remembered";
-import { useSteamSearch } from "./useSteamSearch";
+import { usePlayerSearch } from "../hooks/usePlayerSearch";
 
-export function SteamSearch() {
-  const navigate = useNavigate();
-  const browsing = (useLocation().state as { browse?: boolean } | null)?.browse;
+export function PlayerSearch({
+  label = "Find a player",
+  onPick,
+}: {
+  label?: string;
+  onPick?(accountId: number): void;
+}) {
+  const { navigate } = useLinks();
   const [text, setText] = useState("");
-  const { results, loading, error, directId } = useSteamSearch(text);
+  const { results, loading, error, directId } = usePlayerSearch(text);
   const searched = text.trim().length >= 2;
-  const open = (id: number) => {
-    if (!browsing || readRemembered() === null) writeRemembered(id);
-    return playerPath(id);
-  };
   return (
     <form
-      className="web-search"
+      className="player-search"
       onSubmit={(event) => {
         event.preventDefault();
-        if (directId !== null) navigate(open(directId));
+        if (directId === null) return;
+        onPick?.(directId);
+        navigate({ page: "profile", accountId: directId });
       }}
     >
       <label>
-        Find your Steam account
+        {label}
         <input
           type="search"
           value={text}
@@ -34,16 +35,16 @@ export function SteamSearch() {
           spellCheck={false}
         />
       </label>
-      <div className="web-search-results" aria-live="polite">
+      <div className="player-search-results" aria-live="polite">
         {directId !== null && (
-          <Link
-            className="web-search-direct"
-            to={playerPath(directId)}
-            onClick={() => open(directId)}
+          <RouteLink
+            className="player-search-direct"
+            route={{ page: "profile", accountId: directId }}
+            onClick={() => onPick?.(directId)}
           >
             Use this ID
             <small>Account {directId}</small>
-          </Link>
+          </RouteLink>
         )}
         {loading && <p className="muted">Searching…</p>}
         {error && directId === null && (
@@ -62,20 +63,20 @@ export function SteamSearch() {
           <ul>
             {results.map((profile) => (
               <li key={profile.accountId}>
-                <Link
-                  to={playerPath(profile.accountId)}
-                  onClick={() => open(profile.accountId)}
+                <RouteLink
+                  route={{ page: "profile", accountId: profile.accountId }}
+                  onClick={() => onPick?.(profile.accountId)}
                 >
                   <Picture
                     className="profile-avatar small"
                     src={profile.avatar}
                     label={profile.name}
                   />
-                  <span className="web-search-name">
+                  <span className="player-search-name">
                     {profile.name}
                     <small>Account {profile.accountId}</small>
                   </span>
-                </Link>
+                </RouteLink>
               </li>
             ))}
           </ul>

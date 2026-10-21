@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { AsyncState } from "@/shared/api/useAsync";
 import { useAsync } from "@/shared/api/useAsync";
 import { LineChart } from "@/shared/ui/LineChart";
+import { SectionHeader } from "@/shared/ui/SectionHeader";
 import { fetchSummaryHeroStats } from "../services/profile-api";
 import type { HistoryMatch } from "../types";
 import {
@@ -46,8 +47,8 @@ export function PerformanceTab({
   ];
   return (
     <div className="performance">
+      <SectionHeader title="Performance" />
       <div className="section-head">
-        <p className="eyebrow">PERFORMANCE</p>
         <div className="filter-buttons" role="group" aria-label="Range">
           {ranges.map(({ value, label }) => (
             <button
@@ -82,7 +83,7 @@ export function PerformanceTab({
               values={series.kda}
               average={averages.kda}
               label="KDA per match"
-              color="#dfc48c"
+              color="var(--gold)"
             />
           </section>
           <section className="chart-card">
@@ -91,7 +92,7 @@ export function PerformanceTab({
               values={series.soulsPerMin}
               average={averages.soulsPerMin}
               label="Souls per minute"
-              color="#84c6ae"
+              color="var(--good)"
             />
           </section>
           <section className="chart-card">

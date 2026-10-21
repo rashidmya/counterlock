@@ -4,12 +4,13 @@ import { useAsync } from "@/shared/api/useAsync";
 import { catalog, heroById } from "@/shared/catalog";
 import { gameIcons, rankImage } from "@/shared/ui/gameIcons";
 import { Picture } from "@/shared/ui/Picture";
+import { SectionHeader } from "@/shared/ui/SectionHeader";
 import {
   fetchMates,
   fetchRank,
   fetchSteamProfiles,
 } from "../services/profile-api";
-import type { HistoryFilter, HistoryMatch } from "../types";
+import type { HistoryMatch } from "../types";
 import {
   isSummaryMatch,
   rankedSummary,
@@ -64,7 +65,7 @@ function Teammates({ accountId }: { accountId: number }) {
   if (!data?.length) return null;
   return (
     <section>
-      <p className="eyebrow">FREQUENT TEAMMATES</p>
+      <SectionHeader title="Frequent teammates" />
       <ul className="teammates">
         {data.map((mate) => {
           const name = mate.profile?.name ?? `Player ${mate.accountId}`;
@@ -91,13 +92,11 @@ function Teammates({ accountId }: { accountId: number }) {
 export function OverviewTab({
   accountId,
   history,
-  filter,
-  onFilter,
+  onShowAll,
 }: {
   accountId: number;
   history: AsyncState<HistoryMatch[]>;
-  filter: HistoryFilter;
-  onFilter(filter: HistoryFilter): void;
+  onShowAll(): void;
 }) {
   const matches = history.data;
   const summaryMatches = matches?.filter(isSummaryMatch) ?? [];
@@ -152,7 +151,7 @@ export function OverviewTab({
       )}
       {!!heroes.length && (
         <section>
-          <p className="eyebrow">TOP HEROES</p>
+          <SectionHeader title="Top heroes" />
           <div className="top-heroes">
             {heroes.map((row) => {
               const hero = heroById.get(row.heroId);
@@ -183,7 +182,7 @@ export function OverviewTab({
       )}
       <Teammates accountId={accountId} />
       {!!matches?.length && (
-        <MatchHistory {...{ matches, filter, onFilter, accountId }} />
+        <MatchHistory preview {...{ matches, accountId, onShowAll }} />
       )}
     </div>
   );

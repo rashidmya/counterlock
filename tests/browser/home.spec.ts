@@ -150,20 +150,31 @@ async function storeAccount(page: Page) {
   );
 }
 
+// Home still renders today's profile and stays mounted (hidden) when another page is open.
+const view = (page: Page) => page.locator(".page:not([hidden])");
+
+async function openMyProfile(page: Page) {
+  await page.goto("/");
+  await page.getByRole("button", { name: "My profile" }).click();
+}
+
+const openMatches = (page: Page) =>
+  page.getByRole("tab", { name: "Matches" }).click();
+
 test("empty state accepts a Steam ID", async ({ page }) => {
   await routeApi(page);
   await page.goto("/");
   await expect(
-    page.getByText(
+    view(page).getByText(
       "Play a match with Counterlock open and your profile appears here",
     ),
   ).toBeVisible();
   await page.getByLabel("Steam ID").fill("76561198060265728");
   await page.getByLabel("Steam ID").press("Enter");
-  await expect(page.locator(".profile-header")).toContainText(
+  await expect(view(page).locator(".profile-header")).toContainText(
     "Fixture Persona",
   );
-  await expect(page.locator(".profile-header")).toContainText(
+  await expect(view(page).locator(".profile-header")).toContainText(
     "Entered manually",
   );
   const stored = await page.evaluate(
@@ -171,7 +182,7 @@ test("empty state accepts a Steam ID", async ({ page }) => {
     STORAGE_KEY,
   );
   expect(stored).toMatchObject({ accountId: ACCOUNT, source: "manual" });
-  await page.getByRole("button", { name: "Change" }).click();
+  await page.getByRole("button", { name: "Not you? Switch account" }).click();
   await expect(page.getByLabel("Steam ID")).toBeVisible();
 });
 
@@ -180,40 +191,87 @@ test("overview shows rank, summary, top heroes, teammates and filtered history",
 }) => {
   await storeAccount(page);
   await routeApi(page);
-  await page.goto("/");
-  await expect(page.locator(".profile-header")).toContainText(
+  await openMyProfile(page);
+  await expect(view(page).locator(".profile-header")).toContainText(
     "Seen on this PC · 2h ago",
   );
-  const rank = page.locator(".rank-card");
+  const rank = view(page).locator(".rank-card");
   await expect(rank).toContainText("Mystic 3");
   await expect(rank.locator("img")).toHaveAttribute(
     "src",
     /\/ranks\/5\/3\/image/,
   );
   await expect(
-    page.locator(".stat-card:not(.rank-card)", { hasText: "Ranked" }),
+    view(page).locator(".stat-card:not(.rank-card)", { hasText: "Ranked" }),
   ).toHaveText(/RANKED1100\.0% WR/);
-  await expect(page.getByText("Normal & ranked games")).toBeVisible();
+  await expect(view(page).getByText("Normal & ranked games")).toBeVisible();
   // Street Brawl and bot matches stay out of the Normal & ranked summary.
-  await expect(page.locator(".top-hero")).toHaveCount(2);
-  await expect(page.getByText("Teammate Tess")).toBeVisible();
+  await expect(view(page).locator(".top-hero")).toHaveCount(2);
+  await expect(view(page).getByText("Teammate Tess")).toBeVisible();
 
-  await expect(page.locator(".match-row")).toHaveCount(4);
+  await openMatches(page);
+  await expect(view(page).locator(".match-row")).toHaveCount(4);
   await page.getByRole("button", { name: "Street Brawl", exact: true }).click();
-  await expect(page.locator(".match-row")).toHaveCount(1);
+  await expect(view(page).locator(".match-row")).toHaveCount(1);
   await page.getByRole("button", { name: "All", exact: true }).click();
-  await expect(page.locator(".match-row")).toHaveCount(4);
+  await expect(view(page).locator(".match-row")).toHaveCount(4);
+});
+
+test("overview shows the three newest matches and All matches opens the Matches tab", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page);
+  await openMyProfile(page);
+  await expect(
+    page.getByRole("heading", { name: "Recent matches" }),
+  ).toBeVisible();
+  await expect(view(page).locator(".match-row")).toHaveCount(3);
+  await expect(page.getByRole("group", { name: "Game mode" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Show more" })).toHaveCount(0);
+  await page.getByRole("button", { name: "All matches →" }).click();
+  await expect(page.getByRole("tab", { name: "Matches" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(view(page).locator(".match-row")).toHaveCount(4);
+});
+
+test("My profile opens the stored account with its actions", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "My profile" })).toContainText(
+    "Fixture Persona",
+  );
+  await page.getByRole("button", { name: "My profile" }).click();
+  const header = view(page).locator(".profile-header");
+  await expect(header.locator("h1")).toHaveText("Fixture Persona");
+  await expect(header).toContainText("Player profile");
+  await expect(header).toContainText("Seen on this PC · 2h ago");
+  await expect(page.getByRole("button", { name: "← Back" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "This is me" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Not you? Switch account" }).click();
+  expect(
+    await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY),
+  ).toBeNull();
+  await expect(page.getByLabel("Steam ID")).toBeVisible();
+  await expect(page.getByRole("button", { name: "My profile" })).toHaveText(
+    "Find your account",
+  );
 });
 
 test("protected history degrades", async ({ page }) => {
   await storeAccount(page);
   await routeApi(page, { history: 403, rank: [] });
-  await page.goto("/");
-  await expect(page.locator(".profile-header")).toContainText(
+  await openMyProfile(page);
+  await expect(view(page).locator(".profile-header")).toContainText(
     "Fixture Persona",
   );
-  await expect(page.getByText("Match history unavailable")).toBeVisible();
-  await expect(page.locator(".rank-card")).toContainText("Unavailable");
+  await expect(view(page).getByText("Match history unavailable")).toBeVisible();
+  await expect(view(page).locator(".rank-card")).toContainText("Unavailable");
 });
 
 test("unranked players show Unranked without a badge", async ({ page }) => {
@@ -221,8 +279,8 @@ test("unranked players show Unranked without a badge", async ({ page }) => {
   await routeApi(page, {
     rank: [{ account_id: ACCOUNT, badge: 0, rank: 0, subrank: 0 }],
   });
-  await page.goto("/");
-  const rank = page.locator(".rank-card");
+  await openMyProfile(page);
+  const rank = view(page).locator(".rank-card");
   await expect(rank).toContainText("Unranked");
   await expect(rank).not.toContainText("Obscurus");
   await expect(rank.locator("img")).toHaveCount(0);
@@ -232,38 +290,46 @@ test("retry reloads a failed match history", async ({ page }) => {
   await storeAccount(page);
   await routeApi(page, { failFirstHistory: true });
   await page.goto("/");
-  await expect(page.getByText("Match history unavailable")).toBeVisible();
+  await expect(view(page).getByText("Match history unavailable")).toBeVisible();
   await page.getByRole("button", { name: "Retry", exact: true }).click();
-  await expect(page.locator(".match-row")).toHaveCount(4);
-  await expect(page.getByText("Match history unavailable")).toHaveCount(0);
+  await expect(view(page).getByText("Match history unavailable")).toHaveCount(
+    0,
+  );
+  await openMatches(page);
+  await expect(view(page).locator(".match-row")).toHaveCount(4);
+  await expect(view(page).getByText("Match history unavailable")).toHaveCount(
+    0,
+  );
 });
 
 test("empty history says no recorded matches", async ({ page }) => {
   await storeAccount(page);
   await routeApi(page, { history: [] });
-  await page.goto("/");
-  await expect(page.getByText("No recorded matches")).toBeVisible();
+  await openMyProfile(page);
+  await expect(view(page).getByText("No recorded matches")).toBeVisible();
 });
 
 test("match detail shows both teams with items", async ({ page }) => {
   await storeAccount(page);
   await routeApi(page);
-  await page.goto("/");
-  await page.locator(".match-row").first().click();
-  await expect(page.locator(".scoreboard .score-row")).toHaveCount(12);
-  await expect(page.locator(".scoreboard .score-row.local")).toContainText(
-    "YOU",
-  );
-  await expect(page.locator(".scoreboard img.item-icon").first()).toBeVisible();
-  await page.locator(".match-row").first().click();
-  await expect(page.locator(".scoreboard")).toHaveCount(0);
+  await openMyProfile(page);
+  await view(page).locator(".match-row").first().click();
+  await expect(view(page).locator(".scoreboard .score-row")).toHaveCount(12);
+  await expect(
+    view(page).locator(".scoreboard .score-row.local"),
+  ).toContainText("YOU");
+  await expect(
+    view(page).locator(".scoreboard img.item-icon").first(),
+  ).toBeVisible();
+  await view(page).locator(".match-row").first().click();
+  await expect(view(page).locator(".scoreboard")).toHaveCount(0);
 });
 
 test("hero cross-link opens the Heroes tab", async ({ page }) => {
   await storeAccount(page);
   await routeApi(page);
-  await page.goto("/");
-  await page.locator(".top-hero").first().click();
+  await openMyProfile(page);
+  await view(page).locator(".top-hero").first().click();
   await expect(
     page.getByRole("button", { name: "Heroes", exact: true }),
   ).toHaveClass(/active/);
@@ -289,13 +355,13 @@ const heroesHistory = [
 async function openHeroes(page: Page, fixtures: Fixtures = {}) {
   await storeAccount(page);
   await routeApi(page, { history: heroesHistory, ...fixtures });
-  await page.goto("/");
+  await openMyProfile(page);
   await page.getByRole("tab", { name: "Heroes" }).click();
 }
 
 const heroRowNames = async (page: Page) =>
-  (await page.locator(".hero-row .hero-link").allTextContents()).map((text) =>
-    text.trim(),
+  (await view(page).locator(".hero-row .hero-link").allTextContents()).map(
+    (text) => text.trim(),
   );
 
 test("heroes tab lists played heroes sorted by games with real stats", async ({
@@ -312,7 +378,7 @@ test("heroes tab lists played heroes sorted by games with real stats", async ({
       },
     ],
   });
-  await expect(page.locator(".hero-row")).toHaveCount(3);
+  await expect(view(page).locator(".hero-row")).toHaveCount(3);
   expect(await heroRowNames(page)).toEqual([
     heroName(heroes[0]),
     heroName(heroes[1]),
@@ -321,7 +387,7 @@ test("heroes tab lists played heroes sorted by games with real stats", async ({
   await expect(
     page.getByRole("columnheader", { name: /Games/ }),
   ).toHaveAttribute("aria-sort", "descending");
-  const first = page.locator(".hero-row").first();
+  const first = view(page).locator(".hero-row").first();
   await expect(first).toContainText("2–1");
   await expect(first).toContainText("66.7%");
   await expect(first).toContainText("10.0/5.0/7.0");
@@ -341,7 +407,7 @@ test("heroes tab shows dashes where hero stats have no row", async ({
   page,
 }) => {
   await openHeroes(page);
-  const rows = page.locator(".hero-row");
+  const rows = view(page).locator(".hero-row");
   await expect(rows).toHaveCount(3);
   for (const row of await rows.all()) {
     const cells = row.locator("td");
@@ -390,18 +456,20 @@ test("heroes tab sorts by header and filters by mode", async ({ page }) => {
   ).toHaveAttribute("aria-sort", "ascending");
 
   await page.getByRole("button", { name: "Ranked", exact: true }).click();
-  await expect(page.locator(".hero-row")).toHaveCount(2);
+  await expect(view(page).locator(".hero-row")).toHaveCount(2);
   await page.getByRole("button", { name: "Street Brawl", exact: true }).click();
-  await expect(page.getByText("No recorded matches")).toBeVisible();
+  await expect(view(page).getByText("No recorded matches")).toBeVisible();
 });
 
 test("heroes tab hero cell navigates to the Heroes page", async ({ page }) => {
   await openHeroes(page);
-  await page.locator(".hero-row .hero-link").first().click();
+  await view(page).locator(".hero-row .hero-link").first().click();
   await expect(
     page.getByRole("button", { name: "Heroes", exact: true }),
   ).toHaveClass(/active/);
-  await expect(page.locator(".hero-header h1")).toHaveText(heroName(heroes[0]));
+  await expect(view(page).locator(".hero-header h1")).toHaveText(
+    heroName(heroes[0]),
+  );
 });
 
 // 60 summary games, newest first; every third one is lost. Street Brawl,
@@ -451,42 +519,44 @@ test("performance tab charts, form and range switch", async ({ page }) => {
       },
     ],
   });
-  await page.goto("/");
+  await openMyProfile(page);
   await page.getByRole("tab", { name: "Performance" }).click();
 
-  await expect(page.locator('svg[aria-label="KDA per match"]')).toBeVisible();
   await expect(
-    page.locator('svg[aria-label="Souls per minute"]'),
+    view(page).locator('svg[aria-label="KDA per match"]'),
+  ).toBeVisible();
+  await expect(
+    view(page).locator('svg[aria-label="Souls per minute"]'),
   ).toBeVisible();
   expect(await pointCount(page, "KDA per match")).toBe(20);
   expect(await pointCount(page, "Souls per minute")).toBe(20);
 
-  const squares = page.locator(".form i");
+  const squares = view(page).locator(".form i");
   await expect(squares).toHaveCount(20);
   // Newest game (index 0) was lost; the next ones were won.
   await expect(squares.nth(0)).toHaveCSS(
     "background-color",
-    "rgb(229, 155, 128)",
+    "rgb(224, 122, 95)",
   );
   await expect(squares.nth(1)).toHaveCSS(
     "background-color",
-    "rgb(132, 198, 174)",
+    "rgb(127, 211, 154)",
   );
 
   await expect(
-    page.locator(".stat-card", { hasText: "ACCURACY" }),
+    view(page).locator(".stat-card", { hasText: "ACCURACY" }),
   ).toContainText("50.0%");
   await expect(
-    page.locator(".stat-card", { hasText: "DMG/MIN" }),
+    view(page).locator(".stat-card", { hasText: "DMG/MIN" }),
   ).toContainText("1,250");
   await expect(
-    page.locator(".stat-card", { hasText: "LAST HITS" }),
+    view(page).locator(".stat-card", { hasText: "LAST HITS" }),
   ).toContainText("120.0");
-  await expect(page.locator(".stat-card", { hasText: "DEATHS" })).toContainText(
-    "5.0",
-  );
   await expect(
-    page.getByText(
+    view(page).locator(".stat-card", { hasText: "DEATHS" }),
+  ).toContainText("5.0");
+  await expect(
+    view(page).getByText(
       "Accuracy and damage cover all normal & ranked games in the period.",
     ),
   ).toBeVisible();
@@ -499,7 +569,7 @@ test("performance tab charts, form and range switch", async ({ page }) => {
   await page.getByRole("button", { name: "All", exact: true }).click();
   await expect.poll(() => pointCount(page, "KDA per match")).toBe(60);
   await expect(
-    page.getByText("Accuracy and damage cover all normal & ranked games"),
+    view(page).getByText("Accuracy and damage cover all normal & ranked games"),
   ).toHaveCount(0);
 });
 
@@ -508,17 +578,17 @@ test("performance tab says so with too few matches", async ({ page }) => {
   await routeApi(page, {
     history: [historyRow(1, heroes[0], 1, 4, true, now)],
   });
-  await page.goto("/");
+  await openMyProfile(page);
   await page.getByRole("tab", { name: "Performance" }).click();
-  await expect(page.getByText("Not enough matches")).toHaveCount(2);
-  await expect(page.locator(".form i")).toHaveCount(1);
+  await expect(view(page).getByText("Not enough matches")).toHaveCount(2);
+  await expect(view(page).locator(".form i")).toHaveCount(1);
 });
 
 test("performance tab degrades without match history", async ({ page }) => {
   await storeAccount(page);
   await routeApi(page, { history: 403 });
-  await page.goto("/");
+  await openMyProfile(page);
   await page.getByRole("tab", { name: "Performance" }).click();
-  await expect(page.getByText("Match history unavailable")).toBeVisible();
-  await expect(page.locator("svg[aria-label]")).toHaveCount(0);
+  await expect(view(page).getByText("Match history unavailable")).toBeVisible();
+  await expect(view(page).locator("svg[aria-label]")).toHaveCount(0);
 });

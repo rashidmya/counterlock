@@ -19,7 +19,7 @@ function directAccountId(text: string): number | null {
   return accountId(trimmed) ?? accountId(PROFILE_URL.exec(trimmed)?.[1]);
 }
 
-export function useSteamSearch(text: string, delayMs = 300) {
+export function usePlayerSearch(text: string, delayMs = 300) {
   const query = text.trim();
   const active = query.length >= MIN_QUERY;
   const [settled, setSettled] = useState<Settled | null>(null);

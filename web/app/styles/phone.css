@@ -79,17 +79,17 @@
     align-items: center;
     min-height: 44px;
   }
-  .app.web .web-search input {
+  .app.web .player-search input {
     min-height: 46px;
     max-width: none;
   }
-  .app.web .web-search-results {
+  .app.web .player-search-results {
     max-width: none;
   }
-  .app.web .web-search-results a {
+  .app.web .player-search-results a {
     min-height: 48px;
   }
-  .app.web .web-search-direct small {
+  .app.web .player-search-direct small {
     overflow-wrap: anywhere;
   }
 
@@ -201,44 +201,46 @@
   }
 
   .app.web .profile-header {
-    flex-wrap: wrap;
-    gap: 4px 12px;
+    min-height: 0;
+    margin: -20px -16px 0;
+    padding: 20px 16px;
   }
-  .app.web .section-head {
-    flex-wrap: wrap;
-    gap: 8px;
+  .app.web .profile-header .hero-art {
+    display: none;
   }
-  .app.web .section-head .eyebrow {
-    white-space: nowrap;
+  .app.web .profile-who {
+    gap: 14px;
+  }
+  .app.web .profile-avatar {
+    width: 64px;
+    height: 64px;
   }
   .app.web .profile-identity {
     flex: 1;
     min-width: 0;
   }
   .app.web .profile-identity h1 {
-    font-size: 24px;
+    font-size: 28px;
     overflow-wrap: anywhere;
   }
-  .app.web .profile-header .text-button,
-  .app.web .web-this-is-me {
+  .app.web .profile-action,
+  .app.web .profile-back {
     display: inline-flex;
     align-items: center;
-    min-height: 40px;
-    margin: 0;
-    padding: 0;
-    font-size: 13px;
+    min-height: 44px;
   }
-  .app.web .profile-header .text-button {
-    flex-basis: 100%;
-    margin-left: 0;
+  .app.web .section-head {
+    flex-wrap: wrap;
+    gap: 8px;
   }
-  .app.web .web-this-is-me {
-    margin: -4px 0 4px;
+  .app.web .subtabs {
+    gap: 16px;
   }
   .app.web .subtabs button {
     min-height: 44px;
     padding: 0;
-    font-size: 14px;
+    font-size: 13px;
+    letter-spacing: 0.08em;
   }
   .app.web .stat-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));

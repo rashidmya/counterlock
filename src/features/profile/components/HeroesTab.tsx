@@ -4,6 +4,7 @@ import type { AsyncState } from "@/shared/api/useAsync";
 import { useAsync } from "@/shared/api/useAsync";
 import { heroById } from "@/shared/catalog";
 import { Picture } from "@/shared/ui/Picture";
+import { SectionHeader } from "@/shared/ui/SectionHeader";
 import { type SortDir, sortRows } from "@/shared/utils/sort";
 import { fetchPlayerHeroStats } from "../services/profile-api";
 import type { HeroRow, HistoryFilter, HistoryMatch } from "../types";
@@ -85,8 +86,8 @@ export function HeroesTab({
     );
   return (
     <div className="heroes-tab">
+      <SectionHeader title="Heroes played" />
       <div className="section-head">
-        <p className="eyebrow">HEROES PLAYED</p>
         <HistoryFilterButtons value={filter} onChange={onFilter} />
       </div>
       {history.loading && <p className="muted">Loading match history…</p>}

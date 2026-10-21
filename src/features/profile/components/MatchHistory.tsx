@@ -3,6 +3,7 @@ import { RouteLink } from "@/app/links";
 import { heroById } from "@/shared/catalog";
 import { gameIcons } from "@/shared/ui/gameIcons";
 import { Picture } from "@/shared/ui/Picture";
+import { SectionHeader } from "@/shared/ui/SectionHeader";
 import type { HistoryFilter, HistoryMatch } from "../types";
 import { compactSouls, duration, timeAgo } from "../utils/format";
 import { isWin, matchesFilter, modeLabel } from "../utils/match-history";
@@ -10,28 +11,50 @@ import { HistoryFilterButtons } from "./HistoryFilterButtons";
 import { MatchDetail } from "./MatchDetail";
 
 const PAGE_SIZE = 20;
+const PREVIEW_SIZE = 3;
 
 export function MatchHistory({
   matches,
-  filter,
-  onFilter,
+  filter = "all",
+  onFilter = () => undefined,
   accountId,
+  preview = false,
+  onShowAll,
 }: {
   matches: HistoryMatch[];
-  filter: HistoryFilter;
-  onFilter(filter: HistoryFilter): void;
+  filter?: HistoryFilter;
+  onFilter?(filter: HistoryFilter): void;
   accountId: number;
+  preview?: boolean;
+  onShowAll?(): void;
 }) {
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [open, setOpen] = useState<number | null>(null);
   useEffect(() => setVisible(PAGE_SIZE), [filter]);
-  const filtered = matches.filter((m) => matchesFilter(m, filter));
+  const filtered = preview
+    ? [...matches]
+        .sort((a, b) => b.startTime - a.startTime)
+        .slice(0, PREVIEW_SIZE)
+    : matches.filter((m) => matchesFilter(m, filter));
   return (
     <section className="match-history">
-      <div className="section-head">
-        <p className="eyebrow">MATCH HISTORY</p>
-        <HistoryFilterButtons value={filter} onChange={onFilter} />
-      </div>
+      {preview ? (
+        <SectionHeader
+          title="Recent matches"
+          action={
+            <button type="button" onClick={onShowAll}>
+              All matches →
+            </button>
+          }
+        />
+      ) : (
+        <>
+          <SectionHeader title="All matches" />
+          <div className="section-head">
+            <HistoryFilterButtons value={filter} onChange={onFilter} />
+          </div>
+        </>
+      )}
       {!filtered.length && <p className="muted">No recorded matches</p>}
       <ul>
         {filtered.slice(0, visible).map((match) => {
@@ -40,7 +63,10 @@ export function MatchHistory({
           const won = isWin(match);
           const expanded = open === match.matchId;
           return (
-            <li key={match.matchId} className="match-entry">
+            <li
+              key={match.matchId}
+              className={`match-entry ${won ? "won" : "lost"}`}
+            >
               <div className="match-row">
                 <RouteLink
                   className="hero-link"
@@ -82,7 +108,7 @@ export function MatchHistory({
           );
         })}
       </ul>
-      {filtered.length > visible && (
+      {!preview && filtered.length > visible && (
         <button
           className="show-more"
           onClick={() => setVisible(visible + PAGE_SIZE)}

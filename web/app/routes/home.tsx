@@ -2,11 +2,11 @@ import { useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { fetchHeroSummaries } from "@/features/heroes/services/hero-analytics";
 import { HeroGrid, type HeroCard } from "@/features/heroes/components/HeroGrid";
+import { PlayerSearch } from "@/features/player-search/components/PlayerSearch";
 import { useAsync } from "@/shared/api/useAsync";
 import { heroById } from "@/shared/catalog";
-import { SteamSearch } from "../SteamSearch";
 import { playerPath } from "../paths";
-import { readRemembered } from "../remembered";
+import { readRemembered, writeRemembered } from "../remembered";
 import { PageMeta } from "../seo";
 
 async function fetchSTierCards(): Promise<HeroCard[]> {
@@ -57,7 +57,12 @@ export default function HomeRoute() {
             Counterlock shows which heroes and items are winning right now, the
             best build for every hero, and your own match history.
           </p>
-          <SteamSearch />
+          <PlayerSearch
+            label="Find your Steam account"
+            onPick={(id) => {
+              if (!browsing || readRemembered() === null) writeRemembered(id);
+            }}
+          />
           <p className="web-home-links">
             <Link to="/heroes">Hero tier list</Link>
             <Link to="/items">Items</Link>

@@ -141,7 +141,7 @@ test("results with the same name show distinct account ids", async ({
   await page.goto("/");
   await hydrated(page);
   await search(page).fill("twin");
-  const rows = page.locator(".web-search-results li a");
+  const rows = page.locator(".player-search-results li a");
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toContainText("Account 888");
   await expect(rows.nth(1)).toContainText("Account 889");
@@ -224,6 +224,30 @@ test("another player's profile offers 'This is me' and 'Find another player'", a
   await expect(
     page.getByRole("button", { name: "Not you? Switch account" }),
   ).toBeVisible();
+});
+
+test("This is me updates the header immediately", async ({ page }) => {
+  await mockApi(page);
+  await page.goto(`/players/${OTHER}`);
+  const mine = page.getByRole("link", { name: "My profile" });
+  await expect(mine).toHaveText("Find your account");
+  await page.getByRole("button", { name: "This is me" }).click();
+  await expect(mine).toContainText("Other Persona");
+  await expect(mine).toHaveAttribute("href", `/players/${OTHER}`);
+  await page.getByRole("button", { name: "Not you? Switch account" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(mine).toHaveText("Find your account");
+  expect(await stored(page)).toBeNull();
+});
+
+test("the header shows Find your account with nothing remembered", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto("/heroes");
+  const mine = page.getByRole("link", { name: "My profile" });
+  await expect(mine).toHaveText("Find your account");
+  await expect(mine).toHaveAttribute("href", "/");
 });
 
 test("picking a result while browsing keeps the remembered account", async ({

@@ -1,17 +1,24 @@
 import type { Navigate } from "@/app/navigation";
-import { useProfileAccount } from "../hooks/useProfileAccount";
+import { accountSubtitle, type useDesktopMe } from "../me";
 import { ProfileEmpty } from "./ProfileEmpty";
-import { ProfileHeader } from "./ProfileHeader";
-import { ProfileView } from "./ProfileView";
+import { ProfilePage } from "./ProfilePage";
 
-export function HomePage({ navigate }: { navigate: Navigate }) {
-  const { account, setManual, clear } = useProfileAccount();
-  if (!account) return <ProfileEmpty onSubmit={setManual} />;
+export function HomePage({
+  navigate,
+  me,
+}: {
+  navigate: Navigate;
+  me: ReturnType<typeof useDesktopMe>;
+}) {
+  const { account } = me;
+  if (!account) return <ProfileEmpty onSubmit={me.setMe} />;
   return (
-    <ProfileView
+    <ProfilePage
+      key={account.accountId}
       accountId={account.accountId}
-      header={<ProfileHeader account={account} onChange={clear} />}
+      me={me}
       navigate={navigate}
+      subtitle={accountSubtitle(account)}
     />
   );
 }

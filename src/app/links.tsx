@@ -28,19 +28,28 @@ export function RouteLink({
   className,
   title,
   "aria-label": ariaLabel,
+  onClick,
   children,
 }: {
   route: Route;
   className?: string;
   title?: string;
   "aria-label"?: string;
+  onClick?(): void;
   children: React.ReactNode;
 }) {
   const { navigate, href } = useLinks();
   const shared = { className, title, "aria-label": ariaLabel };
   if (!href)
     return (
-      <button type="button" {...shared} onClick={() => navigate(route)}>
+      <button
+        type="button"
+        {...shared}
+        onClick={() => {
+          onClick?.();
+          navigate(route);
+        }}
+      >
         {children}
       </button>
     );
@@ -49,6 +58,7 @@ export function RouteLink({
       {...shared}
       href={href(route)}
       onClick={(event) => {
+        onClick?.();
         if (
           event.defaultPrevented ||
           event.button !== 0 ||

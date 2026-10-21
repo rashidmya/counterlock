@@ -43,7 +43,7 @@ export function LineChart({
           x2={WIDTH}
           y1={y(average)}
           y2={y(average)}
-          stroke="#394148"
+          stroke="var(--line)"
           strokeWidth={1}
           strokeDasharray="2"
           vectorEffect="non-scaling-stroke"

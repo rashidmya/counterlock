@@ -155,3 +155,38 @@
 .hero-card .hero-card-stat .win {
   color: var(--good);
 }
+
+.my-profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0;
+  color: var(--cream);
+  font: 600 13px var(--font-body);
+  cursor: pointer;
+}
+.my-profile:hover:not(:disabled) {
+  color: var(--gold);
+  text-decoration: none;
+}
+.my-profile .my-avatar {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--gold);
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.my-profile .my-avatar.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 11px var(--font-label);
+  color: var(--dim);
+}
+.my-profile .my-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

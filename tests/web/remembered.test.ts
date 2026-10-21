@@ -3,6 +3,7 @@ import {
   REMEMBERED_KEY,
   clearRemembered,
   readRemembered,
+  subscribeRemembered,
   writeRemembered,
 } from "../../web/app/remembered";
 
@@ -14,7 +15,13 @@ function stubStorage(overrides: Partial<Storage> = {}) {
     removeItem: (key: string) => void data.delete(key),
     ...overrides,
   } as Storage;
-  vi.stubGlobal("window", { localStorage: storage });
+  const events = new EventTarget();
+  vi.stubGlobal("window", {
+    localStorage: storage,
+    addEventListener: events.addEventListener.bind(events),
+    removeEventListener: events.removeEventListener.bind(events),
+    dispatchEvent: events.dispatchEvent.bind(events),
+  });
   vi.stubGlobal("localStorage", storage);
   return data;
 }
@@ -22,6 +29,47 @@ function stubStorage(overrides: Partial<Storage> = {}) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("remembered web account", () => {
+  describe("subscriptions", () => {
+    beforeEach(() => void stubStorage());
+
+    it("writeRemembered notifies subscribers in the same tab", () => {
+      const callback = vi.fn();
+      const stop = subscribeRemembered(callback);
+      writeRemembered(5);
+      expect(callback).toHaveBeenCalledTimes(1);
+      stop();
+    });
+
+    it("clearRemembered notifies subscribers", () => {
+      const callback = vi.fn();
+      const stop = subscribeRemembered(callback);
+      clearRemembered();
+      expect(callback).toHaveBeenCalledTimes(1);
+      stop();
+    });
+
+    it("notifies on storage events for the remembered key only", () => {
+      const callback = vi.fn();
+      const stop = subscribeRemembered(callback);
+      const storageEvent = (key: string | null) =>
+        Object.assign(new Event("storage"), { key });
+      window.dispatchEvent(storageEvent("other"));
+      expect(callback).not.toHaveBeenCalled();
+      window.dispatchEvent(storageEvent(REMEMBERED_KEY));
+      window.dispatchEvent(storageEvent(null));
+      expect(callback).toHaveBeenCalledTimes(2);
+      stop();
+    });
+
+    it("stops notifying after unsubscribe", () => {
+      const callback = vi.fn();
+      subscribeRemembered(callback)();
+      writeRemembered(5);
+      clearRemembered();
+      expect(callback).not.toHaveBeenCalled();
+    });
+  });
+
   describe("with storage", () => {
     let data: Map<string, string>;
     beforeEach(() => {

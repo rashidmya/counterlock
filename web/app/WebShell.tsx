@@ -1,8 +1,10 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router";
 import { LinkProvider } from "@/app/links";
 import type { Route } from "@/app/navigation";
+import { MyProfileLabel } from "@/features/profile/components/MyProfileLabel";
 import { assetUrl } from "@/shared/ui/assets";
 import { routeToPath } from "./paths";
+import { BROWSE_STATE, useRememberedMe } from "./remembered";
 
 const tabs = [
   { to: "/", label: "Home", end: true },
@@ -13,6 +15,7 @@ const tabs = [
 
 export function WebShell({ children }: { children?: React.ReactNode }) {
   const navigate = useNavigate();
+  const { meId } = useRememberedMe();
   return (
     <div className="app web">
       <header>
@@ -22,6 +25,14 @@ export function WebShell({ children }: { children?: React.ReactNode }) {
             COUNTER<b>LOCK</b>
             <small>KNOW THE MATCH. MAKE YOUR MOVE.</small>
           </div>
+        </Link>
+        <Link
+          className="my-profile"
+          aria-label="My profile"
+          to={routeToPath({ page: "profile", accountId: meId ?? undefined })}
+          state={meId === null ? BROWSE_STATE : undefined}
+        >
+          <MyProfileLabel meId={meId} />
         </Link>
       </header>
       <nav>
@@ -36,7 +47,11 @@ export function WebShell({ children }: { children?: React.ReactNode }) {
       <LinkProvider
         value={{
           href: routeToPath,
-          navigate: (route: Route) => navigate(routeToPath(route)),
+          navigate: (route: Route) =>
+            navigate(
+              routeToPath(route),
+              route.page === "home" ? { state: BROWSE_STATE } : undefined,
+            ),
         }}
       >
         <main className="page">{children ?? <Outlet />}</main>

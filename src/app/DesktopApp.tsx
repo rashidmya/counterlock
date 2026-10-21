@@ -20,6 +20,9 @@ import { useCounters } from "@/features/counters/hooks/useCounters";
 import { usePlayerLookup } from "@/features/player-lookup/hooks/usePlayerLookup";
 import { PlayerLookup } from "@/features/player-lookup/components/PlayerLookup";
 import { HomePage } from "@/features/profile/components/HomePage";
+import { MyProfileLabel } from "@/features/profile/components/MyProfileLabel";
+import { ProfilePage } from "@/features/profile/components/ProfilePage";
+import { accountSubtitle, useDesktopMe } from "@/features/profile/me";
 import { TierListPage } from "@/features/heroes/components/TierListPage";
 import { HeroesPage } from "@/features/heroes/components/HeroesPage";
 import { ItemsPage } from "@/features/items/components/ItemsPage";
@@ -51,6 +54,8 @@ export function DesktopApp({
   const counters = useCounters(state);
   const [route, setRoute] = useState<Route>({ page: "home" });
   const [visited, setVisited] = useState<Page[]>(["home"]);
+  const [profileId, setProfileId] = useState<number | null>(null);
+  const me = useDesktopMe();
   const [query, setQuery] = useState<AnalyticsQuery>({ minBadge: 0 });
   const userNavigated = useRef(false);
   const matchSeen = useRef<string | null>(null);
@@ -58,6 +63,9 @@ export function DesktopApp({
   const gameRunning = useDeadlockRunning();
   const status = liveStatus(gameRunning, state);
   const show = (next: Route) => {
+    if (next.page === "profile" && next.accountId === undefined)
+      next = { page: "home" };
+    if (next.page === "profile") setProfileId(next.accountId ?? null);
     setRoute(next);
     setVisited((pages) =>
       pages.includes(next.page) ? pages : [...pages, next.page],
@@ -116,6 +124,19 @@ export function DesktopApp({
                   : "GAME NOT RUNNING"}
           </span>
           <button
+            className="my-profile"
+            aria-label="My profile"
+            onClick={() =>
+              navigate(
+                me.meId === null
+                  ? { page: "home" }
+                  : { page: "profile", accountId: me.meId },
+              )
+            }
+          >
+            <MyProfileLabel meId={me.meId} />
+          </button>
+          <button
             className="icon-button"
             aria-label="Overlay settings"
             onClick={() => setSettings(!settings)}
@@ -172,7 +193,22 @@ export function DesktopApp({
       <LinkProvider value={{ navigate }}>
         {visited.includes("home") && (
           <div className="page" hidden={route.page !== "home"}>
-            <HomePage navigate={navigate} />
+            <HomePage navigate={navigate} me={me} />
+          </div>
+        )}
+        {visited.includes("profile") && profileId !== null && (
+          <div className="page" hidden={route.page !== "profile"}>
+            <ProfilePage
+              key={profileId}
+              accountId={profileId}
+              me={me}
+              navigate={navigate}
+              subtitle={
+                me.account?.accountId === profileId
+                  ? accountSubtitle(me.account)
+                  : undefined
+              }
+            />
           </div>
         )}
         {visited.includes("live") && (

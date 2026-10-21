@@ -45,10 +45,7 @@ const LEGACY = new Set([
   "src/features/player-lookup/styles/lookup.css",
   "src/features/items/styles/items.css",
   "src/features/live/styles/live.css",
-  "src/features/profile/styles/profile.css",
   "web/app/styles/web.css",
-  "src/features/profile/components/PerformanceTab.tsx",
-  "src/shared/ui/LineChart.tsx",
 ]);
 
 const CSS_HEX = /#[0-9a-f]{3,8}\b/i;
