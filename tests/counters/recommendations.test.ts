@@ -7,12 +7,19 @@ import {
 import catalog from "@/shared/catalog/catalog.json";
 import { demoState } from "../fixtures/demo";
 
+// Nurse Harrow: heroThreats has no entry yet. Remove her id here when a profile is added.
+const awaitingProfile = [87];
+
 describe("recommendation constraints", () => {
   const enemies = splitTeams(demoState().players).enemies;
+  it("only the heroes named as awaiting a profile lack a matchup profile", () => {
+    expect(
+      catalog.heroes.filter((hero) => !heroThreats[hero.id]).map((h) => h.id),
+    ).toEqual(awaitingProfile);
+  });
   it("provides starter suggestions for every active hero with a matchup profile", () => {
     for (const hero of catalog.heroes) {
-      // New heroes (e.g. Nurse Harrow) intentionally wait for a profile; see the comment on heroThreats.
-      if (!heroThreats[hero.id]) continue;
+      if (awaitingProfile.includes(hero.id)) continue;
       expect(
         recommend(
           [{ ...enemies[0], heroId: hero.id, heroName: hero.name }],
