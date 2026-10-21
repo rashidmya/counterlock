@@ -8,9 +8,11 @@ import {
 } from "react-router";
 import type { Route } from "./+types/root";
 import { RankQueryProvider } from "./RankQuery";
+import { PageTitle } from "@/shared/ui/PageTitle";
 import { WebShell } from "./WebShell";
 import { NotFound } from "./NotFound";
 import "./styles/web.css";
+import "./styles/phone.css";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -57,7 +59,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
         <NotFound />
       ) : (
         <section className="web-not-found">
-          <h1>Something went wrong</h1>
+          <PageTitle title="Something went wrong" />
           <p className="muted">Try reloading the page.</p>
         </section>
       )}

@@ -35,7 +35,6 @@ const PALETTE: Record<string, string> = {
 const LEGACY = new Set([
   "src/features/overlay/styles/panels.css",
   "src/features/items/styles/items.css",
-  "web/app/styles/web.css",
 ]);
 
 const CSS_HEX = /#[0-9a-f]{3,8}\b/i;

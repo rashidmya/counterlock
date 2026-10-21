@@ -1,3 +1,4 @@
+import { PageTitle } from "@/shared/ui/PageTitle";
 import { PageMeta } from "../seo";
 
 export default function AboutRoute() {
@@ -8,7 +9,7 @@ export default function AboutRoute() {
         description="What Counterlock is, where its Deadlock data comes from, and what the site stores and sends."
         path="/about"
       />
-      <h1>About</h1>
+      <PageTitle title="About" />
       <h2>What Counterlock is</h2>
       <p>
         Counterlock shows Deadlock hero tier lists, builds, counters and item

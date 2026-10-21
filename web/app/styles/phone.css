@@ -1,4 +1,4 @@
-/* Phone layouts for the website only; everything is scoped under `.web`. */
+/* Phone layouts for the website only; everything is scoped under `.web`. Loaded after web.css. */
 
 .app.web
   :is(.heroes-page, .items-page, .item-detail, .hero-detail, .profile, .home) {
@@ -16,55 +16,48 @@
 }
 
 @media (max-width: 640px) {
-  .app.web header {
-    height: 64px;
-    padding: 0 16px;
+  .app.web {
+    --gut: 16px;
+    --page-top: 20px;
   }
   .app.web .brand {
-    font-size: 21px;
+    min-height: 52px;
+    gap: 9px;
+    font-size: 19px;
   }
-  .app.web .brand small {
-    display: none;
+  .app.web .brand img {
+    width: 34px;
+    height: 34px;
   }
   .app.web .my-profile {
+    flex: 0 1 auto;
     min-width: 0;
+    min-height: 52px;
   }
   .app.web .my-profile .my-name {
-    max-width: 96px;
-  }
-  .app.web nav {
-    height: 48px;
-    margin: 0 16px;
+    min-width: 0;
+    max-width: 72px;
   }
   .app.web .tabs {
-    gap: 26px;
+    gap: 24px;
   }
   .app.web .tabs a {
     min-height: 44px;
     font-size: 14px;
+    letter-spacing: 0.12em;
   }
   .app.web .page {
     min-height: 50vh;
   }
   .app.web footer {
-    padding: 16px;
+    padding: 16px var(--gut);
     font-size: 11px;
   }
   .app.web :is(input, select) {
     font-size: 16px;
   }
-
-  .app.web
-    :is(
-      .home,
-      .web-about,
-      .web-not-found,
-      .heroes-page,
-      .items-page,
-      .item-detail,
-      .profile
-    ) {
-    padding: 20px 16px;
+  .app.web .page-title h1 {
+    font-size: 34px;
   }
   .app.web .player-search input {
     min-height: 46px;
@@ -126,11 +119,8 @@
     font-size: 13px;
   }
   .app.web .hero-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .app.web .hero-card {
-    min-height: 54px;
-    font-size: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 
   .app.web .matchup {
@@ -189,8 +179,8 @@
 
   .app.web .profile-header {
     min-height: 0;
-    margin: -20px -16px 0;
-    padding: 20px 16px;
+    padding-top: 20px;
+    padding-bottom: 20px;
   }
   .app.web .profile-header .hero-art {
     display: none;

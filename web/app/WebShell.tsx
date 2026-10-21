@@ -26,6 +26,15 @@ export function WebShell({ children }: { children?: React.ReactNode }) {
             <small>KNOW THE MATCH. MAKE YOUR MOVE.</small>
           </div>
         </Link>
+        <nav>
+          <div className="tabs">
+            {tabs.map(({ to, label, end }) => (
+              <NavLink key={to} to={to} end={end}>
+                {label}
+              </NavLink>
+            ))}
+          </div>
+        </nav>
         <Link
           className="my-profile"
           aria-label="My profile"
@@ -34,15 +43,6 @@ export function WebShell({ children }: { children?: React.ReactNode }) {
           <MyProfileLabel meId={meId} />
         </Link>
       </header>
-      <nav>
-        <div className="tabs">
-          {tabs.map(({ to, label, end }) => (
-            <NavLink key={to} to={to} end={end}>
-              {label}
-            </NavLink>
-          ))}
-        </div>
-      </nav>
       <LinkProvider
         value={{
           href: routeToPath,

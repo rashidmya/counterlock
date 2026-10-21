@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { PageTitle } from "@/shared/ui/PageTitle";
 
 export function NotFound({
   title = "Page not found",
@@ -12,7 +13,7 @@ export function NotFound({
   return (
     <section className="web-not-found">
       <title>Not found | Counterlock</title>
-      <h1>{title}</h1>
+      <PageTitle title={title} />
       <p className="muted">{message}</p>
       <Link to={back.to}>{back.label}</Link>
     </section>

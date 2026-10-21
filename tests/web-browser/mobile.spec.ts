@@ -72,6 +72,10 @@ test.describe("phone width (375px)", () => {
       (page) =>
         expect(page.getByRole("heading", { name: "Leech" })).toBeVisible(),
     ],
+    [
+      `/players/${FARGO}`,
+      (page) => expect(page.locator(".profile-header h1")).toBeVisible(),
+    ],
     ["/about", (page) => expect(page.locator(".web-about h1")).toBeVisible()],
   ];
 
