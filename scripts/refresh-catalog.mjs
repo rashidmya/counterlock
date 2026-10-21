@@ -24,16 +24,71 @@ const compactPopularity = (data) =>
       }
     : null;
 const signatureKeys = ["signature1", "signature2", "signature3", "signature4"];
+const parseNumber = (raw) => {
+  const value = typeof raw === "number" ? raw : Number.parseFloat(raw);
+  return Number.isFinite(value) ? Math.round(value * 100) / 100 : undefined;
+};
+const withPostfix = (raw, text, postfix = "") => {
+  const unit = String(raw)
+    .trim()
+    .replace(/^[-+]?[\d.]+/, "")
+    .trim();
+  return `${text}${unit || postfix}`;
+};
 const formatStat = (property) => {
-  const value = Number(property?.value);
-  if (!property?.label || !Number.isFinite(value) || value === 0)
-    return undefined;
+  const value = parseNumber(property?.value);
+  if (!property?.label || value === undefined || value === 0) return undefined;
   const sign = property.prefix?.includes("{s:sign}") && value > 0 ? "+" : "";
   return {
     label: property.label,
-    value: `${sign}${value}${property.postfix ?? ""}`,
+    value: withPostfix(property.value, `${sign}${value}`, property.postfix),
     icon: property.icon,
   };
+};
+const highlightsOf = (html = "") => [
+  ...new Set(
+    [...html.matchAll(/<span class="highlight">([\s\S]*?)<\/span>/g)]
+      .map((match) => plainText(match[1]))
+      .filter(Boolean),
+  ),
+];
+const abilityStats = (item) => {
+  const section = item.tooltip_details?.info_sections?.[0];
+  const properties = item.properties ?? {};
+  const keyStats = (section?.properties_block ?? [])
+    .flatMap((block) => block.properties ?? [])
+    .map((entry) => {
+      const stat = formatStat(properties[entry.important_property]);
+      const icon = entry.important_property_icon ?? stat?.icon;
+      return stat && { ...stat, icon };
+    })
+    .filter(Boolean)
+    .slice(0, 3);
+  const minorStats = (section?.basic_properties ?? [])
+    .map((name) => formatStat(properties[name]))
+    .filter(Boolean);
+  const cooldown = parseNumber(properties.AbilityCooldown?.value);
+  return {
+    cooldown: cooldown ? `${cooldown}s` : undefined,
+    keyStats,
+    minorStats,
+  };
+};
+const upgradeText = (item, index) => {
+  const written = plainText(item.description?.[`t${index + 1}_desc`]);
+  if (written) return written;
+  return (item.upgrades?.[index]?.property_upgrades ?? [])
+    .filter((upgrade) => upgrade.upgrade_type !== "EAddToScale")
+    .map((upgrade) => {
+      const property = item.properties?.[upgrade.name];
+      const bonus = parseNumber(upgrade.bonus);
+      if (!property?.label || bonus === undefined || bonus === 0)
+        return undefined;
+      const sign = bonus > 0 ? "+" : "";
+      return `${withPostfix(upgrade.bonus, `${sign}${bonus}`, property.postfix)} ${property.label}`;
+    })
+    .filter(Boolean)
+    .join(" ");
 };
 const compactStats = (item) => {
   const names = (item.tooltip_sections ?? []).flatMap((section) =>
@@ -87,11 +142,9 @@ export function compact(heroes, items, ranks) {
         image: i.image_webp ?? i.image,
         quip: plainText(i.description?.quip),
         description: plainText(i.description?.desc),
-        upgrades: [
-          i.description?.t1_desc,
-          i.description?.t2_desc,
-          i.description?.t3_desc,
-        ].map(plainText),
+        upgrades: [0, 1, 2].map((index) => upgradeText(i, index)),
+        highlights: highlightsOf(i.description?.desc),
+        ...abilityStats(i),
       })),
     items: items
       .filter((i) => i.type === "upgrade" && i.shopable && !i.disabled)

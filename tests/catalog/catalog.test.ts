@@ -3,6 +3,11 @@ import { abilityById, catalog, itemByClass } from "@/shared/catalog";
 import { rankImage } from "@/shared/ui/gameIcons";
 
 const roles = ["assassin", "brawler", "marksman", "mystic"];
+const byName = (name: string) => {
+  const ability = catalog.abilities.find((a) => a.name === name);
+  if (!ability) throw new Error(`Missing ability ${name}`);
+  return ability;
+};
 
 describe("catalog", () => {
   it("every active hero has a role and four resolvable abilities", () => {
@@ -42,12 +47,32 @@ describe("catalog", () => {
   it("ability upgrades stay positional by tier", () => {
     for (const ability of catalog.abilities)
       expect(ability.upgrades, ability.name).toHaveLength(3);
-    const keg = catalog.abilities.find(
-      (ability) => ability.name === "Powder Keg",
-    );
-    expect(keg?.upgrades[0]).toBe("");
-    expect(keg?.upgrades[1]).toBe("");
-    expect(keg?.upgrades[2]).toContain("Impact Damage");
+  });
+
+  it("abilities carry tooltip data", () => {
+    const dagger = byName("Sleep Dagger");
+    expect(dagger.cooldown).toBe("30s");
+    expect(dagger.keyStats.map((s) => [s.label, s.value])).toEqual([
+      ["Damage", "65"],
+      ["Sleep Duration", "2.75s"],
+    ]);
+    expect(dagger.keyStats[0].icon).toMatch(/^https:/);
+    expect(dagger.highlights).toEqual(["damages", "sleeps"]);
+    for (const a of catalog.abilities) {
+      expect(a.keyStats.length).toBeLessThanOrEqual(3);
+      for (const s of a.minorStats)
+        expect(Number.parseFloat(s.value)).not.toBe(0);
+    }
+  });
+
+  it("empty upgrade text is built from property upgrades", () => {
+    expect(byName("Powder Keg").upgrades.slice(0, 2)).toEqual([
+      "-10s Cooldown",
+      "+1 Charges",
+    ]);
+    expect(byName("Powder Keg").upgrades[2]).toContain("Impact Damage");
+    expect(byName("Bullet Dance").upgrades[0]).toBe("+7 Bullet Damage");
+    expect(byName("Smoke Bomb").upgrades[0]).toBe("+7m Invis Sprint Speed");
   });
 
   it("items carry tier, class and formatted stats", () => {

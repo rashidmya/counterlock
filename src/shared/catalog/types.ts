@@ -21,6 +21,11 @@ export interface PopularItem {
   pick_pct: number;
   winrate_pct?: number;
 }
+export interface AbilityStat {
+  label: string;
+  value: string;
+  icon?: string;
+}
 export interface Ability {
   id: number;
   heroId: number;
@@ -30,6 +35,10 @@ export interface Ability {
   description: string;
   // Always length 3; index = tier - 1; "" = no upgrade text for that tier.
   upgrades: string[];
+  cooldown?: string;
+  keyStats: AbilityStat[];
+  minorStats: AbilityStat[];
+  highlights: string[];
 }
 export interface ItemStat {
   label: string;

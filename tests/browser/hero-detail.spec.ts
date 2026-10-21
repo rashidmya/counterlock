@@ -235,7 +235,7 @@ test("abilities render four numbered cards in signature order with art and toolt
   }
   const title = await cards.nth(1).getAttribute("title");
   expect(title).toContain(abilities[1].description);
-  expect(title).not.toContain("T1:");
+  expect(title).toContain(`T1: ${abilities[1].upgrades[0]}`);
   expect(title).toContain(`T2: ${abilities[1].upgrades[1]}`);
   expect(title).toContain(`T3: ${abilities[1].upgrades[2]}`);
 });

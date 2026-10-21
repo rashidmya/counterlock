@@ -88,7 +88,9 @@ test("tier sort groups heroes under S to D headings with real stats", async ({
     /^https?:/,
   );
   await expect(first.locator(".hero-name")).toHaveText(byWinRate[0].name);
-  await expect(first).toContainText("61.0%");
+  await expect(first).toContainText(
+    `${((400 + (catalog.heroes.length - 1) * 5) / 10).toFixed(1)}%`,
+  );
   await expect(first).toContainText(/\d+\.\d% pick/);
   await expect(first.locator(".tier-letter")).toHaveText("S");
   await expect(first.locator(".tier-letter")).toHaveCSS(
