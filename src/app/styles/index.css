@@ -6,7 +6,6 @@
 @import "../../features/counters/styles/counters.css";
 @import "../../features/overlay/styles/settings.css";
 @import "../../features/roster/styles/compact.css";
-@import "../../features/player-lookup/styles/lookup.css";
 @import "layout.css";
 @import "../../features/builds/styles/builds.css";
 @import "../../features/roster/styles/inventory.css";
@@ -15,6 +14,7 @@
 @import "../../features/overlay/styles/panels.css";
 @import "../../features/live/styles/live.css";
 @import "../../features/profile/styles/profile.css";
+@import "../../features/home/styles/home.css";
 @import "../../features/player-search/styles/player-search.css";
 @import "shared.css";
 @import "../../features/heroes/styles/heroes.css";

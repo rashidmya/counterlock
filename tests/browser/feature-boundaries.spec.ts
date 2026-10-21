@@ -84,7 +84,7 @@ test("counter window uses its native window identity and responds to live roster
   ).toBe("false");
 });
 
-test("desktop retains counter and lookup state across tabs and exposes game-only settings", async ({
+test("desktop retains counter state across tabs and exposes game-only settings", async ({
   page,
 }) => {
   await nativeWindow(page, "desktop");
@@ -94,21 +94,9 @@ test("desktop retains counter and lookup state across tabs and exposes game-only
   await expect(page.locator(".match-clock strong")).toHaveText("12:34");
   await expect(page.locator(".build-panel")).toContainText("Fixture build");
   await page.getByLabel("Item budget").selectOption("1600");
-  await page
-    .getByRole("button", { name: "Player lookup", exact: true })
-    .click();
-  await page
-    .locator(".lookup")
-    .getByLabel("Steam ID", { exact: true })
-    .fill("100000000");
+  await page.getByRole("button", { name: "Heroes", exact: true }).click();
   await page.getByRole("button", { name: "Live" }).click();
   await expect(page.getByLabel("Item budget")).toHaveValue("1600");
-  await page
-    .getByRole("button", { name: "Player lookup", exact: true })
-    .click();
-  await expect(
-    page.locator(".lookup").getByLabel("Steam ID", { exact: true }),
-  ).toHaveValue("100000000");
   await page
     .getByRole("button", { name: "Overlay settings", exact: true })
     .click();

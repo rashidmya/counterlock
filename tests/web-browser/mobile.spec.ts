@@ -37,7 +37,11 @@ test.describe("phone width (375px)", () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
   const loaded: [string, (page: Page) => Promise<void>][] = [
-    ["/", (page) => expect(page.locator("a.hero-card").first()).toBeVisible()],
+    [
+      "/",
+      (page) =>
+        expect(page.locator(".home-top a.hero-card").first()).toBeVisible(),
+    ],
     [
       "/tier-list",
       (page) => expect(page.locator("a.tier-tile").first()).toBeVisible(),
@@ -112,6 +116,30 @@ test.describe("phone width (375px)", () => {
         expect(box.top).toBe(boxes[0].top);
       }
     });
+
+  test("Home with a remembered account fits at phone width", async ({
+    page,
+  }) => {
+    await mockApi(page);
+    await page.addInitScript(
+      (id) =>
+        localStorage.setItem(
+          "counterlock.web.account",
+          JSON.stringify({ accountId: id }),
+        ),
+      FARGO,
+    );
+    await page.goto("/");
+    await expect(page.locator(".home-top a.hero-card").first()).toBeVisible();
+    await expect(page.locator(".you-card .you-name")).toContainText("Persona");
+    await expect(page.locator(".latest-match")).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    expect((await overflow(page)).scroll).toBeLessThanOrEqual(375);
+    // The header name is deliberately ellipsised at this width.
+    expect(
+      (await clipped(page, 375)).filter((line) => !line.includes("my-name")),
+    ).toEqual([]);
+  });
 
   test("hero detail stacks: identity above the art, one column of sections", async ({
     page,

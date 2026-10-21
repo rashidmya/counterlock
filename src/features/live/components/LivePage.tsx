@@ -13,6 +13,7 @@ interface Props {
   counters: ReturnType<typeof useCounters>;
   refresh: () => void;
   navigate: Navigate;
+  meId: number | null;
 }
 
 export function LivePage({
@@ -23,6 +24,7 @@ export function LivePage({
   counters,
   refresh,
   navigate,
+  meId,
 }: Props) {
   if (status === "in-match")
     return (
@@ -42,7 +44,15 @@ export function LivePage({
       </p>
       <button
         className="text-button"
-        onClick={() => navigate({ page: running ? "home" : "heroes" })}
+        onClick={() =>
+          navigate(
+            !running
+              ? { page: "heroes" }
+              : meId === null
+                ? { page: "home" }
+                : { page: "profile", accountId: meId },
+          )
+        }
       >
         {running ? "View your profile" : "Browse heroes"}
       </button>

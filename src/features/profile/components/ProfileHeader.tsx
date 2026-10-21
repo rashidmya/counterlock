@@ -6,7 +6,7 @@ import { OptionalImage } from "@/shared/ui/OptionalImage";
 import { Picture } from "@/shared/ui/Picture";
 import { fetchRank, fetchSteamProfiles } from "../services/profile-api";
 
-function RankBadge({ accountId }: { accountId: number }) {
+export function RankBadge({ accountId }: { accountId: number }) {
   const { data: rank } = useAsync(() => fetchRank(accountId), [accountId]);
   if (!rank) return null;
   if (rank.rank === 0 || rank.badge === 0)

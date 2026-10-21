@@ -66,8 +66,16 @@ async function mockApi(page: Page, mocks: Mocks = {}) {
 const stored = (page: Page) =>
   page.evaluate((key) => localStorage.getItem(key), KEY);
 const hydrated = (page: Page) =>
-  expect(page.locator(".web-s-tier a.hero-card").first()).toBeVisible();
-const search = (page: Page) => page.getByLabel("Find your Steam account");
+  expect(page.locator(".home-top a.hero-card").first()).toBeVisible();
+const search = (page: Page) => page.getByLabel("Find a player");
+const prompt =
+  "Search for your Steam account above, open it and press This is me.";
+const remember = (page: Page, id: number) =>
+  page.addInitScript(
+    ([key, value]) =>
+      localStorage.setItem(key, JSON.stringify({ accountId: value })),
+    [KEY, id] as const,
+  );
 
 test("the landing page hydrates cleanly and links into the site", async ({
   page,
@@ -84,21 +92,20 @@ test("the landing page hydrates cleanly and links into the site", async ({
     "Counterlock — Deadlock stats, builds & counters",
   );
   await expect(
-    page.getByRole("heading", { name: "Deadlock stats, builds and counters" }),
+    page.getByRole("heading", { name: "Know the match." }),
   ).toBeVisible();
   await hydrated(page);
-  const card = page.locator(".web-s-tier a.hero-card").first();
+  await expect(page.locator(".home-top a.hero-card")).toHaveCount(6);
+  const card = page.locator(".home-top a.hero-card").first();
   await expect(card).toHaveAttribute("href", /^\/heroes\/[a-z-]+$/);
   await expect(card).toContainText(/\d+\.\d%/);
   await expect(card.locator("img.hero-card-portrait")).toBeVisible();
   const main = page.locator("main");
-  await expect(
-    main.getByRole("link", { name: "Hero tier list" }),
-  ).toHaveAttribute("href", "/heroes");
-  await expect(main.getByRole("link", { name: "Items" })).toHaveAttribute(
+  await expect(main.getByRole("link", { name: "Tier list →" })).toHaveAttribute(
     "href",
-    "/items",
+    "/tier-list",
   );
+  await expect(main.getByText(prompt)).toBeVisible();
   expect(problems).toEqual([]);
 });
 
@@ -106,9 +113,9 @@ test("pre-rendered home HTML has the pitch and search but no live numbers", asyn
   request,
 }) => {
   const html = await (await request.get("/")).text();
-  expect(html).toContain("Deadlock stats, builds and counters");
-  expect(html).toContain("Find your Steam account");
-  expect(html).toContain("S-tier heroes right now");
+  expect(html).toContain("Know the match.");
+  expect(html).toContain("Find a player");
+  expect(html).toContain("Top of the city");
   expect(html).not.toMatch(/\d+\.\d%/);
   expect(html).not.toContain("hero-card");
 });
@@ -159,27 +166,52 @@ test("search results can be chosen with the keyboard", async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/players/${FARGO}$`));
 });
 
-test("a remembered account opens on revisit and can be switched", async ({
+test("home revisit with a remembered account shows You and hydrates cleanly", async ({
   page,
 }) => {
+  const problems: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" || message.type() === "warning")
+      problems.push(message.text());
+  });
+  page.on("pageerror", (error) => problems.push(error.message));
   await mockApi(page);
+  await remember(page, FARGO);
   await page.goto("/");
   await hydrated(page);
-  await search(page).fill("farg");
-  await page.getByRole("link", { name: "Fargo Fixture" }).click();
-  await expect(page.locator(".profile-header h1")).toHaveText("Fargo Fixture");
-
-  await page.goto("/");
-  await expect(page).toHaveURL(new RegExp(`/players/${FARGO}$`));
-  await expect(page.locator(".profile-header h1")).toHaveText("Fargo Fixture");
-  await expect(page.getByRole("button", { name: "This is me" })).toHaveCount(0);
-
-  await page.getByRole("button", { name: "Not you? Switch account" }).click();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(search(page)).toBeVisible();
-  expect(await stored(page)).toBeNull();
+  await expect(page.locator(".you-card .you-name")).toHaveText("Fargo Fixture");
+  await expect(page.getByText(prompt)).toHaveCount(0);
   await page.waitForTimeout(300);
   await expect(page).toHaveURL(/\/$/);
+  expect(problems).toEqual([]);
+
+  await page
+    .locator("main")
+    .getByRole("link", { name: "My profile →", exact: true })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/players/${FARGO}$`));
+  await expect(page.locator(".profile-header h1")).toHaveText("Fargo Fixture");
+  await page.getByRole("button", { name: "Not you? Switch account" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  expect(await stored(page)).toBeNull();
+  await expect(page.getByText(prompt)).toBeVisible();
+  await expect(page.locator(".you-card")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "My profile" })).toHaveText(
+    "Find your account",
+  );
+});
+
+test("Home can switch account without leaving the page", async ({ page }) => {
+  await mockApi(page);
+  await remember(page, FARGO);
+  await page.goto("/");
+  await hydrated(page);
+  await expect(page.locator(".you-card")).toBeVisible();
+  await page.getByRole("button", { name: "Not you? Switch account" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByText(prompt)).toBeVisible();
+  await expect(page.locator(".you-card")).toHaveCount(0);
+  expect(await stored(page)).toBeNull();
 });
 
 test("a malformed remembered value keeps the landing page", async ({
@@ -194,6 +226,8 @@ test("a malformed remembered value keeps the landing page", async ({
   await page.waitForTimeout(300);
   await expect(page).toHaveURL(/\/$/);
   await expect(search(page)).toBeVisible();
+  await expect(page.getByText(prompt)).toBeVisible();
+  await expect(page.locator(".you-card")).toHaveCount(0);
   expect(problems).toEqual([]);
 });
 
@@ -254,13 +288,10 @@ test("picking a result while browsing keeps the remembered account", async ({
   page,
 }) => {
   await mockApi(page);
-  await page.addInitScript(
-    ([key, id]) => localStorage.setItem(key, JSON.stringify({ accountId: id })),
-    [KEY, FARGO] as const,
-  );
-  await page.goto(`/players/${OTHER}`);
-  await page.getByRole("button", { name: "Find another player" }).click();
-  await expect(search(page)).toBeVisible();
+  await remember(page, FARGO);
+  await page.goto("/");
+  await hydrated(page);
+  await expect(page.locator(".you-card")).toBeVisible();
   await search(page).fill("farq");
   await page.getByRole("link", { name: /Farquhar Fixture/ }).click();
   await expect(page).toHaveURL(/\/players\/777$/);

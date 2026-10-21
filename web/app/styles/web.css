@@ -65,36 +65,6 @@
   padding: 30px;
 }
 
-.web-home {
-  display: grid;
-  gap: 28px;
-  padding: 32px 30px;
-}
-.web-hero {
-  display: grid;
-  gap: 12px;
-  max-width: 640px;
-}
-.web-hero h1 {
-  margin: 0;
-  font-size: 34px;
-}
-.web-hero p {
-  margin: 0;
-}
-.web-home-links {
-  display: flex;
-  gap: 18px;
-}
-.web-home a:not(.hero-card),
-.web-not-found a {
-  color: #dfc48c;
-}
-.web-s-tier h2 {
-  margin: 0 0 10px;
-  font-size: 18px;
-}
-
 .web-about {
   display: grid;
   gap: 12px;

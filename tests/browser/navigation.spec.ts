@@ -8,6 +8,16 @@ test("browser preview opens Home and Live shows not running", async ({
   await expect(page.getByRole("button", { name: "Home" })).toHaveClass(
     /active/,
   );
+  await expect(page.getByRole("button", { name: "Player lookup" })).toHaveCount(
+    0,
+  );
+  await expect(page.locator(".tabs button")).toHaveText([
+    "Home",
+    "Live",
+    "Tier list",
+    "Heroes",
+    "Items",
+  ]);
   await page.getByRole("button", { name: "Live" }).click();
   await expect(page.getByText("Deadlock isn't running")).toBeVisible();
   await page.getByRole("button", { name: "Browse heroes" }).click();
@@ -65,6 +75,39 @@ test("joining a match switches to Live once", async ({ page }) => {
   await updateMatch(page, { players: [] });
   await updateMatch(page, { players: matchPlayers(), matchId: "43" });
   await expect(page.getByRole("button", { name: "Live" })).toHaveClass(
+    /active/,
+  );
+});
+
+test("View your profile opens the stored account's profile", async ({
+  page,
+}) => {
+  await nativeWindow(page, "desktop", "normal", {
+    running: true,
+    players: false,
+  });
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "counterlock.profile.account",
+      JSON.stringify({
+        accountId: 100000000,
+        seenAt: Date.now(),
+        source: "manual",
+      }),
+    ),
+  );
+  await page.route("https://api.deadlock-api.com/**", (route) =>
+    route.fulfill({
+      json: [],
+      headers: { "access-control-allow-origin": "*" },
+    }),
+  );
+  await page.goto("/desktop/desktop.html");
+  await page.getByRole("button", { name: "View your profile" }).click();
+  await expect(
+    page.locator(".page:not([hidden]) .profile-header"),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Home" })).not.toHaveClass(
     /active/,
   );
 });

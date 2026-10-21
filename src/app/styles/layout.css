@@ -103,12 +103,6 @@ footer a {
   .settings {
     margin: 15px 20px;
   }
-  .lookup form {
-    flex-wrap: wrap;
-  }
-  .lookup label {
-    flex: auto !important;
-  }
   .intro h1 {
     font-size: 31px;
   }
@@ -176,15 +170,6 @@ footer a {
   th:last-child {
     display: none;
   }
-  .lookup {
-    padding: 25px 20px;
-  }
-  .lookup form {
-    display: grid;
-  }
-  .lookup input {
-    width: 100%;
-  }
   footer {
     gap: 15px;
     padding: 15px 20px;
@@ -230,11 +215,6 @@ footer,
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: #435050 transparent;
-}
-.lookup {
-  overflow: auto;
-  flex: 1;
-  min-height: 0;
 }
 .compact header {
   height: 58px;
@@ -316,9 +296,6 @@ footer,
   }
   .counters {
     margin-top: 20px;
-  }
-  .lookup {
-    min-height: 500px;
   }
   .table-wrap {
     overflow: auto;

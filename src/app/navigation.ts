@@ -1,5 +1,5 @@
 export type Page =
-  "home" | "live" | "tierlist" | "heroes" | "items" | "profile" | "lookup";
+  "home" | "live" | "tierlist" | "heroes" | "items" | "profile";
 export interface Route {
   page: Page;
   heroId?: number;

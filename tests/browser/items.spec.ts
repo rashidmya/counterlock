@@ -289,7 +289,7 @@ test("the rank filter selection is shared between Heroes and Items", async ({
   page.on("request", (request) => requests.push(request.url()));
   await openItems(page);
   await page.getByRole("button", { name: "Heroes", exact: true }).click();
-  await page.locator(".hero-card").first().click();
+  await page.locator(".page:not([hidden]) .hero-card").first().click();
   await expect(page.locator(".hero-header h1")).toBeVisible();
   await rank(page).selectOption({ label: "Mystic+" });
   await page.getByRole("button", { name: "Items", exact: true }).click();
@@ -305,7 +305,7 @@ test("the rank filter selection is shared between Heroes and Items", async ({
     .toBe(true);
   await rank(page).selectOption({ label: "All ranks" });
   await page.getByRole("button", { name: "Heroes", exact: true }).click();
-  await page.locator(".hero-card").first().click();
+  await page.locator(".page:not([hidden]) .hero-card").first().click();
   await expect(rank(page)).toHaveValue("0");
 });
 

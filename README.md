@@ -15,7 +15,7 @@ npm ci
 npm run dev
 ```
 
-Open the local URL Vite prints. The browser opens on **Home** with tabs for **Home · Live · Heroes · Items · Player lookup**. Without Overwolf, **Live** shows "Deadlock isn't running"; with Overwolf it shows "Waiting for a match" until live data arrives. Demo match data is confined to test fixtures. In the browser, Home asks for a Steam ID because there are no game events to detect your account. **Home**, **Heroes**, **Items** and **Player lookup** make real requests; lookup and Home accept an exact SteamID64, account ID, or `[U:1:account]` ID. No API key is required by the endpoints used here.
+Open the local URL Vite prints. The browser opens on **Home** with tabs for **Home · Live · Tier list · Heroes · Items**. Without Overwolf, **Live** shows "Deadlock isn't running"; with Overwolf it shows "Waiting for a match" until live data arrives. Demo match data is confined to test fixtures. In the browser, Home has no game events to detect your account, so you search for it: **Find a player** accepts a Steam name, an exact SteamID64, account ID, `[U:1:account]` ID or profile link, and the profile's **This is me** button remembers it. **Home**, **Tier list**, **Heroes** and **Items** make real requests. No API key is required by the endpoints used here.
 
 The root preview redirects to `/desktop/desktop.html`. Open `/in_game/in_game.html` to preview the in-game entrypoint. Without Overwolf, the in-game entrypoint also renders the full browser preview. In Overwolf, it resolves the native window name and mounts the compact build or counter overlay.
 
@@ -27,7 +27,7 @@ The root preview redirects to `/desktop/desktop.html`. Open `/in_game/in_game.ht
 4. Launch Deadlock and enable its Overwolf overlay. The app targets Overwolf game ID **24482** and starts automatically with the game.
 5. Use **Ctrl+Shift+S** to show or hide Counterlock's in-game window. The binding can be changed in Overwolf. Drag the app header to move the window. The gear button exposes overlay visibility and opacity while Deadlock is running; desktop rows remain compact.
 
-Home's account comes from Deadlock game events: the `background` window stores the last account it detects on this PC in `localStorage` under `counterlock.profile.account`, and Home shows that profile. If none has been detected, enter a Steam ID manually; it is stored the same way, and the next account detected in-game replaces it. **Change** clears the stored account. It never leaves this PC except as a public ID in API requests.
+Home's account comes from Deadlock game events: the `background` window stores the last account it detects on this PC in `localStorage` under `counterlock.profile.account`, and Home's **You** section shows that account's latest results. If none has been detected, search for yourself on Home and press **This is me**; it is stored the same way, and the next account detected in-game replaces it. **Not you? Switch account** clears the stored account. It never leaves this PC except as a public ID in API requests.
 
 The `background` window owns the shared live store, game-event subscriptions, feature registration, hotkeys, and overlay lifecycle. The `desktop` window stays independent of overlay visibility. The `in_game` and `counter_overlay` windows both use `in_game/in_game.html`, resolving their native window identity at mount time to render the appropriate compact panel. Each declared HTML path remains stable in `dist/` and in the manifest. Foreground windows subscribe to the background store through `getMainWindow()`; they do not create their own live stores.
 
@@ -67,7 +67,7 @@ Home and the hero and item pages use Deadlock API aggregates, so figures reflect
 
 ## Website
 
-Counterlock also builds as a public static website: Home (profile), Heroes and Items, with real URLs, pre-rendered hero and item pages and share previews. It has no **Live** page, overlay, hotkeys or **Player lookup** tab; on the web, Home searches for a Steam account by name or ID instead. It lives in `web/` (React Router v8 framework mode on Vite, `ssr: false` with `prerender`) and reuses the feature code in `src/`, so the Overwolf app is unaffected.
+Counterlock also builds as a public static website: Home, Tier list, Heroes, Items and player profiles, with real URLs, pre-rendered hero and item pages and share previews. It has no **Live** page, overlay or hotkeys; Home searches for a Steam account by name or ID. It lives in `web/` (React Router v8 framework mode on Vite, `ssr: false` with `prerender`) and reuses the feature code in `src/`, so the Overwolf app is unaffected.
 
 ```sh
 npm run web:dev        # dev server
@@ -126,13 +126,13 @@ Before a public release, test in Windows with a live match: game startup and shu
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `src/app/`                                        | React window composition and mounting; global, shell, and responsive layout styles                 |
 | `src/features/live/`                              | Live tab states (not running, waiting, in match) and once-per-match auto-switch                    |
-| `src/features/profile/`                           | Home profile: account storage, Deadlock API services, overview, history, heroes, charts            |
+| `src/features/profile/`                           | Player profile: account storage, Deadlock API services, overview, history, heroes, charts          |
 | `src/features/heroes/`                            | Hero tier list, analytics derivations and services, hero detail                                    |
 | `src/features/items/`                             | Item shop browser and item detail                                                                  |
 | `src/features/match/`                             | Live match types, event parsing, identity, shared store, match overview                            |
 | `src/features/roster/`                            | Team tables, player rows, roster and inventory styles                                              |
 | `src/features/player-stats/`                      | Batched statistics client, cache/cooldowns, response types, win-rate utility                       |
-| `src/features/player-lookup/`                     | Lookup form and request state                                                                      |
+| `src/features/home/`                              | Home: search, You card (rank, recent form, latest match) and Top of the city                       |
 | `src/features/builds/`                            | Desktop/compact builds, shared request hook, build analytics, phase recommendations, styles        |
 | `src/features/counters/`                          | Counter rules, threat types, selection state, desktop/compact panels, styles                       |
 | `src/features/overlay/`                           | Visibility preferences, persisted keys, settings UI, overlay styles                                |
@@ -149,7 +149,7 @@ Seams shared by the Overwolf app and the website: `src/app/links.tsx` (navigatio
 
 Use `@/` imports across feature boundaries and relative imports within a feature. The alias is configured consistently in TypeScript, Vite and Vitest. Types belong to the feature that owns them; shared code must not depend on app composition. Keep Overwolf lifecycle operations in the platform layer and leave game parsing and recommendation calculations independent of React.
 
-The app shell owns lookup and counter hook lifetimes so switching tabs preserves their state. Build requests share timeout, abort and stale-response handling while retaining each presentation's error messages. The background remains the only live-store owner. Existing `scout.overlay.*` keys and native window names are compatibility contracts.
+The app shell owns the counter hook lifetime so switching tabs preserves their state. Build requests share timeout, abort and stale-response handling while retaining each presentation's error messages. The background remains the only live-store owner. Existing `scout.overlay.*` keys and native window names are compatibility contracts.
 
 Feature styles are composed centrally by `src/app/styles/index.css`. Its import order preserves the original cascade, including responsive and compact overrides; keep that order deliberate when adding styles. There are no new runtime dependencies. Type checking rejects unused imports and parameters.
 

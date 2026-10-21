@@ -1,14 +1,7 @@
 /* Phone layouts for the website only; everything is scoped under `.web`. */
 
 .app.web
-  :is(
-    .heroes-page,
-    .items-page,
-    .item-detail,
-    .hero-detail,
-    .profile,
-    .profile-empty
-  ) {
+  :is(.heroes-page, .items-page, .item-detail, .hero-detail, .profile, .home) {
   overflow: visible;
 }
 .app.web
@@ -32,6 +25,12 @@
   }
   .app.web .brand small {
     display: none;
+  }
+  .app.web .my-profile {
+    min-width: 0;
+  }
+  .app.web .my-profile .my-name {
+    max-width: 96px;
   }
   .app.web nav {
     height: 48px;
@@ -57,27 +56,15 @@
 
   .app.web
     :is(
-      .web-home,
+      .home,
       .web-about,
       .web-not-found,
       .heroes-page,
       .items-page,
       .item-detail,
-      .profile,
-      .profile-empty
+      .profile
     ) {
     padding: 20px 16px;
-  }
-  .app.web .web-hero h1 {
-    font-size: 30px;
-  }
-  .app.web .web-home-links {
-    gap: 22px;
-  }
-  .app.web .web-home-links a {
-    display: flex;
-    align-items: center;
-    min-height: 44px;
   }
   .app.web .player-search input {
     min-height: 46px;

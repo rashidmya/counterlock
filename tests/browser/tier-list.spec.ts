@@ -42,6 +42,7 @@ async function openTierList(
     requests,
   } = options;
   let served = 0;
+  let armed = false;
   await page.route("https://assets-bucket.deadlock-api.com/**", (route) =>
     route.fulfill({ body: PNG, contentType: "image/png", headers: cors }),
   );
@@ -49,7 +50,7 @@ async function openTierList(
     const url = new URL(route.request().url());
     if (url.pathname === "/v1/analytics/hero-stats") {
       requests?.push(route.request().url());
-      const failing = failFirst && served++ === 0;
+      const failing = failFirst && (!armed || served++ === 0);
       return route.fulfill({
         status: failing ? 500 : status,
         json: stats,
@@ -58,7 +59,14 @@ async function openTierList(
     }
     return route.fulfill({ json: [], headers: cors });
   });
+  // Home asks for the same stats on load and the API client caches successes,
+  // so Home's request fails too; the Tier list's first request then fails and Retry succeeds.
+  const homeStats = page.waitForResponse((response) =>
+    response.url().includes("/v1/analytics/hero-stats"),
+  );
   await page.goto("/");
+  await homeStats;
+  armed = true;
   await page.getByRole("button", { name: "Tier list", exact: true }).click();
   await expect(page.locator(".tier-tile").first()).toBeVisible();
 }

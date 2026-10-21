@@ -23,7 +23,6 @@ describe("web paths", () => {
 
   it("sends app-only pages to home", () => {
     expect(routeToPath({ page: "live" })).toBe("/");
-    expect(routeToPath({ page: "lookup" })).toBe("/");
   });
 
   it("sends an unknown hero or item to its list", () => {

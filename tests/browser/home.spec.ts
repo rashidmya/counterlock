@@ -74,6 +74,20 @@ const scoreboard = {
   },
 };
 
+const heroSummaryRows = catalog.heroes.map((hero, index) => {
+  const matches = 20000;
+  const wins = matches * (0.4 + index * 0.005);
+  return {
+    hero_id: hero.id,
+    wins,
+    losses: matches - wins,
+    matches,
+    total_kills: 8 * matches,
+    total_deaths: 5 * matches,
+    total_assists: 10 * matches,
+  };
+});
+
 interface Fixtures {
   history?: number | unknown[];
   failFirstHistory?: boolean;
@@ -125,6 +139,8 @@ async function routeApi(page: Page, fixtures: Fixtures = {}) {
     }
     if (url.pathname === "/v1/players/hero-stats")
       return json(fixtures.heroStats ?? []);
+    if (url.pathname === "/v1/analytics/hero-stats")
+      return json(heroSummaryRows);
     if (url.pathname.endsWith("/mate-stats"))
       return json([
         { mate_id: 200, matches_played: 12, wins: 9 },
@@ -150,40 +166,137 @@ async function storeAccount(page: Page) {
   );
 }
 
-// Home still renders today's profile and stays mounted (hidden) when another page is open.
+// Pages stay mounted (hidden) once visited, so scope locators to the visible one.
 const view = (page: Page) => page.locator(".page:not([hidden])");
+const myProfile = (page: Page) =>
+  page.getByRole("button", { name: "My profile", exact: true });
+const prompt =
+  "Search for your Steam account above, open it and press This is me.";
 
 async function openMyProfile(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "My profile" }).click();
+  await myProfile(page).click();
 }
 
 const openMatches = (page: Page) =>
   page.getByRole("tab", { name: "Matches" }).click();
 
-test("empty state accepts a Steam ID", async ({ page }) => {
+test("search opens a profile and This is me remembers it", async ({ page }) => {
   await routeApi(page);
   await page.goto("/");
   await expect(
-    view(page).getByText(
-      "Play a match with Counterlock open and your profile appears here",
-    ),
+    page.getByRole("heading", { name: "Know the match." }),
   ).toBeVisible();
-  await page.getByLabel("Steam ID").fill("76561198060265728");
-  await page.getByLabel("Steam ID").press("Enter");
-  await expect(view(page).locator(".profile-header")).toContainText(
+  await expect(view(page).getByText(prompt)).toBeVisible();
+  await expect(myProfile(page)).toHaveText("Find your account");
+  await page.getByLabel("Find a player").fill("76561198060265728");
+  await page.getByRole("button", { name: /Use this ID/ }).click();
+  await expect(view(page).locator(".profile-header h1")).toHaveText(
     "Fixture Persona",
   );
-  await expect(view(page).locator(".profile-header")).toContainText(
-    "Entered manually",
-  );
+  await expect(myProfile(page)).toHaveText("Find your account");
+  await page.getByRole("button", { name: "This is me" }).click();
+  await expect(myProfile(page)).toContainText("Fixture Persona");
   const stored = await page.evaluate(
     (key) => JSON.parse(localStorage.getItem(key) ?? "null"),
     STORAGE_KEY,
   );
   expect(stored).toMatchObject({ accountId: ACCOUNT, source: "manual" });
+  await page.getByRole("button", { name: "← Back" }).click();
+  await expect(view(page).locator(".you-card")).toContainText(
+    "Fixture Persona",
+  );
+  await expect(view(page).getByText(prompt)).toHaveCount(0);
+  await expect(view(page).locator(".profile-header")).toHaveCount(0);
+});
+
+test("Home shows the You card and latest match for a stored account", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page);
+  await page.goto("/");
+  const you = view(page).locator(".you-card");
+  await expect(you.locator(".you-name")).toHaveText("Fixture Persona");
+  await expect(you).toContainText("Mystic 3");
+  // Only the normal and ranked games (1001 won, 1002 lost) count toward the strip.
+  await expect(you.locator(".wl-strip span")).toHaveCount(2);
+  await expect(you.locator(".wl-strip span.w")).toHaveCount(1);
+  await expect(you.locator(".wl-strip span.l")).toHaveCount(1);
+  await expect(you).toContainText("1W 1L · last 2 games");
+  const latest = view(page).locator(".latest-match");
+  await expect(latest.locator(".latest-result")).toHaveText(
+    `Victory · ${heroName(heroes[0])}`,
+  );
+  await expect(latest.locator(".latest-result")).toHaveClass(/good/);
+  await expect(latest).toContainText("10 / 5 / 7");
+  await expect(latest).toContainText("1,000");
+  await expect(latest).toContainText("30:00");
+  await expect(view(page).getByText(prompt)).toHaveCount(0);
+  await expect(view(page).locator(".profile-header")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "← Back" })).toHaveCount(0);
+  await latest.getByRole("button", { name: "View profile →" }).click();
+  await expect(view(page).locator(".profile-header h1")).toHaveText(
+    "Fixture Persona",
+  );
+});
+
+test("a lost latest match reads Defeat", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, {
+    history: [historyRow(1, heroes[1], 1, 1, false, now - 600)],
+  });
+  await page.goto("/");
+  const latest = view(page).locator(".latest-match .latest-result");
+  await expect(latest).toHaveText(`Defeat · ${heroName(heroes[1])}`);
+  await expect(latest).toHaveClass(/bad/);
+  await expect(view(page).locator(".you-card")).toContainText(
+    "0W 1L · last game",
+  );
+});
+
+test("Home offers My profile and Not you? Switch account for a stored account", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page);
+  await page.goto("/");
+  await expect(view(page).locator(".you-card")).toBeVisible();
   await page.getByRole("button", { name: "Not you? Switch account" }).click();
-  await expect(page.getByLabel("Steam ID")).toBeVisible();
+  await expect(view(page).getByText(prompt)).toBeVisible();
+  await expect(myProfile(page)).toHaveText("Find your account");
+  await expect(page.getByRole("button", { name: "Home" })).toHaveClass(
+    /active/,
+  );
+  expect(
+    await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY),
+  ).toBeNull();
+  await expect(page.getByRole("button", { name: "My profile →" })).toHaveCount(
+    0,
+  );
+});
+
+test("top of the city lists six heroes linking to the Heroes tab", async ({
+  page,
+}) => {
+  await routeApi(page);
+  await page.goto("/");
+  const top = view(page).locator("section.home-top");
+  await expect(
+    top.getByRole("heading", { name: "Top of the city" }),
+  ).toBeVisible();
+  await expect(top.locator(".hero-card")).toHaveCount(6);
+  await expect(top.locator(".hero-card .tier-letter").first()).toBeVisible();
+  await top.locator(".hero-card").first().click();
+  await expect(
+    page.getByRole("button", { name: "Heroes", exact: true }),
+  ).toHaveClass(/active/);
+  await expect(view(page).locator(".hero-header h1")).toBeVisible();
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await page.getByRole("button", { name: "Tier list →" }).click();
+  await expect(
+    page.getByRole("button", { name: "Tier list", exact: true }),
+  ).toHaveClass(/active/);
 });
 
 test("overview shows rank, summary, top heroes, teammates and filtered history", async ({
@@ -243,10 +356,8 @@ test("My profile opens the stored account with its actions", async ({
   await storeAccount(page);
   await routeApi(page);
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "My profile" })).toContainText(
-    "Fixture Persona",
-  );
-  await page.getByRole("button", { name: "My profile" }).click();
+  await expect(myProfile(page)).toContainText("Fixture Persona");
+  await myProfile(page).click();
   const header = view(page).locator(".profile-header");
   await expect(header.locator("h1")).toHaveText("Fixture Persona");
   await expect(header).toContainText("Player profile");
@@ -257,10 +368,8 @@ test("My profile opens the stored account with its actions", async ({
   expect(
     await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY),
   ).toBeNull();
-  await expect(page.getByLabel("Steam ID")).toBeVisible();
-  await expect(page.getByRole("button", { name: "My profile" })).toHaveText(
-    "Find your account",
-  );
+  await expect(view(page).getByText(prompt)).toBeVisible();
+  await expect(myProfile(page)).toHaveText("Find your account");
 });
 
 test("protected history degrades", async ({ page }) => {
@@ -287,9 +396,10 @@ test("unranked players show Unranked without a badge", async ({ page }) => {
 });
 
 test("retry reloads a failed match history", async ({ page }) => {
-  await storeAccount(page);
   await routeApi(page, { failFirstHistory: true });
   await page.goto("/");
+  await page.getByLabel("Find a player").fill("76561198060265728");
+  await page.getByRole("button", { name: /Use this ID/ }).click();
   await expect(view(page).getByText("Match history unavailable")).toBeVisible();
   await page.getByRole("button", { name: "Retry", exact: true }).click();
   await expect(view(page).getByText("Match history unavailable")).toHaveCount(

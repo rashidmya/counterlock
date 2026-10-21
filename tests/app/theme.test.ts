@@ -42,7 +42,6 @@ const LEGACY = new Set([
   "src/features/overlay/styles/settings.css",
   "src/features/roster/styles/roster.css",
   "src/features/roster/styles/inventory.css",
-  "src/features/player-lookup/styles/lookup.css",
   "src/features/items/styles/items.css",
   "src/features/live/styles/live.css",
   "web/app/styles/web.css",

@@ -182,7 +182,10 @@ async function openHaze(
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Heroes", exact: true }).click();
-  await page.locator(".hero-card", { hasText: open.name }).first().click();
+  await page
+    .locator(".page:not([hidden]) .hero-card", { hasText: open.name })
+    .first()
+    .click();
   await expect(page.locator(".hero-header h1")).toHaveText(open.name);
 }
 
@@ -451,13 +454,17 @@ test("All heroes returns to the list with its role filter kept", async ({
 }) => {
   await openHaze(page);
   await page.getByRole("button", { name: "← All heroes" }).click();
-  await expect(page.locator(".hero-card")).toHaveCount(catalog.heroes.length);
+  await expect(page.locator(".page:not([hidden]) .hero-card")).toHaveCount(
+    catalog.heroes.length,
+  );
   await page.getByRole("button", { name: "Mystic", exact: true }).click();
   const mystics = catalog.heroes.filter((hero) => hero.role === "mystic");
-  await page.locator(".hero-card").first().click();
+  await page.locator(".page:not([hidden]) .hero-card").first().click();
   await expect(page.locator(".hero-header h1")).toBeVisible();
   await page.getByRole("button", { name: "← All heroes" }).click();
-  await expect(page.locator(".hero-card")).toHaveCount(mystics.length);
+  await expect(page.locator(".page:not([hidden]) .hero-card")).toHaveCount(
+    mystics.length,
+  );
 });
 
 test("a hero without a tagline omits that line", async ({ page }) => {

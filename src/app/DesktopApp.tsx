@@ -17,9 +17,7 @@ import { useDeadlockRunning } from "@/platform/overwolf/hooks/useDeadlockRunning
 import { useOverlayPreference } from "@/features/overlay/hooks/useOverlayPreference";
 import { OverlaySettings } from "@/features/overlay/components/OverlaySettings";
 import { useCounters } from "@/features/counters/hooks/useCounters";
-import { usePlayerLookup } from "@/features/player-lookup/hooks/usePlayerLookup";
-import { PlayerLookup } from "@/features/player-lookup/components/PlayerLookup";
-import { HomePage } from "@/features/profile/components/HomePage";
+import { HomePage } from "@/features/home/components/HomePage";
 import { MyProfileLabel } from "@/features/profile/components/MyProfileLabel";
 import { ProfilePage } from "@/features/profile/components/ProfilePage";
 import { accountSubtitle, useDesktopMe } from "@/features/profile/me";
@@ -42,7 +40,6 @@ const tabs: { page: Page; label: string }[] = [
   { page: "tierlist", label: "Tier list" },
   { page: "heroes", label: "Heroes" },
   { page: "items", label: "Items" },
-  { page: "lookup", label: "Player lookup" },
 ];
 export function DesktopApp({
   windowName,
@@ -91,7 +88,6 @@ export function DesktopApp({
     useOverlayPreference("counter-items");
   const showBuild = windowName === kWindowNames.desktop || overlayBuild;
   const showCounters = windowName === kWindowNames.desktop || overlayCounters;
-  const lookup = usePlayerLookup();
   const hotkey = useHotkey();
   return (
     <main
@@ -193,7 +189,7 @@ export function DesktopApp({
       <LinkProvider value={{ navigate }}>
         {visited.includes("home") && (
           <div className="page" hidden={route.page !== "home"}>
-            <HomePage navigate={navigate} me={me} />
+            <HomePage me={me} />
           </div>
         )}
         {visited.includes("profile") && profileId !== null && (
@@ -221,6 +217,7 @@ export function DesktopApp({
                 showCounters,
                 counters,
                 navigate,
+                meId: me.meId,
               }}
               refresh={bridge.refresh}
             />
@@ -239,11 +236,6 @@ export function DesktopApp({
         {visited.includes("items") && (
           <div className="page" hidden={route.page !== "items"}>
             <ItemsPage {...{ route, navigate, query, setQuery }} />
-          </div>
-        )}
-        {visited.includes("lookup") && (
-          <div className="page" hidden={route.page !== "lookup"}>
-            <PlayerLookup model={lookup} />
           </div>
         )}
       </LinkProvider>

@@ -3,10 +3,6 @@ import type { MeAdapter } from "@/features/profile/me";
 
 export const REMEMBERED_KEY = "counterlock.web.account";
 
-// Passed as navigation state so "Find another player" is not bounced back to
-// the remembered account.
-export const BROWSE_STATE = { browse: true } as const;
-
 const REMEMBERED_EVENT = "counterlock:remembered";
 
 const storage = (): Storage | undefined =>
