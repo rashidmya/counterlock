@@ -102,6 +102,12 @@ export function YouCard({ accountId }: { accountId: number }) {
           </p>
         )
       )}
+      {latest && (
+        <p className="you-derived">
+          Recent form counts normal & ranked games only. Souls / min is the
+          match's net worth divided by its minutes.
+        </p>
+      )}
     </div>
   );
 }

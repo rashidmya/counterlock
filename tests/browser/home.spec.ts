@@ -232,6 +232,9 @@ test("Home shows the You card and latest match for a stored account", async ({
   await expect(latest).toContainText("10 / 5 / 7");
   await expect(latest).toContainText("1,000");
   await expect(latest).toContainText("30:00");
+  await expect(view(page).locator(".you-derived")).toHaveText(
+    "Recent form counts normal & ranked games only. Souls / min is the match's net worth divided by its minutes.",
+  );
   await expect(view(page).getByText(prompt)).toHaveCount(0);
   await expect(view(page).locator(".profile-header")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "← Back" })).toHaveCount(0);
@@ -239,6 +242,27 @@ test("Home shows the You card and latest match for a stored account", async ({
   await expect(view(page).locator(".profile-header h1")).toHaveText(
     "Fixture Persona",
   );
+});
+
+test("the latest match can be any mode while the strip counts normal and ranked only", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, {
+    history: [
+      // Newest: a Street Brawl win that the strip must ignore.
+      historyRow(1, heroes[2], 4, 1, true, now - 600),
+      historyRow(2, heroes[0], 1, 4, false, now - 3600),
+      historyRow(3, heroes[1], 1, 1, false, now - 7200),
+    ],
+  });
+  await page.goto("/");
+  const latest = view(page).locator(".latest-match .latest-result");
+  await expect(latest).toHaveText(`Victory · ${heroName(heroes[2])}`);
+  const you = view(page).locator(".you-card");
+  await expect(you.locator(".wl-strip span")).toHaveCount(2);
+  await expect(you.locator(".wl-strip span.w")).toHaveCount(0);
+  await expect(you).toContainText("0W 2L · last 2 games");
 });
 
 test("a lost latest match reads Defeat", async ({ page }) => {
