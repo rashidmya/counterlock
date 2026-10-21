@@ -2,10 +2,14 @@ footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: 1px solid #29363c;
-  padding: 15px 30px;
-  color: #7c8c8f;
-  font-size: 9px;
+  border-top: 1px solid var(--line);
+  padding: 12px 24px;
+  color: var(--dim);
+  font: 600 11px var(--font-label);
+  letter-spacing: 0.14em;
+}
+.app:not(.web) footer {
+  text-transform: uppercase;
 }
 footer > span {
   display: flex;
@@ -13,22 +17,22 @@ footer > span {
   align-items: center;
 }
 .footer-dot {
-  width: 4px;
-  height: 4px;
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--good);
 }
 .divider {
-  color: #43585d;
+  color: var(--line);
   margin: 0 2px;
 }
 footer a {
-  color: #a6b6b1;
+  color: var(--muted);
 }
 @media (min-width: 1500px) {
   .workspace {
     grid-template-columns: minmax(0, 1fr) 370px;
-  }
-  .item-card p {
-    font-size: 11px;
   }
 }
 @media (max-width: 1100px) {
@@ -37,7 +41,10 @@ footer a {
     gap: 15px;
     padding: 0 20px 20px;
   }
-  header,
+  header {
+    gap: 18px;
+    padding: 0 16px;
+  }
   .intro {
     padding-left: 20px;
     padding-right: 20px;
@@ -49,11 +56,21 @@ footer a {
     margin-left: 20px;
     margin-right: 20px;
   }
+  .tabs {
+    gap: 16px;
+  }
+  .tabs button {
+    font-size: 14px;
+    letter-spacing: 0.1em;
+  }
+  .header-right {
+    gap: 12px;
+  }
+  .my-profile .my-name {
+    max-width: 96px;
+  }
   .rank-icon {
     display: none;
-  }
-  th {
-    font-size: 7px;
   }
   td {
     padding: 6px;
@@ -62,20 +79,17 @@ footer a {
     max-width: 95px;
   }
   .panel-heading {
-    padding: 13px;
-  }
-  .panel-heading .muted {
-    font-size: 7px;
+    padding: 9px 12px;
   }
   .portrait {
-    width: 32px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
   }
   .player-button {
     gap: 7px;
   }
   .counters {
-    padding: 15px 12px;
+    padding: 14px 12px;
   }
   .item-card {
     padding: 10px;
@@ -84,18 +98,37 @@ footer a {
     margin: 0 2px;
   }
 }
+@media (max-width: 900px) {
+  .app > header {
+    gap: 14px;
+    padding: 0 14px;
+  }
+  .app > header .brand {
+    font-size: 20px;
+  }
+  .app > header .tabs {
+    gap: 14px;
+  }
+  .app > header .tabs button {
+    font-size: 13px;
+    letter-spacing: 0.08em;
+  }
+  .app > header .header-right {
+    gap: 10px;
+  }
+  .app > header .my-profile .my-name {
+    max-width: 80px;
+  }
+}
 @media (max-width: 850px) {
   .workspace {
     grid-template-columns: 1fr;
   }
   .counters {
-    padding: 20px;
+    padding: 16px;
   }
   .recommendations {
     grid-template-columns: 1fr 1fr;
-  }
-  .shortcut {
-    display: none;
   }
   .rank-icon {
     display: block;
@@ -103,8 +136,8 @@ footer a {
   .settings {
     margin: 15px 20px;
   }
-  .intro h1 {
-    font-size: 31px;
+  .intro .page-title h1 {
+    font-size: 34px;
   }
   .table-wrap {
     width: 100%;
@@ -123,21 +156,15 @@ footer a {
   .header-right {
     gap: 8px;
   }
-  .connection {
-    font-size: 8px;
-  }
   .intro {
     align-items: flex-start;
     gap: 15px;
   }
-  .intro h1 {
-    font-size: 26px;
-  }
-  .intro .muted {
-    font-size: 11px;
+  .intro .page-title h1 {
+    font-size: 28px;
   }
   .match-clock strong {
-    font-size: 29px;
+    font-size: 32px;
   }
   .notice {
     align-items: flex-start;
@@ -157,14 +184,14 @@ footer a {
     padding-left: 10px;
   }
   .player-label strong {
-    font-size: 11px;
+    font-size: 12px;
   }
   .player-label small {
     max-width: 85px;
   }
   .portrait {
-    width: 27px;
-    height: 31px;
+    width: 30px;
+    height: 30px;
   }
   td:last-child,
   th:last-child {
@@ -172,8 +199,8 @@ footer a {
   }
   footer {
     gap: 15px;
-    padding: 15px 20px;
-    font-size: 8px;
+    padding: 12px 20px;
+    font-size: 10px;
   }
 }
 
@@ -207,79 +234,14 @@ footer,
   max-height: 100%;
   overflow: auto;
   grid-auto-rows: max-content;
-  scrollbar-width: thin;
-  scrollbar-color: #435050 transparent;
 }
 .counters {
   max-height: 100%;
   overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #435050 transparent;
-}
-.compact header {
-  height: 58px;
-}
-.compact nav {
-  height: 43px;
-}
-.compact .intro {
-  padding-top: 17px;
-  padding-bottom: 17px;
-}
-.compact h1 {
-  font-size: 30px;
-  margin: 5px 0;
-}
-.compact .panel-heading {
-  padding-top: 11px;
-  padding-bottom: 11px;
-}
-.compact td {
-  height: 42px;
-  padding-top: 4px;
-  padding-bottom: 4px;
-}
-.compact .portrait {
-  width: 30px;
-  height: 30px;
-}
-.compact .rosters {
-  gap: 13px;
-}
-.compact .notice {
-  margin-bottom: 15px;
-  padding-top: 7px;
-  padding-bottom: 7px;
-}
-.compact .workspace {
-  padding-bottom: 14px;
-}
-.compact .brand {
-  font-size: 21px;
-}
-.compact .brand img {
-  height: 35px;
-  width: 35px;
-}
-.compact .brand small {
-  font-size: 8px;
-}
-.compact .player-label strong {
-  font-size: 11px;
-}
-.compact .player-label small {
-  font-size: 9px;
-}
-.compact th {
-  padding-top: 8px;
-  padding-bottom: 6px;
-}
-.compact .data-note {
-  font-size: 9px;
 }
 * {
   scrollbar-width: thin;
-  scrollbar-color: #435050 transparent;
+  scrollbar-color: var(--line) transparent;
 }
 @media (max-width: 850px) {
   .app {
@@ -299,41 +261,5 @@ footer,
   }
   .table-wrap {
     overflow: auto;
-  }
-}
-@media (min-width: 851px) {
-  .compact .intro {
-    height: 50px;
-    padding: 8px 30px;
-  }
-  .compact .intro h1 {
-    font-size: 23px;
-    margin: 0;
-  }
-  .compact .intro .eyebrow,
-  .compact .intro .muted,
-  .compact .match-clock small {
-    display: none;
-  }
-  .compact .match-clock {
-    display: flex;
-    align-items: center;
-    gap: 13px;
-  }
-  .compact .match-clock strong {
-    font-size: 27px;
-  }
-  .compact .notice {
-    margin-bottom: 10px;
-  }
-  .compact td {
-    height: 40px;
-  }
-  .compact .panel-heading {
-    padding-top: 9px;
-    padding-bottom: 9px;
-  }
-  .compact .rosters {
-    gap: 10px;
   }
 }

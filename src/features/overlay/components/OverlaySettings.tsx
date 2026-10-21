@@ -1,6 +1,7 @@
 import { overlayOpacityKey } from "../preferences";
 
 export interface OverlaySettingsProps {
+  hotkey: string;
   overlaySettings: boolean;
   overlayBuild: boolean;
   setShowBuild: (value: boolean) => void;
@@ -10,6 +11,7 @@ export interface OverlaySettingsProps {
   setOpacity: (value: number) => void;
 }
 export function OverlaySettings({
+  hotkey,
   overlaySettings,
   overlayBuild,
   setShowBuild,
@@ -20,6 +22,10 @@ export function OverlaySettings({
 }: OverlaySettingsProps) {
   return (
     <section className="settings panel">
+      <div className="settings-hotkey">
+        <span>Show / hide overlay</span>
+        <kbd>{hotkey}</kbd>
+      </div>
       {overlaySettings && (
         <>
           <label>
@@ -59,7 +65,9 @@ export function OverlaySettings({
         </label>
       )}
 
-      <span>Hide the overlay to return full control to the game.</span>
+      <span className="settings-hint">
+        Hide the overlay to return full control to the game.
+      </span>
     </section>
   );
 }

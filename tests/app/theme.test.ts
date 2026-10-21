@@ -33,17 +33,8 @@ const PALETTE: Record<string, string> = {
 
 // Files that still contain hex colours. Each later task removes its files; the last task asserts this is empty.
 const LEGACY = new Set([
-  "src/app/styles/shell.css",
-  "src/app/styles/layout.css",
-  "src/app/styles/shared.css",
-  "src/features/builds/styles/builds.css",
-  "src/features/counters/styles/counters.css",
   "src/features/overlay/styles/panels.css",
-  "src/features/overlay/styles/settings.css",
-  "src/features/roster/styles/roster.css",
-  "src/features/roster/styles/inventory.css",
   "src/features/items/styles/items.css",
-  "src/features/live/styles/live.css",
   "web/app/styles/web.css",
 ]);
 

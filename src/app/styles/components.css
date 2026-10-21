@@ -163,6 +163,7 @@
   padding: 0;
   color: var(--cream);
   font: 600 13px var(--font-body);
+  white-space: nowrap;
   cursor: pointer;
 }
 .my-profile:hover:not(:disabled) {

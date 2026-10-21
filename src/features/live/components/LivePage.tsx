@@ -2,7 +2,7 @@ import type { MatchState } from "@/features/match/types";
 import type { useCounters } from "@/features/counters/hooks/useCounters";
 import { MatchOverview } from "@/features/match/components/MatchOverview";
 import type { Navigate } from "@/app/navigation";
-import { Icon } from "@/shared/ui/Icon";
+import { PageTitle } from "@/shared/ui/PageTitle";
 import type { LiveStatus } from "../utils/live-status";
 
 interface Props {
@@ -35,9 +35,10 @@ export function LivePage({
   const running = status === "waiting";
   return (
     <section className="live-empty">
-      <Icon name="eye" />
-      <h1>{running ? "Waiting for a match" : "Deadlock isn't running"}</h1>
-      <p className="muted">
+      <PageTitle
+        title={running ? "Waiting for a match" : "Deadlock isn't running"}
+      />
+      <p className="page-lede">
         {running
           ? "Queue up. We'll switch to this tab when the lobby loads."
           : "Launch Deadlock and this tab will fill in as soon as you join a match."}

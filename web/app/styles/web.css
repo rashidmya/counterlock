@@ -12,6 +12,7 @@
   background: #0f151b;
 }
 .web > header {
+  justify-content: space-between;
   -webkit-app-region: no-drag;
 }
 .web .brand {

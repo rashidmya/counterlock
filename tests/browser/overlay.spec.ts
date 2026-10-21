@@ -7,7 +7,8 @@ for (const entry of ["/", "/desktop/desktop.html"]) {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(entry);
-    await expect(page.getByText("STANDBY", { exact: true })).toBeVisible();
+    await expect(page.getByText("STANDBY", { exact: true })).toHaveCount(0);
+    await expect(page.locator(".live-badge")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Home" })).toHaveClass(
       /active/,
     );

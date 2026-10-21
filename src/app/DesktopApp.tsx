@@ -7,7 +7,6 @@ import { readOverlayOpacity } from "@/features/overlay/preferences";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { catalog } from "@/shared/catalog";
 import { Icon } from "@/shared/ui/Icon";
-import { assetUrl } from "@/shared/ui/assets";
 import { bridge, inOverwolf, waiting } from "@/platform/overwolf/store-bridge";
 import {
   kWindowNames,
@@ -102,23 +101,31 @@ export function DesktopApp({
       )}
       <header onMouseDown={dragCurrentWindow}>
         <div className="brand">
-          <img src={assetUrl("icon.svg")} alt="" />
-          <div>
-            COUNTER<b>LOCK</b>
-            <small>KNOW THE MATCH. MAKE YOUR MOVE.</small>
-          </div>
+          <span>
+            Counter<b>lock</b>
+          </span>
+        </div>
+        <div className="tabs">
+          {tabs.map(({ page, label }) => (
+            <button
+              key={page}
+              className={route.page === page ? "active" : ""}
+              onClick={() => navigate({ page })}
+            >
+              {label}
+              {page === "live" && status === "in-match" && (
+                <span className="live-dot" aria-hidden="true" />
+              )}
+            </button>
+          ))}
         </div>
         <div className="header-right">
-          <span className="connection">
-            <span />
-            {!inOverwolf
-              ? "STANDBY"
-              : status === "in-match"
-                ? "LIVE MATCH"
-                : status === "waiting"
-                  ? "IN MENUS"
-                  : "GAME NOT RUNNING"}
-          </span>
+          {status === "in-match" && (
+            <span className="live-badge">
+              <i aria-hidden="true" />
+              LIVE MATCH
+            </span>
+          )}
           <button
             className="my-profile"
             aria-label="My profile"
@@ -154,28 +161,10 @@ export function DesktopApp({
           )}
         </div>
       </header>
-      <nav>
-        <div className="tabs">
-          {tabs.map(({ page, label }) => (
-            <button
-              key={page}
-              className={route.page === page ? "active" : ""}
-              onClick={() => navigate({ page })}
-            >
-              {label}
-              {page === "live" && status === "in-match" && (
-                <span className="live-dot" aria-hidden="true" />
-              )}
-            </button>
-          ))}
-        </div>
-        <span className="shortcut">
-          TOGGLE OVERLAY <kbd>{hotkey}</kbd>
-        </span>
-      </nav>
       {settings && (
         <OverlaySettings
           {...{
+            hotkey,
             overlaySettings,
             overlayBuild,
             setShowBuild,

@@ -1,10 +1,11 @@
 import type { MatchState } from "../types";
-import { catalog } from "@/shared/catalog";
+import { catalog, heroById } from "@/shared/catalog";
 import { BuildPanel } from "@/features/builds/components/BuildPanel";
 import { CounterPanel } from "@/features/counters/components/CounterPanel";
 import type { useCounters } from "@/features/counters/hooks/useCounters";
 import { Team } from "@/features/roster/components/Team";
 import { Icon } from "@/shared/ui/Icon";
+import { PageTitle } from "@/shared/ui/PageTitle";
 
 interface Props {
   state: MatchState;
@@ -25,16 +26,18 @@ export function MatchOverview({
   const errorStats = Object.values(state.stats).some(
     (s) => s.heroError || s.rankError,
   );
+  const local = state.players.find((p) => p.local);
+  const myHero = local
+    ? (heroById.get(local.heroId)?.name ?? local.heroName)
+    : undefined;
   return (
     <>
       <div className="intro">
-        <div>
-          <p className="eyebrow">YOUR MATCH, AT A GLANCE</p>
-          <h1>A little intel. A better fight.</h1>
-          <p className="muted">
-            Scout the lineup and find the right answer to their heroes.
-          </p>
-        </div>
+        <PageTitle
+          eyebrow="Live match"
+          title="Know the match."
+          ribbon={myHero ? `You're playing ${myHero}` : undefined}
+        />
         <div className="match-clock">
           <span>
             {state.phase === "PostGame"

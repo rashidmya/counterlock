@@ -90,7 +90,6 @@ test("desktop retains counter state across tabs and exposes game-only settings",
   await nativeWindow(page, "desktop");
   await buildResponses(page);
   await page.goto("/desktop/desktop.html");
-  await expect(page.locator("kbd")).toHaveText("Alt + S");
   await expect(page.locator(".match-clock strong")).toHaveText("12:34");
   await expect(page.locator(".build-panel")).toContainText("Fixture build");
   await page.getByLabel("Item budget").selectOption("1600");
@@ -100,6 +99,7 @@ test("desktop retains counter state across tabs and exposes game-only settings",
   await page
     .getByRole("button", { name: "Overlay settings", exact: true })
     .click();
+  await expect(page.locator(".settings kbd")).toHaveText("Alt + S");
   await expect(page.getByLabel("Recommended build in overlay")).toBeChecked();
   await page.getByLabel("Recommended build in overlay").uncheck();
   await page.getByRole("button", { name: "Live" }).click();

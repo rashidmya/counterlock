@@ -2,24 +2,34 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 20px;
-  padding: 15px;
-  margin: 15px 30px;
+  gap: 14px 24px;
+  padding: 12px 16px;
+  margin: 14px 30px;
+}
+.settings-hotkey {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 700 12px var(--font-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
 }
 .settings label {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
-  color: #aabbba;
+  font-size: 12px;
+  color: var(--cream);
 }
-.settings span {
-  font-size: 10px;
-  color: #7e9297;
+.settings-hint {
+  font-size: 12px;
+  color: var(--dim);
 }
 .settings input {
-  accent-color: #c3aa72;
+  accent-color: var(--gold);
 }
 .settings input[type="range"] {
   width: 100px;
+  padding: 0;
 }

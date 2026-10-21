@@ -1,64 +1,68 @@
 /* Hero builds use the game's complete shop artwork, shared with counter cards. */
-.build-panel {
-  background: linear-gradient(115deg, #282b2499, #192129aa 38%);
-}
 .build-heading {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
-  border-bottom: 1px solid #394039;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  border-left: 5px solid var(--gold);
 }
 .build-title {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
 }
 .build-emblem {
   font-size: 31px;
-  color: #d8bd7f;
+  color: var(--gold);
   line-height: 1;
 }
 .build-hero-portrait {
-  width: 34px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   object-fit: cover;
-  border-radius: 4px;
+  object-position: center 15%;
+  border: 1px solid var(--line);
+  border-radius: 0;
 }
 .build-history {
   display: flex;
-  gap: 14px;
+  gap: 18px;
   margin-left: auto;
 }
 .build-history > span {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 1px;
 }
 .build-history strong {
-  color: #bcd3c5;
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--cream);
+  font: 700 20px/1.1 var(--font-label);
 }
 .build-history small {
-  color: #8c9b99;
-  font-size: 7px;
-  letter-spacing: 0.5px;
+  color: var(--muted);
+  font: 600 11px var(--font-label);
+  letter-spacing: 0.14em;
 }
 .build-title .eyebrow {
-  font-size: 7px;
-  letter-spacing: 1.6px;
-  margin-bottom: 4px;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  margin-bottom: 2px;
 }
 .build-title h2 {
-  font-size: 12px;
+  font: 700 20px var(--font-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .build-title h2 span {
-  font-weight: 400;
-  color: #d3bd89;
+  color: var(--gold);
   margin-left: 10px;
+}
+.build-title small {
+  color: var(--dim);
+  font-size: 12px;
 }
 .build-controls,
 .build-controls label {
@@ -67,18 +71,18 @@
   align-items: center;
 }
 .build-controls label > span {
-  color: #8c9b99;
-  font-size: 8px;
-  letter-spacing: 0.8px;
+  color: var(--muted);
+  font: 700 12px var(--font-label);
+  letter-spacing: 0.14em;
 }
 .build-controls select {
   min-width: 150px;
   padding: 6px 9px;
-  font-size: 10px;
+  font-size: 13px;
 }
 .build-controls > button {
   font-size: 22px;
-  color: #b6b998;
+  color: var(--muted);
   width: 25px;
   height: 25px;
   line-height: 1;
@@ -86,36 +90,35 @@
 .build-stages {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  padding: 8px 12px 6px;
-  gap: 6px;
 }
 .build-stage {
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 10px;
   align-items: start;
   min-width: 0;
+  padding: 10px 14px;
 }
 .build-stage + .build-stage {
-  border-top: 1px solid #34413e;
-  padding-top: 6px;
+  border-top: 1px solid var(--line-soft);
 }
 .build-stage h3 {
-  color: #bcc6c2;
-  font-size: 10px;
-  font-weight: 500;
+  color: var(--cream);
+  font: 700 16px var(--font-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   margin-bottom: 0;
   padding-top: 3px;
 }
 .build-stage h3 > span {
-  font-size: 8px;
-  letter-spacing: 1px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
   margin-right: 8px;
-  color: #948668;
+  color: var(--dim);
 }
 .build-items {
   display: grid;
-  grid-template-columns: repeat(8, minmax(54px, 1fr));
+  grid-template-columns: repeat(8, minmax(58px, 1fr));
   gap: 4px;
   overflow-x: auto;
 }
@@ -124,76 +127,104 @@
   display: flex;
   align-items: center;
   flex-direction: column;
+  gap: 2px;
   text-align: center;
-  border-radius: 5px;
-  padding: 2px;
+  border: 1px solid transparent;
+  padding: 3px 2px;
 }
 .build-item:hover,
 .build-item:focus-visible {
-  background: #56614c33;
+  background: rgb(from var(--gold) r g b / 0.06);
+  border-color: var(--line);
 }
 .build-art {
   position: relative;
-  height: 32px;
-  width: 32px;
-  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  width: 40px;
+  margin-bottom: 2px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.build-art:has(.item-icon.weapon) {
+  background: linear-gradient(
+    160deg,
+    rgb(from var(--weapon) r g b / 0.35),
+    rgb(from var(--weapon) r g b / 0.08)
+  );
+}
+.build-art:has(.item-icon.vitality) {
+  background: linear-gradient(
+    160deg,
+    rgb(from var(--vitality) r g b / 0.4),
+    rgb(from var(--vitality) r g b / 0.08)
+  );
+}
+.build-art:has(.item-icon.spirit) {
+  background: linear-gradient(
+    160deg,
+    rgb(from var(--spirit) r g b / 0.4),
+    rgb(from var(--spirit) r g b / 0.08)
+  );
 }
 .build-art .item-icon {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: block;
-  border-radius: 5px;
+  border-radius: 0;
 }
 .build-item strong {
-  font-size: 9px;
-  font-weight: 500;
-  line-height: 1.3;
-  color: #d2d9d6;
-  min-height: 22px;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--cream);
+  min-height: 26px;
 }
 .build-item small {
-  font-size: 8px;
-  color: #b9a67b;
-  margin-top: 1px;
+  font: 600 11px var(--font-label);
+  letter-spacing: 0.06em;
+  color: var(--muted);
 }
 .build-item.owned small {
-  color: #9ecba8;
+  color: var(--good);
 }
 .owned-mark {
   position: absolute;
-  bottom: -3px;
+  bottom: -5px;
   right: -5px;
-  background: #244c3a;
-  border: 1px solid #8ac8a0;
-  color: #bce4bc;
+  background: var(--good);
+  color: var(--ink);
   border-radius: 50%;
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
   line-height: 16px;
   text-align: center;
-  font-size: 10px;
+  font: 700 10px var(--font-label);
 }
 .build-source {
   display: flex;
   gap: 10px;
   justify-content: space-between;
-  color: #7c8e8c;
-  font-size: 8px;
-  padding: 4px 12px 7px;
+  color: var(--dim);
+  font-size: 12px;
+  padding: 6px 14px 10px;
   line-height: 1.5;
+  border-top: 1px solid var(--line-soft);
 }
 .build-source a {
-  color: #b2b69e;
+  color: var(--gold);
   white-space: nowrap;
 }
 .build-empty {
   padding: 18px 16px;
-  color: #8da09f;
-  font-size: 11px;
+  color: var(--muted);
+  font-size: 13px;
 }
 .build-empty-stage {
-  font-size: 10px;
-  color: #899c9a;
+  font-size: 12px;
+  color: var(--muted);
   grid-column: 1/-1;
   padding: 15px 0;
 }
@@ -202,7 +233,7 @@
   object-fit: contain;
   width: 44px;
   height: 44px;
-  border-radius: 5px;
+  border-radius: 0;
 }
 .item-icon.vitality,
 .item-icon.weapon,
@@ -233,12 +264,6 @@
   }
   .build-item strong {
     min-height: 0;
-    font-size: 10px;
-  }
-  .build-art,
-  .build-art .item-icon {
-    width: 36px;
-    height: 36px;
   }
 }
 @media (max-width: 520px) {
@@ -265,7 +290,7 @@
   .build-source {
     flex-wrap: wrap;
   }
-  .build-stages {
+  .build-stage {
     padding: 12px;
   }
 }
@@ -280,32 +305,29 @@
 }
 .stage-time {
   flex-basis: 100%;
-  font-size: 9px;
-  color: #8c9a94;
-  font-weight: 400;
+  font: 500 12px var(--font-body);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
 }
 .stage-now {
-  font-size: 7px;
-  letter-spacing: 0.7px;
-  font-weight: 500;
-  color: #e5c88c;
-  border: 1px solid #82704b;
-  border-radius: 3px;
-  padding: 2px 4px;
+  font: 700 11px var(--font-label);
+  letter-spacing: 0.16em;
+  background: var(--gold);
+  color: var(--ink);
+  padding: 1px 6px;
   margin-left: 0;
 }
-.current-stage h3 {
-  color: #e5c88c;
-}
-.current-stage .build-item {
-  background: #bfa7730b;
-}
-.current-stage .stage-time {
-  color: #baa77e;
+.current-stage {
+  background: linear-gradient(
+    90deg,
+    rgb(from var(--gold) r g b / 0.08),
+    transparent
+  );
 }
 .flex-label {
-  color: #849b9a;
-  font-size: 7px;
+  color: var(--dim);
+  font-size: 11px;
 }
 @media (max-width: 850px) {
   .stage-time {

@@ -18,6 +18,8 @@ test("browser preview opens Home and Live shows not running", async ({
     "Heroes",
     "Items",
   ]);
+  await expect(page.locator(".live-badge")).toHaveCount(0);
+  await expect(page.getByText("TOGGLE OVERLAY")).toHaveCount(0);
   await page.getByRole("button", { name: "Live" }).click();
   await expect(page.getByText("Deadlock isn't running")).toBeVisible();
   await page.getByRole("button", { name: "Browse heroes" }).click();
@@ -62,6 +64,7 @@ test("joining a match switches to Live once", async ({ page }) => {
     /active/,
   );
   await expect(page.locator(".build-panel")).toBeVisible();
+  await expect(page.locator(".live-badge")).toBeVisible();
 
   await page.getByRole("button", { name: "Heroes" }).click();
   await updateMatch(page, { matchId: "42" });
@@ -73,6 +76,7 @@ test("joining a match switches to Live once", async ({ page }) => {
   ).toBeVisible();
 
   await updateMatch(page, { players: [] });
+  await expect(page.locator(".live-badge")).toBeHidden();
   await updateMatch(page, { players: matchPlayers(), matchId: "43" });
   await expect(page.getByRole("button", { name: "Live" })).toHaveClass(
     /active/,
