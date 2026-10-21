@@ -16,13 +16,7 @@ const artHero = catalog.heroes.find((hero) => hero.name === "Haze");
 const fetchTopCards = async () =>
   topHeroCards(await fetchHeroSummaries({ minBadge: 0 }));
 
-export function HomeView({
-  me,
-  onPick,
-}: {
-  me: MeAdapter;
-  onPick?(accountId: number): void;
-}) {
+export function HomeView({ me }: { me: MeAdapter }) {
   const top = useAsync(fetchTopCards, []);
   const { meId } = me;
   return (
@@ -36,7 +30,7 @@ export function HomeView({
           title="Know the match."
           ribbon="Make your move"
         />
-        <PlayerSearch label="Find a player" onPick={onPick} />
+        <PlayerSearch label="Find a player" />
       </div>
 
       <section className="home-you">

@@ -3,13 +3,7 @@ import { RouteLink, useLinks } from "@/app/links";
 import { Picture } from "@/shared/ui/Picture";
 import { usePlayerSearch } from "../hooks/usePlayerSearch";
 
-export function PlayerSearch({
-  label = "Find a player",
-  onPick,
-}: {
-  label?: string;
-  onPick?(accountId: number): void;
-}) {
+export function PlayerSearch({ label = "Find a player" }: { label?: string }) {
   const { navigate } = useLinks();
   const [text, setText] = useState("");
   const { results, loading, error, directId } = usePlayerSearch(text);
@@ -20,7 +14,6 @@ export function PlayerSearch({
       onSubmit={(event) => {
         event.preventDefault();
         if (directId === null) return;
-        onPick?.(directId);
         navigate({ page: "profile", accountId: directId });
       }}
     >
@@ -40,7 +33,6 @@ export function PlayerSearch({
           <RouteLink
             className="player-search-direct"
             route={{ page: "profile", accountId: directId }}
-            onClick={() => onPick?.(directId)}
           >
             Use this ID
             <small>Account {directId}</small>
@@ -65,7 +57,6 @@ export function PlayerSearch({
               <li key={profile.accountId}>
                 <RouteLink
                   route={{ page: "profile", accountId: profile.accountId }}
-                  onClick={() => onPick?.(profile.accountId)}
                 >
                   <Picture
                     className="profile-avatar small"

@@ -120,7 +120,7 @@ test("pre-rendered home HTML has the pitch and search but no live numbers", asyn
   expect(html).not.toContain("hero-card");
 });
 
-test("search lists matches, a result opens and remembers the profile", async ({
+test("search lists matches and a result opens the profile without remembering it", async ({
   page,
 }) => {
   await mockApi(page);
@@ -138,7 +138,10 @@ test("search lists matches, a result opens and remembers the profile", async ({
     "Deadlock profile",
   );
   await expect(page).toHaveTitle("Fargo Fixture | Counterlock");
-  expect(await stored(page)).toBe(`{"accountId":${FARGO}}`);
+  expect(await stored(page)).toBeNull();
+  await expect(page.getByRole("link", { name: "My profile" })).toHaveText(
+    "Find your account",
+  );
 });
 
 test("results with the same name show distinct account ids", async ({
@@ -373,7 +376,7 @@ test("pasting a SteamID64 offers 'Use this ID'", async ({ page }) => {
   await expect(page.getByText("No Deadlock players found")).toHaveCount(0);
   await use.click();
   await expect(page).toHaveURL(new RegExp(`/players/${OTHER}$`));
-  expect(await stored(page)).toBe(`{"accountId":${OTHER}}`);
+  expect(await stored(page)).toBeNull();
 });
 
 test("a Steam profile URL with a numeric id is understood", async ({
