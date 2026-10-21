@@ -27,9 +27,7 @@ export function MatchOverview({
     (s) => s.heroError || s.rankError,
   );
   const local = state.players.find((p) => p.local);
-  const myHero = local
-    ? (heroById.get(local.heroId)?.name ?? local.heroName)
-    : undefined;
+  const myHero = local ? heroById.get(local.heroId)?.name : undefined;
   return (
     <>
       <div className="intro">

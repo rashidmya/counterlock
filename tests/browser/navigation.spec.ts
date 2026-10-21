@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
 import { matchPlayers, nativeWindow, updateMatch } from "./helpers";
 
 test("browser preview opens Home and Live shows not running", async ({
@@ -114,4 +115,34 @@ test("View your profile opens the stored account's profile", async ({
   await expect(page.getByRole("button", { name: "Home" })).not.toHaveClass(
     /active/,
   );
+});
+
+test("Live intro ribbon names the local player's hero", async ({ page }) => {
+  await nativeWindow(page, "desktop");
+  await page.route("**/analytics/hero-build-stats/**", (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.goto("/desktop/desktop.html");
+  const hero = catalog.heroes.find((h) => h.id === 7)!.name;
+  await expect(page.locator(".intro .ribbon")).toHaveText(
+    `You're playing ${hero}`,
+  );
+});
+
+test("Live intro omits the ribbon when the local hero is unresolved", async ({
+  page,
+}) => {
+  await nativeWindow(page, "desktop");
+  await page.route("**/analytics/hero-build-stats/**", (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.goto("/desktop/desktop.html");
+  await expect(page.locator(".intro .ribbon")).toBeVisible();
+  const [local, enemy] = matchPlayers();
+  await updateMatch(page, {
+    players: [{ ...local, heroId: 0, heroName: "Hero not detected" }, enemy],
+  });
+  await expect(page.locator(".intro h1")).toHaveText("Know the match.");
+  await expect(page.locator(".intro .ribbon")).toHaveCount(0);
+  await expect(page.getByText("You're playing")).toHaveCount(0);
 });
