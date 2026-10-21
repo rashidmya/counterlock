@@ -93,9 +93,11 @@ test("tier rows run S to D with win · pick under each tile", async ({
     "rgb(242, 198, 109)",
   );
   await expect(
-    page.getByText("Tiers by win rate over the last 30 days, all ranks.", {
-      exact: true,
-    }),
+    page
+      .locator(".heroes-page")
+      .getByText("Tiers by win rate over the last 30 days, all ranks.", {
+        exact: true,
+      }),
   ).toBeVisible();
 });
 
