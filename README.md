@@ -1,6 +1,6 @@
 # Counterlock
 
-An Overwolf Native app for team rosters, player ranks, hero win rates and games played, with recommended hero builds and counter-item suggestions. A desktop window adds companion pages: your profile and match history, a hero tier list with matchups, and an item browser. Built with React, TypeScript and Vite.
+An Overwolf Native app for team rosters, player ranks, hero win rates and games played, with recommended hero builds and counter-item suggestions. A desktop window adds companion pages: a search-first Home, a Live page, a hero tier list, hero pages with matchups, an item browser, and player profiles with match history. Built with React, TypeScript and Vite, in a "Deadlock noir" look (see [The look](#the-look)).
 
 This is a working development prototype. The browser UI, API handling and simulated Overwolf integration are tested. **A real Windows/Overwolf/Deadlock session has not been tested in this Linux workspace.**
 
@@ -15,7 +15,7 @@ npm ci
 npm run dev
 ```
 
-Open the local URL Vite prints. The browser opens on **Home** with tabs for **Home · Live · Tier list · Heroes · Items**. Without Overwolf, **Live** shows "Deadlock isn't running"; with Overwolf it shows "Waiting for a match" until live data arrives. Demo match data is confined to test fixtures. In the browser, Home has no game events to detect your account, so you search for it: **Find a player** accepts a Steam name, an exact SteamID64, account ID, `[U:1:account]` ID or profile link, and the profile's **This is me** button remembers it. **Home**, **Tier list**, **Heroes** and **Items** make real requests. No API key is required by the endpoints used here.
+Open the local URL Vite prints. The browser opens on **Home** with tabs for **Home · Live · Tier list · Heroes · Items**, plus a **My profile** button in the header once an account is remembered. Without Overwolf, **Live** shows "Deadlock isn't running"; with Overwolf it shows "Waiting for a match" until live data arrives. Demo match data is confined to test fixtures. In the browser, Home has no game events to detect your account, so you search for it: **Find a player** accepts a Steam name, an exact SteamID64, account ID, `[U:1:account]` ID or profile link, and the profile's **This is me** button remembers it. **Home**, **Tier list**, **Heroes**, **Items** and profiles make real requests. No API key is required by the endpoints used here.
 
 The root preview redirects to `/desktop/desktop.html`. Open `/in_game/in_game.html` to preview the in-game entrypoint. Without Overwolf, the in-game entrypoint also renders the full browser preview. In Overwolf, it resolves the native window name and mounts the compact build or counter overlay.
 
@@ -27,7 +27,7 @@ The root preview redirects to `/desktop/desktop.html`. Open `/in_game/in_game.ht
 4. Launch Deadlock and enable its Overwolf overlay. The app targets Overwolf game ID **24482** and starts automatically with the game.
 5. Use **Ctrl+Shift+S** to show or hide Counterlock's in-game window. The binding can be changed in Overwolf. Drag the app header to move the window. The gear button exposes overlay visibility and opacity while Deadlock is running; desktop rows remain compact.
 
-Home's account comes from Deadlock game events: the `background` window stores the last account it detects on this PC in `localStorage` under `counterlock.profile.account`, and Home's **You** section shows that account's latest results. If none has been detected, search for yourself on Home and press **This is me**; it is stored the same way, and the next account detected in-game replaces it. **Not you? Switch account** clears the stored account. It never leaves this PC except as a public ID in API requests.
+The remembered account comes from Deadlock game events: the `background` window stores the last account it detects on this PC in `localStorage` under `counterlock.profile.account`, and Home's **You** section and the header's **My profile** button use it. If none has been detected, search for yourself on Home, open the profile and press **This is me**; it is stored the same way, and the next account detected in-game replaces it. **Not you? Switch account** clears the stored account. It never leaves this PC except as a public ID in API requests.
 
 The `background` window owns the shared live store, game-event subscriptions, feature registration, hotkeys, and overlay lifecycle. The `desktop` window stays independent of overlay visibility. The `in_game` and `counter_overlay` windows both use `in_game/in_game.html`, resolving their native window identity at mount time to render the appropriate compact panel. Each declared HTML path remains stable in `dist/` and in the manifest. Foreground windows subscribe to the background store through `getMainWindow()`; they do not create their own live stores.
 
@@ -40,9 +40,11 @@ For Overwolf development, load the built files. Avoid `debug_url` with this back
 **Companion pages** (desktop window):
 
 - **Live** shows the current match roster, builds and counters, or a "Deadlock isn't running" / "Waiting for a match" state. The app opens on Live when Deadlock is detected running (unless you have already picked a tab); otherwise it opens on Home. It also switches to Live once per match when live data first arrives.
-- **Home** shows the profile of the last account detected on this PC: rank badge, ranked games, KDA, souls per minute, top heroes, frequent teammates and a filterable match history. Click a match for its scoreboard. Further tabs list played heroes and show performance charts.
-- **Heroes** lists heroes with tiers derived from win-rate percentiles, a role filter, sorting and a rank filter. A hero page shows abilities, skill order, a build, matchups, best partners and best items, with counter items listed separately. Counter items use measured data (an item's win rate against the hero compared with its overall win rate, adjusted for the hero's overall win rate) and fall back to hero-trait heuristics, labelled "Based on hero traits", when there is not enough data.
-- **Items** is a shop-style browser with search, filtering and sorting. An item page shows its stats and what it builds from and into.
+- **Home** is a search (**Find a player**) followed by a **You** section for the remembered account (rank, recent form and latest match, each number explained) and **Top of the city**, the strongest heroes right now.
+- **Profile** is its own page, opened from search, **You** or the header's **My profile**: rank badge, ranked games, KDA, souls per minute, top heroes, frequent teammates and a filterable match history, in the tabs Overview, Matches, Performance and Heroes. Click a match for its scoreboard. **This is me** remembers the account; **Not you? Switch account** forgets it.
+- **Tier list** ranks heroes S to D by win-rate percentile over the last 30 days across all ranks, with a role filter.
+- **Heroes** is the full roster with search and a role filter. A hero page (with a rank filter) shows abilities (hover, focus or tap one for its tooltip), skill order, a build, matchups, best partners and best items, with counter items listed separately. Counter items use measured data (an item's win rate against the hero compared with its overall win rate, adjusted for the hero's overall win rate) and fall back to hero-trait heuristics, labelled "Based on hero traits", when there is not enough data.
+- **Items** ("The Shop") is a shop-style browser with search, filtering and sorting, in columns by category and cost. An item page shows its stats, win and pick rate, and what it builds from and into.
 
 **Live match overlays and roster:**
 
@@ -67,7 +69,7 @@ Home and the hero and item pages use Deadlock API aggregates, so figures reflect
 
 ## Website
 
-Counterlock also builds as a public static website: Home, Tier list, Heroes, Items and player profiles, with real URLs, pre-rendered hero and item pages and share previews. It has no **Live** page, overlay or hotkeys; Home searches for a Steam account by name or ID. It lives in `web/` (React Router v8 framework mode on Vite, `ssr: false` with `prerender`) and reuses the feature code in `src/`, so the Overwolf app is unaffected.
+Counterlock also builds as a public static website with the nav **Home · Tier list · Heroes · Items** (the tier list lives at `/tier-list`) and player profiles, with real URLs, pre-rendered hero and item pages and share previews. It has no **Live** page, overlay or hotkeys; Home searches for a Steam account by name or ID, and the header's **My profile** opens the remembered account. The layout is full width with side gutters and has phone layouts down to 375px. It lives in `web/` (React Router v8 framework mode on Vite, `ssr: false` with `prerender`) and reuses the feature code in `src/`, so the Overwolf app is unaffected.
 
 ```sh
 npm run web:dev        # dev server
@@ -77,7 +79,7 @@ npm run web:typecheck  # typegen + tsc for web/
 npm run test:web       # browser tests against the built site
 ```
 
-`web:build` pre-renders `/`, `/heroes`, `/items`, `/about`, every hero and item page, `sitemap.xml` and `robots.txt`. Pre-rendered HTML holds catalog facts only; statistics load in the browser. Player profiles (`/players/:accountId`) are not pre-rendered and render in the browser. After the build, `web/scripts/postbuild.mjs` writes `_redirects` and `404.html` into the output.
+`web:build` pre-renders `/`, `/tier-list`, `/heroes`, `/items`, `/about`, every hero and item page, `sitemap.xml` and `robots.txt`. Pre-rendered HTML holds catalog facts only; statistics load in the browser. Player profiles (`/players/:accountId`) are not pre-rendered and render in the browser. After the build, `web/scripts/postbuild.mjs` writes `_redirects` and `404.html` into the output.
 
 Set `VITE_SITE_URL` (for example `https://counterlock.example`, no trailing slash) at build time. It is the absolute origin used for canonical links, Open Graph tags, the sitemap and `robots.txt`; it defaults to `https://counterlock.example`.
 
@@ -95,6 +97,10 @@ The only host-specific piece is the fallback for non-pre-rendered routes. The bu
 ### Website privacy
 
 The website has no backend, analytics or cookies. The remembered Steam account is stored only in the visitor's browser, in `localStorage` under `counterlock.web.account`; **Switch account** clears it. Search text and public player IDs are sent to Deadlock API to fetch statistics. Fonts load from Google Fonts, hero and item images load from the Deadlock API asset CDN, and Steam avatars load from Steam, so those providers also see the visitor's request. The /about page explains this; every page's footer links to it.
+
+## The look
+
+The noir look is defined once, in `src/app/styles/tokens.css`: the palette (ink, cream, gold, poster red, category and tier colours), the three font families and the page texture. Feature CSS uses `var(--token)` rather than colour literals. `tests/app/theme.test.ts` checks the palette and fails on any hex colour in `src/**/*.css`, `src/**/*.tsx` or `web/app/**/*.css` outside `tokens.css`. Playfair Display SC, Rajdhani and DM Sans load from Google Fonts (imported in `base.css`), so they need a network connection, like portraits and rank images. `docs/superpowers/specs/2026-10-21-redesign-prototype.html` is the visual reference.
 
 ## Maintain the catalog and rules
 
@@ -124,10 +130,10 @@ Before a public release, test in Windows with a live match: game startup and shu
 
 | Directory                                         | Responsibility                                                                                     |
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `src/app/`                                        | React window composition and mounting; global, shell, and responsive layout styles                 |
+| `src/app/`                                        | React window composition and mounting; design tokens, global, shell, and responsive layout styles  |
 | `src/features/live/`                              | Live tab states (not running, waiting, in match) and once-per-match auto-switch                    |
-| `src/features/profile/`                           | Player profile: account storage, Deadlock API services, overview, history, heroes, charts          |
-| `src/features/heroes/`                            | Hero tier list, analytics derivations and services, hero detail                                    |
+| `src/features/profile/`                           | Player profile page: account storage, Deadlock API services, overview, history, heroes, charts     |
+| `src/features/heroes/`                            | Tier list, hero roster, analytics derivations and services, hero detail with ability tooltips      |
 | `src/features/items/`                             | Item shop browser and item detail                                                                  |
 | `src/features/match/`                             | Live match types, event parsing, identity, shared store, match overview                            |
 | `src/features/roster/`                            | Team tables, player rows, roster and inventory styles                                              |
@@ -139,7 +145,7 @@ Before a public release, test in Windows with a live match: game startup and shu
 | `src/platform/overwolf/`                          | Background lifecycle, store bridge, game detection, window controls and native window hooks        |
 | `src/shared/api/`                                 | Shared cached Deadlock API client and async request hook                                           |
 | `src/shared/catalog/`                             | Typed catalog access (heroes, roles, abilities, items), metadata types and the dated JSON snapshot |
-| `src/shared/ui/`                                  | Reusable icons, images, item artwork and overlay item tiles                                        |
+| `src/shared/ui/`                                  | Reusable icons, images, item artwork, page title, ribbon and section header                        |
 | `src/background/`, `src/desktop/`, `src/in_game/` | Stable HTML and minimal TypeScript entrypoints used by the manifest                                |
 | `web/`                                            | Website: React Router app, routes, SEO, phone styles, static-host scripts; reuses `src/` features  |
 | `tests/`                                          | Unit suites grouped by feature, browser integration tests, and demo fixtures                       |

@@ -13,14 +13,12 @@ body[data-window="counter_overlay"] #root {
   width: 100%;
   height: 100vh;
   overflow: hidden;
-  border: 1px solid #71837b66;
-  border-radius: 9px;
-  background: #14201ff5;
-  color: #edf3ea;
-  font:
-    11px/1.3 system-ui,
-    sans-serif;
-  box-shadow: 0 2px 8px #0005;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: rgb(from var(--surface) r g b / 0.96);
+  color: var(--cream);
+  font: 11px/1.3 var(--font-body);
+  box-shadow: 0 2px 8px color-mix(in srgb, black 33%, transparent);
 }
 .hud-handle {
   display: flex;
@@ -28,7 +26,7 @@ body[data-window="counter_overlay"] #root {
   justify-content: space-between;
   height: 28px;
   padding: 0 8px;
-  background: #23322d;
+  background: var(--surface-2);
   cursor: grab;
   user-select: none;
   touch-action: none;
@@ -44,7 +42,7 @@ body[data-window="counter_overlay"] #root {
   padding: 0;
   border: 0;
   background: transparent;
-  color: #c7d4cb;
+  color: var(--muted);
   font-size: 20px;
   line-height: 24px;
   cursor: pointer;
@@ -65,19 +63,19 @@ body[data-window="counter_overlay"] #root {
   font-size: 10px;
 }
 .hud-subtitle span {
-  color: #b5c3b7;
+  color: var(--muted);
   font-size: 9px;
 }
 .scout-hud select {
   height: 24px;
   min-height: 0;
-  border: 1px solid #53645b;
-  background: #21302b;
-  color: #e6eee7;
-  font: 10px system-ui;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--cream);
+  font: 10px var(--font-body);
   padding: 2px 5px;
   width: 100%;
-  border-radius: 4px;
+  border-radius: 0;
 }
 .hud-items {
   display: grid;
@@ -113,21 +111,21 @@ body[data-window="counter_overlay"] #root {
   position: absolute;
   right: 1px;
   top: 0;
-  background: #183e2a;
+  background: rgb(from var(--good) r g b / 0.25);
   border-radius: 50%;
-  color: #a9f5b7;
+  color: var(--good);
   padding: 0 2px;
 }
 .hud-note {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #98ada0;
+  color: var(--dim);
   font-size: 9px;
 }
 .hud-empty {
   font-size: 11px;
-  color: #b4c6b8;
+  color: var(--muted);
   margin: 10px 0;
 }
 .hud-counters .hud-items {
@@ -138,7 +136,7 @@ body[data-window="counter_overlay"] #root {
 }
 .hud-targets {
   display: block;
-  color: #b9d5bc;
+  color: var(--muted);
   font-size: 8px;
   white-space: nowrap;
   overflow: hidden;

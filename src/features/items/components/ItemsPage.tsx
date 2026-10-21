@@ -3,6 +3,7 @@ import { LinkScope } from "@/app/links";
 import type { Navigate, Route } from "@/app/navigation";
 import { useAsync } from "@/shared/api/useAsync";
 import { catalog, itemById } from "@/shared/catalog";
+import { PageTitle } from "@/shared/ui/PageTitle";
 import { sortRows } from "@/shared/utils/sort";
 import { RankFilter } from "@/features/heroes/components/RankFilter";
 import {
@@ -95,6 +96,7 @@ export function ItemsPage({
   return (
     <LinkScope navigate={navigate}>
       <section className="items-page">
+        <PageTitle title="The Shop" ribbon="Every item · win & pick rates" />
         <div className="items-toolbar">
           <input
             type="search"

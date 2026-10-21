@@ -32,10 +32,7 @@ const PALETTE: Record<string, string> = {
 };
 
 // Files that still contain hex colours. Each later task removes its files; the last task asserts this is empty.
-const LEGACY = new Set([
-  "src/features/overlay/styles/panels.css",
-  "src/features/items/styles/items.css",
-]);
+const LEGACY = new Set<string>();
 
 const CSS_HEX = /#[0-9a-f]{3,8}\b/i;
 const TSX_HEX = /#(?:[0-9a-f]{8}|[0-9a-f]{6})\b/i;
@@ -77,6 +74,10 @@ describe("noir theme", () => {
       )
       .map((file) => relative(root, file));
     expect(offenders.filter((file) => !LEGACY.has(file))).toEqual([]);
+  });
+
+  it("legacy list is empty", () => {
+    expect([...LEGACY]).toEqual([]);
   });
 
   it("legacy list only names files that still exist", () => {

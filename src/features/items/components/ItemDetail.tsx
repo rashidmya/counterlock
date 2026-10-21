@@ -6,6 +6,7 @@ import {
   type ItemPerf,
 } from "@/features/heroes/utils/analytics";
 import { ItemIcon } from "@/shared/ui/ItemIcon";
+import { SectionHeader } from "@/shared/ui/SectionHeader";
 
 const percent = (rate?: number) =>
   rate === undefined ? "—" : `${(rate * 100).toFixed(1)}%`;
@@ -22,7 +23,7 @@ const capitalize = (text: string) =>
 function Links({ title, items }: { title: string; items: Item[] }) {
   return (
     <section className="item-links">
-      <h2>{title}</h2>
+      <SectionHeader title={title} />
       {items.length === 0 ? (
         <span className="muted">—</span>
       ) : (
@@ -86,8 +87,12 @@ export function ItemDetail({
           <ul className="item-stats">
             {item.stats.map((stat, index) => (
               <li key={`${stat.label}:${index}`} className="item-stat">
-                {stat.icon && <img src={stat.icon} alt="" />}
-                {`${stat.value} ${stat.label}`}
+                {stat.icon ? (
+                  <img src={stat.icon} alt="" />
+                ) : (
+                  <span className="item-stat-icon" aria-hidden="true"></span>
+                )}
+                <b>{stat.value}</b> {stat.label}
               </li>
             ))}
           </ul>

@@ -75,8 +75,7 @@
 
   .app.web .eyebrow,
   .app.web .tier-heading,
-  .app.web .cost-heading,
-  .app.web .item-links h2 {
+  .app.web .cost-heading {
     font-size: 11px;
   }
   .app.web .muted,
@@ -170,7 +169,7 @@
     font-size: 14px;
   }
   .app.web .stat-box small {
-    font-size: 10px;
+    font-size: 11px;
   }
   .app.web .item-link {
     min-height: 44px;

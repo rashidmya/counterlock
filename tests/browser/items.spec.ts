@@ -81,6 +81,14 @@ const costs = (category: string) =>
     .sort((a, b) => a - b)
     .map((cost) => cost.toLocaleString("en-US"));
 
+test("items page has the shop title and ribbon", async ({ page }) => {
+  await openItems(page);
+  await expect(page.locator(".items-page h1")).toHaveText("The Shop");
+  await expect(page.locator(".items-page .ribbon")).toHaveText(
+    "Every item · win & pick rates",
+  );
+});
+
 test("default layout is a shop with Weapon, Vitality and Spirit columns split by cost", async ({
   page,
 }) => {

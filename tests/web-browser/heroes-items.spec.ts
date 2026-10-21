@@ -140,6 +140,10 @@ test("item cards link to item pages and an item page direct-loads", async ({
   await mockApi(page);
   await page.goto("/items");
   await expect(page).toHaveTitle("Deadlock items | Counterlock");
+  await expect(page.locator(".items-page h1")).toHaveText("The Shop");
+  await expect(page.locator(".items-page .ribbon")).toHaveText(
+    "Every item · win & pick rates",
+  );
   const tile = page.locator(`a[href="/items/${slugify(bestA.name)}"]`).first();
   await expect(tile).toBeVisible();
   await markNavigation(page);

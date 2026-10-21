@@ -659,7 +659,7 @@ sizes. Manifest changes (new windows) must follow the Overwolf docs.
 
 Build and ship in this order. Each phase gets its own plan.
 
-1. **New look + navigation:** tokens, fonts, texture, components, shell,
+1. **New look + navigation (done):** tokens, fonts, texture, components, shell,
    new tabs, Home search (replacing Player lookup), and restyling of every
    existing page and state, in the app and on the website (including phone
    layouts). No new data features.
