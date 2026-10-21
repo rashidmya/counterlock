@@ -21,6 +21,9 @@ test("shell fits one row at the minimum window width", async ({ page }) => {
   await expect(page.locator(".live-badge")).toBeVisible();
   const header = await page.locator(".app > header").boundingBox();
   expect(header!.height).toBeLessThanOrEqual(70);
+  await expect(
+    page.getByRole("navigation", { name: "Main" }).getByRole("button"),
+  ).toHaveCount(5);
   const tops = await page
     .locator(".tabs button")
     .evaluateAll((buttons) =>

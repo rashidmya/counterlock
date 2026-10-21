@@ -49,9 +49,6 @@ footer a {
     padding-left: 20px;
     padding-right: 20px;
   }
-  nav {
-    margin: 0 20px;
-  }
   .notice {
     margin-left: 20px;
     margin-right: 20px;
@@ -103,7 +100,7 @@ footer a {
     gap: 14px;
     padding: 0 14px;
   }
-  .app > header .brand {
+  .app:not(.web) > header .brand {
     font-size: 20px;
   }
   .app > header .tabs {
@@ -212,7 +209,6 @@ body.overwolf {
   flex-direction: column;
 }
 header,
-nav,
 .intro,
 .notice,
 footer,

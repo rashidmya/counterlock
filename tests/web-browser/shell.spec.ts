@@ -21,6 +21,14 @@ test("shell shows web navigation and footer", async ({ page }) => {
   ).toHaveAttribute("href", "/about");
 });
 
+test("wordmark keeps its website size between phone and desktop widths", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 800, height: 900 });
+  await page.goto("/");
+  await expect(page.locator("header .brand")).toHaveCSS("font-size", "21px");
+});
+
 test("navigation links change the URL", async ({ page }) => {
   await page.goto("/");
   await page

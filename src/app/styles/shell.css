@@ -63,14 +63,6 @@ header {
   font-size: 18px;
   color: var(--dim);
 }
-nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 57px;
-  margin: 0 30px;
-  border-bottom: 1px solid var(--line);
-}
 .tabs {
   display: flex;
   align-self: stretch;

@@ -105,7 +105,7 @@ export function DesktopApp({
             Counter<b>lock</b>
           </span>
         </div>
-        <div className="tabs">
+        <div className="tabs" role="navigation" aria-label="Main">
           {tabs.map(({ page, label }) => (
             <button
               key={page}
