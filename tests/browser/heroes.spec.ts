@@ -7,12 +7,11 @@ const PNG = Buffer.from(
 );
 const cors = { "access-control-allow-origin": "*" };
 
-// Win rates rise with the hero's position in the catalog, pick rates fall.
-const statsRow = (heroId: number, index: number) => {
+const heroStats = catalog.heroes.map((hero, index) => {
   const matches = 20000 - index * 200;
   const wins = (matches * (400 + index * 5)) / 1000;
   return {
-    hero_id: heroId,
+    hero_id: hero.id,
     wins,
     losses: matches - wins,
     matches,
@@ -20,45 +19,22 @@ const statsRow = (heroId: number, index: number) => {
     total_deaths: 5 * matches,
     total_assists: 10 * matches,
   };
-};
-
-const heroStats = catalog.heroes.map((hero, index) => statsRow(hero.id, index));
-const byWinRate = [...catalog.heroes].reverse();
+});
 const alphabetical = catalog.heroes
   .map((hero) => hero.name)
   .sort((a, b) => a.localeCompare(b));
+const haze = catalog.heroes.find((hero) => hero.name === "Haze")!;
 
-async function openHeroes(
-  page: Page,
-  options: {
-    stats?: unknown[];
-    status?: number;
-    failFirst?: boolean;
-    requests?: string[];
-  } = {},
-) {
-  const {
-    stats = heroStats,
-    status = 200,
-    failFirst = false,
-    requests,
-  } = options;
-  let served = 0;
+async function openHeroes(page: Page) {
   await page.route("https://assets-bucket.deadlock-api.com/**", (route) =>
     route.fulfill({ body: PNG, contentType: "image/png", headers: cors }),
   );
   await page.route("https://api.deadlock-api.com/**", (route) => {
     const url = new URL(route.request().url());
-    if (url.pathname === "/v1/analytics/hero-stats") {
-      requests?.push(route.request().url());
-      const failing = failFirst && served++ === 0;
-      return route.fulfill({
-        status: failing ? 500 : status,
-        json: stats,
-        headers: cors,
-      });
-    }
-    return route.fulfill({ json: [], headers: cors });
+    return route.fulfill({
+      json: url.pathname === "/v1/analytics/hero-stats" ? heroStats : [],
+      headers: cors,
+    });
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Heroes", exact: true }).click();
@@ -70,36 +46,27 @@ const cardNames = async (page: Page) =>
     name.trim(),
   );
 
-test("tier sort groups heroes under S to D headings with real stats", async ({
-  page,
-}) => {
+test("roster lists every hero A–Z with role and win rate", async ({ page }) => {
   await openHeroes(page);
   await expect(page.locator(".hero-card")).toHaveCount(catalog.heroes.length);
-  await expect(page.locator(".tier-heading")).toHaveText([
-    "S TIER",
-    "A TIER",
-    "B TIER",
-    "C TIER",
-    "D TIER",
-  ]);
+  expect(await cardNames(page)).toEqual(alphabetical);
   const first = page.locator(".hero-card").first();
-  await expect(first.locator("img.hero-portrait")).toHaveAttribute(
-    "src",
-    /^https?:/,
-  );
-  await expect(first.locator(".hero-name")).toHaveText(byWinRate[0].name);
-  await expect(first).toContainText(
-    `${((400 + (catalog.heroes.length - 1) * 5) / 10).toFixed(1)}%`,
-  );
-  await expect(first).toContainText(/\d+\.\d% pick/);
-  await expect(first.locator(".tier-letter")).toHaveText("S");
-  await expect(first.locator(".tier-letter")).toHaveCSS(
-    "color",
-    "rgb(242, 198, 109)",
-  );
-  await expect(
-    page.getByText("Tiers are based on win rate.", { exact: true }),
-  ).toBeVisible();
+  const hero = catalog.heroes.find((entry) => entry.name === alphabetical[0])!;
+  await expect(first).toContainText(hero.role!);
+  await expect(first).toContainText(/\d+\.\d%/);
+  await expect(page.locator(".tier-letter")).toHaveCount(0);
+});
+
+test("search narrows the roster", async ({ page }) => {
+  await openHeroes(page);
+  await page.getByLabel("Search heroes").fill("ha");
+  await expect(page.locator(".hero-card", { hasText: "Haze" })).toHaveCount(1);
+  const count = await page.locator(".hero-card").count();
+  expect(count).toBeGreaterThan(0);
+  expect(count).toBeLessThan(catalog.heroes.length);
+  expect(
+    (await cardNames(page)).every((name) => name.toLowerCase().includes("ha")),
+  ).toBe(true);
 });
 
 test("role filter keeps only that role", async ({ page }) => {
@@ -112,86 +79,12 @@ test("role filter keeps only that role", async ({ page }) => {
   );
 });
 
-test("A–Z sort drops the tier headings", async ({ page }) => {
-  await openHeroes(page);
-  await page.getByLabel("Sort", { exact: true }).selectOption({ label: "A–Z" });
-  await expect(page.locator(".tier-heading")).toHaveCount(0);
-  expect((await cardNames(page))[0]).toBe(alphabetical[0]);
-  expect(await cardNames(page)).toEqual(alphabetical);
-});
-
-test("win rate and pick rate sorts are flat and descending", async ({
+test("clicking a card opens that hero and back returns to the roster", async ({
   page,
 }) => {
   await openHeroes(page);
-  const sort = page.getByLabel("Sort", { exact: true });
-  await sort.selectOption({ label: "Win rate" });
-  await expect(page.locator(".tier-heading")).toHaveCount(0);
-  expect(await cardNames(page)).toEqual(byWinRate.map((hero) => hero.name));
-  await sort.selectOption({ label: "Pick rate" });
-  expect(await cardNames(page)).toEqual(
-    catalog.heroes.map((hero) => hero.name),
-  );
-});
-
-test("rank filter requests stats with min_average_badge", async ({ page }) => {
-  const requests: string[] = [];
-  await openHeroes(page, { requests });
-  expect(requests[0]).not.toContain("min_average_badge");
-  const next = page.waitForRequest(
-    (request) =>
-      request.url().includes("/v1/analytics/hero-stats") &&
-      request.url().includes("min_average_badge=51"),
-  );
-  await page
-    .getByLabel("Rank", { exact: true })
-    .selectOption({ label: "Mystic+" });
-  await next;
-  await expect(page.locator(".hero-card").first()).toBeVisible();
-});
-
-test("heroes without analytics show dashes and trail as unranked", async ({
-  page,
-}) => {
-  await openHeroes(page, { stats: heroStats.slice(1) });
-  const missing = catalog.heroes[0];
-  await expect(page.locator(".tier-heading").last()).toHaveText("UNRANKED");
-  const card = page.locator(".hero-card", { hasText: missing.name });
-  await expect(card).toContainText("—");
-  await expect(card.locator(".tier-letter")).toHaveCount(0);
-  await page.getByLabel("Sort", { exact: true }).selectOption({ label: "A–Z" });
-  await expect(page.locator(".hero-card")).toHaveCount(catalog.heroes.length);
-});
-
-test("failed stats keep the heroes browsable", async ({ page }) => {
-  await openHeroes(page, { status: 500 });
-  await expect(page.getByRole("status")).toContainText(
-    "Hero stats unavailable",
-  );
-  await expect(page.locator(".hero-card")).toHaveCount(catalog.heroes.length);
-  await expect(page.locator(".tier-heading")).toHaveText(["NO DATA"]);
-});
-
-test("retry reloads failed stats", async ({ page }) => {
-  await openHeroes(page, { failFirst: true });
-  await expect(page.getByRole("status")).toContainText(
-    "Hero stats unavailable",
-  );
-  await page.getByRole("button", { name: "Retry", exact: true }).click();
-  await expect(page.locator(".tier-heading").first()).toHaveText("S TIER");
-  await expect(page.getByRole("status")).toHaveCount(0);
-  await expect(
-    page.getByText("Tiers are based on win rate.", { exact: true }),
-  ).toBeVisible();
-});
-
-test("clicking a card opens that hero and back returns to the list", async ({
-  page,
-}) => {
-  await openHeroes(page);
-  const hero = byWinRate[3];
-  await page.locator(".hero-card", { hasText: hero.name }).click();
-  await expect(page.locator(".hero-header h1")).toHaveText(hero.name);
+  await page.locator(".hero-card", { hasText: haze.name }).first().click();
+  await expect(page.locator(".hero-header h1")).toHaveText(haze.name);
   await expect(page.locator(".hero-card")).toHaveCount(0);
   await page.getByRole("button", { name: "← All heroes" }).click();
   await expect(page.locator(".hero-card")).toHaveCount(catalog.heroes.length);

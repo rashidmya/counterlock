@@ -41,8 +41,11 @@ test("item page is pre-rendered with head metadata and catalog facts", () => {
 });
 
 test("list pages are pre-rendered with their titles", () => {
-  expect(head(read("heroes/index.html"))).toContain(
+  expect(head(read("tier-list/index.html"))).toContain(
     "<title>Deadlock hero tier list | Counterlock</title>",
+  );
+  expect(head(read("heroes/index.html"))).toContain(
+    "<title>Deadlock heroes | Counterlock</title>",
   );
   expect(head(read("items/index.html"))).toContain(
     "<title>Deadlock items | Counterlock</title>",
@@ -54,6 +57,12 @@ test("the hero list is pre-rendered from the catalog without live numbers", () =
   expect(html).toContain('href="/heroes/haze"');
   expect(html).toContain('href="/heroes/mo-krill"');
   expect(html).toContain("Haze");
+  expect(html).not.toMatch(/\d+\.\d%/);
+});
+
+test("the tier list is pre-rendered from the catalog without live numbers", () => {
+  const html = body(read("tier-list/index.html"));
+  expect(html).toContain('href="/heroes/haze"');
   expect(html).not.toMatch(/\d+\.\d%/);
 });
 
@@ -79,9 +88,10 @@ test("sitemap lists static, hero and item pages but no player pages", () => {
   const xml = read("sitemap.xml");
   expect(xml).toContain("<loc>https://counterlock.example/heroes/haze</loc>");
   expect(xml).toContain("<loc>https://counterlock.example/about</loc>");
+  expect(xml).toContain("<loc>https://counterlock.example/tier-list</loc>");
   expect(xml).not.toContain("/players/");
   expect(xml.match(/<loc>/g)).toHaveLength(
-    4 + catalog.heroes.length + catalog.items.length,
+    5 + catalog.heroes.length + catalog.items.length,
   );
 });
 

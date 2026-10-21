@@ -44,7 +44,6 @@ const LEGACY = new Set([
   "src/features/roster/styles/inventory.css",
   "src/features/player-lookup/styles/lookup.css",
   "src/features/heroes/styles/hero-detail.css",
-  "src/features/heroes/styles/heroes.css",
   "src/features/items/styles/items.css",
   "src/features/live/styles/live.css",
   "src/features/profile/styles/profile.css",

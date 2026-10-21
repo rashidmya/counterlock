@@ -20,6 +20,7 @@ import { useCounters } from "@/features/counters/hooks/useCounters";
 import { usePlayerLookup } from "@/features/player-lookup/hooks/usePlayerLookup";
 import { PlayerLookup } from "@/features/player-lookup/components/PlayerLookup";
 import { HomePage } from "@/features/profile/components/HomePage";
+import { TierListPage } from "@/features/heroes/components/TierListPage";
 import { HeroesPage } from "@/features/heroes/components/HeroesPage";
 import { ItemsPage } from "@/features/items/components/ItemsPage";
 import type { AnalyticsQuery } from "@/features/heroes/utils/analytics";
@@ -35,6 +36,7 @@ import type { Page, Route } from "./navigation";
 const tabs: { page: Page; label: string }[] = [
   { page: "home", label: "Home" },
   { page: "live", label: "Live" },
+  { page: "tierlist", label: "Tier list" },
   { page: "heroes", label: "Heroes" },
   { page: "items", label: "Items" },
   { page: "lookup", label: "Player lookup" },
@@ -186,6 +188,11 @@ export function DesktopApp({
               }}
               refresh={bridge.refresh}
             />
+          </div>
+        )}
+        {visited.includes("tierlist") && (
+          <div className="page" hidden={route.page !== "tierlist"}>
+            <TierListPage navigate={navigate} />
           </div>
         )}
         {visited.includes("heroes") && (

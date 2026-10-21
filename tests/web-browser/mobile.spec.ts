@@ -39,6 +39,10 @@ test.describe("phone width (375px)", () => {
   const loaded: [string, (page: Page) => Promise<void>][] = [
     ["/", (page) => expect(page.locator("a.hero-card").first()).toBeVisible()],
     [
+      "/tier-list",
+      (page) => expect(page.locator("a.tier-tile").first()).toBeVisible(),
+    ],
+    [
       "/heroes",
       (page) => expect(page.locator("a.hero-card").first()).toBeVisible(),
     ],
@@ -81,7 +85,7 @@ test.describe("phone width (375px)", () => {
       expect(await clipped(page, 375)).toEqual([]);
 
       const links = page.locator("nav").getByRole("link");
-      await expect(links).toHaveCount(3);
+      await expect(links).toHaveCount(4);
       const boxes = await links.evaluateAll((nodes) =>
         nodes.map((node) => {
           const { left, right, top, height } = node.getBoundingClientRect();

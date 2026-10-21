@@ -89,7 +89,7 @@ test("hero cards are real links and clicking one navigates in-page", async ({
 }) => {
   await mockApi(page);
   await page.goto("/heroes");
-  await expect(page).toHaveTitle("Deadlock hero tier list | Counterlock");
+  await expect(page).toHaveTitle("Deadlock heroes | Counterlock");
   const cards = page.locator("a.hero-card");
   await expect(cards).toHaveCount(catalog.heroes.length);
   await expect(
@@ -106,6 +106,19 @@ test("hero cards are real links and clicking one navigates in-page", async ({
   expect(await marker(page)).toBe("alive");
   await page.getByRole("link", { name: "← All heroes" }).click();
   await expect(page).toHaveURL(/\/heroes$/);
+  expect(await marker(page)).toBe("alive");
+});
+
+test("tier list page lists tiles that link to heroes", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/tier-list");
+  await expect(page).toHaveTitle("Deadlock hero tier list | Counterlock");
+  await expect(page.locator("a.tier-tile").first()).toBeVisible();
+  await expect(page.locator('a.tier-tile[href="/heroes/haze"]')).toHaveCount(1);
+  await markNavigation(page);
+  await page.locator('a.tier-tile[href="/heroes/haze"]').click();
+  await expect(page).toHaveURL(/\/heroes\/haze$/);
+  await expect(page.locator(".hero-header h1")).toHaveText("Haze");
   expect(await marker(page)).toBe("alive");
 });
 
@@ -147,8 +160,8 @@ test("the rank filter set on Heroes is kept after navigating to Items", async ({
 }) => {
   const requests: string[] = [];
   await mockApi(page, requests);
-  await page.goto("/heroes");
-  await expect(page.locator(".hero-card").first()).toBeVisible();
+  await page.goto("/heroes/haze");
+  await expect(page.locator(".hero-header h1")).toHaveText("Haze");
   await page.getByLabel("Rank").selectOption({ index: 2 });
   const chosen = await page.getByLabel("Rank").inputValue();
   expect(Number(chosen)).toBeGreaterThan(0);

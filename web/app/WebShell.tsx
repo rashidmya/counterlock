@@ -6,6 +6,7 @@ import { routeToPath } from "./paths";
 
 const tabs = [
   { to: "/", label: "Home", end: true },
+  { to: "/tier-list", label: "Tier list", end: false },
   { to: "/heroes", label: "Heroes", end: false },
   { to: "/items", label: "Items", end: false },
 ];

@@ -7,12 +7,18 @@ const leech = catalog.items.find((item) => item.name === "Leech")!;
 describe("web paths", () => {
   it("maps routes to URLs", () => {
     expect(routeToPath({ page: "home" })).toBe("/");
+    expect(routeToPath({ page: "tierlist" })).toBe("/tier-list");
     expect(routeToPath({ page: "heroes" })).toBe("/heroes");
     expect(routeToPath({ page: "heroes", heroId: 13 })).toBe("/heroes/haze");
     expect(routeToPath({ page: "items" })).toBe("/items");
     expect(routeToPath({ page: "items", itemId: leech.id })).toBe(
       "/items/leech",
     );
+  });
+
+  it("maps profiles to player paths and a bare profile to home", () => {
+    expect(routeToPath({ page: "profile", accountId: 42 })).toBe("/players/42");
+    expect(routeToPath({ page: "profile" })).toBe("/");
   });
 
   it("sends app-only pages to home", () => {

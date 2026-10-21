@@ -7,6 +7,7 @@ test("shell shows web navigation and footer", async ({ page }) => {
   await page.goto("/");
   const nav = page.getByRole("navigation");
   await expect(nav.getByRole("link", { name: "Home" })).toHaveClass(/active/);
+  await expect(nav.getByRole("link", { name: "Tier list" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Heroes" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Items" })).toBeVisible();
   await expect(nav.getByText("Live")).toHaveCount(0);
@@ -26,6 +27,11 @@ test("navigation links change the URL", async ({ page }) => {
     .getByRole("link", { name: "Heroes" })
     .click();
   await expect(page).toHaveURL(/\/heroes$/);
+  await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "Tier list" })
+    .click();
+  await expect(page).toHaveURL(/\/tier-list$/);
 });
 
 test("reloading a player URL serves the app shell with 200", async ({

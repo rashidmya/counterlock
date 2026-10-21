@@ -9,8 +9,8 @@ export default function HeroesRoute() {
   return (
     <>
       <PageMeta
-        title="Deadlock hero tier list | Counterlock"
-        description="Deadlock hero tier list: every hero ranked by win rate and pick rate, filterable by role and rank."
+        title="Deadlock heroes | Counterlock"
+        description="Every Deadlock hero with role and win rate. Open a hero for builds, counters and matchups."
         path="/heroes"
       />
       <HeroesPage

@@ -3,6 +3,7 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 export default [
   index("routes/home.tsx"),
   route("players/:accountId", "routes/player.tsx"),
+  route("tier-list", "routes/tier-list.tsx"),
   route("heroes", "routes/heroes.tsx"),
   route("heroes/:slug", "routes/hero.tsx"),
   route("items", "routes/items.tsx"),

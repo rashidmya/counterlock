@@ -5,6 +5,7 @@ import { slugify } from "../../src/shared/catalog/slugs";
 export function sitePaths(): string[] {
   return [
     "/",
+    "/tier-list",
     "/heroes",
     "/items",
     "/about",

@@ -7,7 +7,13 @@ describe("site paths", () => {
   const paths = sitePaths();
 
   it("lists the static pages first", () => {
-    expect(paths.slice(0, 4)).toEqual(["/", "/heroes", "/items", "/about"]);
+    expect(paths.slice(0, 5)).toEqual([
+      "/",
+      "/tier-list",
+      "/heroes",
+      "/items",
+      "/about",
+    ]);
   });
 
   it("matches routeToPath for every hero and item", () => {
@@ -19,7 +25,7 @@ describe("site paths", () => {
         routeToPath({ page: "items", itemId: item.id }),
       ),
     ];
-    expect(paths.slice(4)).toEqual(expected);
+    expect(paths.slice(5)).toEqual(expected);
   });
 
   it("has no duplicates and no player paths", () => {
