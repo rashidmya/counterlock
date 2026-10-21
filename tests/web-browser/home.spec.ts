@@ -90,7 +90,7 @@ test("the landing page hydrates cleanly and links into the site", async ({
   const card = page.locator(".web-s-tier a.hero-card").first();
   await expect(card).toHaveAttribute("href", /^\/heroes\/[a-z-]+$/);
   await expect(card).toContainText(/\d+\.\d%/);
-  await expect(card.locator("img")).toBeVisible();
+  await expect(card.locator("img.hero-card-portrait")).toBeVisible();
   const main = page.locator("main");
   await expect(
     main.getByRole("link", { name: "Hero tier list" }),

@@ -1,0 +1,157 @@
+.page-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.page-title .eyebrow {
+  font: 700 12px var(--font-label);
+  letter-spacing: 0.3em;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+.page-title h1 {
+  font: 900 52px/1 var(--font-title);
+  margin: 4px 0 6px;
+  letter-spacing: 0.01em;
+}
+
+.ribbon {
+  display: inline-block;
+  margin: 4px 0 0 4px;
+  padding: 7px 14px;
+  background: var(--poster-red);
+  color: var(--cream);
+  font: 700 15px/1 var(--font-label);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  transform: rotate(-2deg);
+  box-shadow: 3px 3px 0 black;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 34px 0 16px;
+}
+.section-header h2 {
+  padding-left: 12px;
+  border-left: 5px solid var(--gold);
+  font: 700 22px var(--font-label);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.section-rule {
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cream), transparent);
+  opacity: 0.8;
+}
+.section-header a,
+.section-header button {
+  color: var(--gold);
+  font: 700 13px var(--font-label);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.hero-card {
+  position: relative;
+  display: block;
+  height: 214px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--cream);
+  text-align: left;
+  transition:
+    transform 0.15s,
+    border-color 0.15s;
+}
+.hero-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--gold);
+  color: var(--cream);
+  text-decoration: none;
+}
+.hero-card .hero-card-bg {
+  position: absolute;
+  top: -12%;
+  right: 0;
+  width: 100%;
+  height: 124%;
+  object-fit: cover;
+  object-position: left center;
+  opacity: 0.85;
+}
+.hero-card .hero-card-portrait {
+  position: absolute;
+  inset: 0 0 52px 0;
+  width: 100%;
+  height: calc(100% - 52px);
+  border-radius: 0;
+  background: transparent;
+  object-fit: cover;
+  object-position: center 18%;
+}
+.hero-card .hero-card-portrait.placeholder {
+  display: flex;
+  font: 900 34px var(--font-title);
+  color: var(--dim);
+}
+.hero-card .tier-letter {
+  position: absolute;
+  top: 6px;
+  left: 9px;
+  font: 900 34px/1 var(--font-title);
+  color: var(--tier-gold);
+  text-shadow: 0 2px 0 black;
+}
+.tier-letter.tier-S {
+  color: var(--tier-s);
+}
+.tier-letter.tier-A {
+  color: var(--tier-a);
+}
+.tier-letter.tier-B {
+  color: var(--tier-b);
+}
+.tier-letter.tier-C {
+  color: var(--tier-c);
+}
+.tier-letter.tier-D {
+  color: var(--tier-d);
+}
+.hero-card .hero-card-text {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: block;
+  height: 70px;
+  padding: 22px 10px 0;
+  background: linear-gradient(transparent, var(--ink) 42%);
+}
+.hero-card .hero-name {
+  display: block;
+  overflow: hidden;
+  font: 700 18px/1.1 var(--font-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hero-card .hero-card-stat {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+.hero-card .hero-card-stat .win {
+  color: var(--good);
+}

@@ -92,7 +92,7 @@ test("tier sort groups heroes under S to D headings with real stats", async ({
   await expect(first).toContainText(/\d+\.\d% pick/);
   await expect(first.locator(".tier-letter")).toHaveText("S");
   await expect(first.locator(".tier-letter")).toHaveCSS(
-    "background-color",
+    "color",
     "rgb(242, 198, 109)",
   );
   await expect(
