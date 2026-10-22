@@ -3,6 +3,7 @@ import {
   averageSeries,
   formatValue,
   leadSeries,
+  minuteStep,
   playerSeries,
   rangeAvailable,
   rangeOf,
@@ -10,6 +11,7 @@ import {
   rankingTitle,
   teamSeries,
   valueAt,
+  yAxis,
 } from "@/features/match-report/utils/graph";
 import { metricById } from "@/features/match-report/utils/metrics";
 import { parseCurve, rankBand } from "@/features/match-report/utils/rank-curve";
@@ -167,5 +169,31 @@ describe("ranges and ranking", () => {
     expect(formatValue(-0.25, deaths)).toBe("−0.25");
     expect(formatValue(0.004, deaths)).toBe("0");
     expect(formatValue(-29160, souls)).toBe("−29.2K");
+  });
+});
+
+describe("axes", () => {
+  it("puts the y-axis on round ticks from 0 up past the top", () => {
+    expect(yAxis([0, 32400], false)).toEqual({
+      low: 0,
+      high: 40000,
+      ticks: [0, 10000, 20000, 30000, 40000],
+    });
+    expect(yAxis([-5, 10], false).ticks).toEqual([-5, 0, 5, 10]);
+    expect(yAxis([0, 0], false)).toMatchObject({ low: 0, high: 1 });
+  });
+
+  it("centres the team lead on a 0 tick", () => {
+    expect(yAxis([-29160, 500], true)).toEqual({
+      low: -40000,
+      high: 40000,
+      ticks: [-40000, -20000, 0, 20000, 40000],
+    });
+  });
+
+  it("spaces minute ticks at least 60px apart", () => {
+    expect(minuteStep(1800, 900)).toBe(300);
+    expect(minuteStep(3600, 300)).toBe(900);
+    expect(minuteStep(600, 100)).toBe(600);
   });
 });

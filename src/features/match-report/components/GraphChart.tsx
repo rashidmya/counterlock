@@ -1,6 +1,12 @@
-import { useId, useState } from "react";
+import { useId, useState, type PointerEvent } from "react";
 import { clock } from "../utils/format";
-import { formatValue, valueAt, type Point } from "../utils/graph";
+import {
+  formatValue,
+  minuteStep,
+  valueAt,
+  yAxis,
+  type Point,
+} from "../utils/graph";
 import type { Metric } from "../utils/metrics";
 import type { Team } from "../utils/report";
 
@@ -18,11 +24,13 @@ export interface Markers {
 }
 
 // Plot margins and the marker lanes below it, in pixels.
-const LEFT = 80;
+const LEFT = 84;
 const RIGHT = 24;
 const TOP = 12;
 const BOTTOM = 24;
 export const LANES = 66;
+// Matches the tooltip's CSS width.
+const TIP_WIDTH = 220;
 
 /** About 24% of the width, kept between 190 and 260px. */
 export const plotHeight = (width: number) =>
@@ -78,28 +86,25 @@ export function GraphChart({
   }));
   const band = average ? visible(average, t0, t1) : [];
   const inside = (t: number) => t >= t0 && t <= t1;
+  // Lines run to the plot's edges between snapshots, so the values there
+  // count towards the scale too.
+  const bandTop = band.map(([t, v, s]): Point => [t, v + s]);
   const values = [
-    ...shown.flatMap((line) =>
-      line.points.filter(([t]) => inside(t)).map(([, v]) => v),
-    ),
-    ...band.filter(([t]) => inside(t)).map(([, v, s]) => v + s),
+    ...shown.flatMap((line) => [
+      ...line.points.filter(([t]) => inside(t)).map(([, v]) => v),
+      ...(line.points.length
+        ? [valueAt(line.points, t0), valueAt(line.points, t1)]
+        : []),
+    ]),
+    ...bandTop.filter(([t]) => inside(t)).map(([, v]) => v),
+    ...(band.length ? [valueAt(bandTop, t0), valueAt(bandTop, t1)] : []),
   ];
-  let low = Math.min(0, ...values);
-  let high = Math.max(...values, 0) * 1.06 || 1;
-  if (lead) {
-    const most = Math.max(...values.map(Math.abs), 1) * 1.1;
-    low = -most;
-    high = most;
-  }
+  const { low, high, ticks } = yAxis(values, lead);
   const y = (v: number) =>
     TOP + (1 - (v - low) / (high - low)) * (height - TOP - BOTTOM);
   const path = (points: [number, number][]) =>
     points.map(([t, v]) => `${x(t).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-  const ticks = Array.from(
-    { length: 6 },
-    (_, i) => low + ((high - low) * i) / 5,
-  );
-  const step = width < 520 ? 600 : 300;
+  const step = minuteStep(t1 - t0, width - LEFT - RIGHT);
   const minutes: number[] = [];
   for (let t = Math.ceil(t0 / step) * step; t <= t1; t += step) minutes.push(t);
   const lanes = {
@@ -136,6 +141,12 @@ export function GraphChart({
             : []),
         ];
   const hoverX = hover === null ? 0 : x(hover);
+  const track = (event: PointerEvent<SVGRectElement>) => {
+    const box = event.currentTarget.ownerSVGElement!.getBoundingClientRect();
+    const px = ((event.clientX - box.left) / box.width) * width;
+    const t = t0 + ((px - LEFT) / (width - LEFT - RIGHT)) * (t1 - t0);
+    setHover(Math.min(t1, Math.max(t0, t)));
+  };
 
   return (
     <>
@@ -255,9 +266,9 @@ export function GraphChart({
             </text>
             {markers.deaths
               .filter((m) => inside(m.t))
-              .map((m) => (
+              .map((m, index) => (
                 <circle
-                  key={m.t}
+                  key={`${m.t}-${index}`}
                   className="mark-death"
                   cx={x(m.t)}
                   cy={lanes.deaths}
@@ -361,22 +372,26 @@ export function GraphChart({
           y={TOP}
           width={width - LEFT - RIGHT}
           height={height - TOP - BOTTOM}
-          onPointerMove={(event) => {
-            const box =
-              event.currentTarget.ownerSVGElement!.getBoundingClientRect();
-            const px = ((event.clientX - box.left) / box.width) * width;
-            const t = t0 + ((px - LEFT) / (width - LEFT - RIGHT)) * (t1 - t0);
-            setHover(Math.min(t1, Math.max(t0, t)));
+          onPointerMove={track}
+          onPointerDown={track}
+          // A tap keeps its tooltip; only a mouse or pen leaving clears it.
+          onPointerLeave={(event) => {
+            if (event.pointerType !== "touch") setHover(null);
           }}
-          onPointerLeave={() => setHover(null)}
         />
       </svg>
       {hover !== null && hoverRows.length > 0 && (
         <div
           className="graph-tip"
-          role="status"
+          aria-hidden="true"
           style={{
-            left: hoverX > width * 0.6 ? hoverX - 234 : hoverX + 14,
+            left: Math.max(
+              0,
+              Math.min(
+                width - TIP_WIDTH,
+                hoverX > width * 0.6 ? hoverX - TIP_WIDTH - 14 : hoverX + 14,
+              ),
+            ),
           }}
         >
           <b>

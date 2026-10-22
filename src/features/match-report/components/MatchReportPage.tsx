@@ -124,7 +124,8 @@ function Report({
       <SectionHeader title="Graph" />
       <ReportGraph
         {...{ report, names, meId, selected }}
-        curve={curve.data ?? null}
+        curve={curve}
+        normal={normal}
         onSelect={viewAs}
       />
       {selected ? (

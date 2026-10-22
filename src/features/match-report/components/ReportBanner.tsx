@@ -80,7 +80,7 @@ export function ReportBanner({
         <OptionalImage src={hero?.backgroundImage} className="hero-art-bg" />
       </div>
       <Picture
-        key={selected.heroId}
+        key={`portrait-${selected.heroId}`}
         className="report-banner-portrait"
         src={hero?.cardImage ?? hero?.image}
         label={heroName(selected.heroId)}

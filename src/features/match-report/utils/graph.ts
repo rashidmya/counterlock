@@ -188,3 +188,42 @@ export function formatValue(value: number, metric: Metric) {
   if (rounded === 0) return "0";
   return `${value < 0 ? "−" : ""}${rounded.toLocaleString("en-US", { maximumFractionDigits: digits })}`;
 }
+
+/** A round step near span ÷ count: 1, 2, 2.5 or 5 times a power of ten. */
+function niceStep(span: number, count: number) {
+  const raw = Math.max(span, 1e-9) / count;
+  const power = 10 ** Math.floor(Math.log10(raw));
+  return ([1, 2, 2.5, 5].find((m) => m * power >= raw) ?? 10) * power;
+}
+
+const steps = (from: number, to: number, step: number) =>
+  Array.from(
+    { length: Math.round((to - from) / step) + 1 },
+    (_, i) => from + i * step,
+  );
+
+/**
+ * The y-axis for the values on screen: from 0 (or below) up past the top,
+ * on round ticks. The team lead is symmetric around a 0 tick.
+ */
+export function yAxis(values: number[], lead: boolean) {
+  const finite = values.filter(Number.isFinite);
+  if (lead) {
+    const most = Math.max(0, ...finite.map(Math.abs)) || 1;
+    const step = niceStep(most, 2);
+    const top = Math.ceil(most / step) * step;
+    return { low: -top, high: top, ticks: steps(-top, top, step) };
+  }
+  const bottom = Math.min(0, ...finite);
+  const peak = Math.max(0, ...finite) || 1;
+  const step = niceStep(peak - bottom, 5);
+  const low = Math.floor(bottom / step) * step;
+  const high = Math.ceil(peak / step) * step;
+  return { low, high, ticks: steps(low, high, step) };
+}
+
+/** Seconds between x ticks: the smallest of 5, 10, 15, 20 or 30 min that keeps labels 60px apart. */
+export const minuteStep = (spanS: number, plotWidth: number) =>
+  [300, 600, 900, 1200, 1800].find(
+    (step) => (step / Math.max(1, spanS)) * plotWidth >= 60,
+  ) ?? 1800;

@@ -468,10 +468,13 @@ test.describe("the graph", () => {
     await g.getByRole("button", { name: "Team totals" }).click();
     await expect(g.locator(".graph-line")).toHaveCount(2);
     await expect(g.locator(".graph-foot")).toContainText(
-      "Each team's combined total.",
+      "Each team's combined total · Amber in blue, Sapphire in red.",
     );
     await g.getByRole("button", { name: "Team lead" }).click();
     await expect(g.locator(".graph-line")).toHaveCount(1);
+    await expect(
+      g.locator(".graph-axis").getByText("0", { exact: true }),
+    ).toHaveCount(1);
     await expect(g.locator(".graph-lead-label")).toHaveText([
       "AMBER AHEAD",
       "SAPPHIRE AHEAD",
@@ -569,6 +572,73 @@ test.describe("the graph", () => {
     await expect(
       report(page).locator(".report-stats.buffs dd").first(),
     ).toHaveText("2");
+  });
+
+  test("follows Viewing as: line, average, markers and footnote", async ({
+    page,
+  }) => {
+    await openReport(page);
+    const g = graph(page);
+    await viewingAs(page).selectOption("2");
+    await expect(g.locator(".graph-foot")).toHaveText(
+      `somdr (${second.name}) vs the average ${second.name} at Emissary · shaded band = normal range (±1 standard deviation). Snapshots every 3 min until 15:00, then every 5 min; lines connect them.`,
+    );
+    await expect(g.locator(".mark-death")).toHaveCount(1);
+    await viewingAs(page).selectOption("all");
+    await expect(g.getByRole("button", { name: "Everyone" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await viewingAs(page).selectOption("1");
+    await expect(
+      g.getByRole("button", { name: "Player vs avg" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("says why there is no average line while it fails", async ({ page }) => {
+    await storeAccount(page);
+    await routeApi(page);
+    await page.route(
+      "https://api.deadlock-api.com/v1/analytics/player-performance-curve**",
+      (route) => route.fulfill({ status: 500, headers: cors, body: "" }),
+    );
+    await page.goto("/");
+    await view(page)
+      .getByRole("button", { name: "Open match report →" })
+      .click();
+    await expect(graph(page).locator(".graph-foot")).toHaveText(
+      "You · rank average unavailable. Snapshots every 3 min until 15:00, then every 5 min; lines connect them.",
+    );
+  });
+
+  test("keeps lines and the band inside the plot when zoomed", async ({
+    page,
+  }) => {
+    await openReport(page);
+    const g = graph(page);
+    await g.getByRole("button", { name: "0–10" }).click();
+    const ys = await g.locator(".graph-line, .graph-avg").evaluateAll((nodes) =>
+      nodes.flatMap((node) =>
+        (node.getAttribute("points") ?? "")
+          .trim()
+          .split(" ")
+          .map((pair) => Number(pair.split(",")[1])),
+      ),
+    );
+    expect(ys.length).toBeGreaterThan(0);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
+  });
+
+  test("ranking rows read out their values", async ({ page }) => {
+    await openReport(page);
+    await expect(
+      graph(page).getByRole("button", {
+        name: `View as Sapphire · ${heroes[11].name}: 37.6K`,
+      }),
+    ).toBeVisible();
+    await expect(
+      graph(page).locator('.graph-ranking [aria-current="true"]'),
+    ).toContainText(lead.name);
   });
 
   test("clicking a ranking row switches Viewing as", async ({ page }) => {

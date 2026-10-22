@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import type { AsyncState } from "@/shared/api/useAsync";
 import { heroById, itemById } from "@/shared/catalog";
 import { Picture } from "@/shared/ui/Picture";
 import { clock } from "../utils/format";
@@ -44,6 +45,8 @@ const SHADES = [100, 62, 84, 46, 92, 70];
 const teamColor = (team: Team) => (team === 0 ? "var(--ally)" : "var(--enemy)");
 const shade = (team: Team, index: number) =>
   `color-mix(in srgb, ${teamColor(team)} ${SHADES[index % SHADES.length]}%, var(--cream))`;
+// Narrower than this and the plot has no room left of the axis labels.
+const MIN_CHART_WIDTH = 240;
 const FOOT =
   "Snapshots every 3 min until 15:00, then every 5 min; lines connect them.";
 
@@ -85,16 +88,19 @@ export function ReportGraph({
   names,
   meId,
   selected,
-  curve,
+  curve: curveState,
+  normal,
   onSelect,
 }: {
   report: MatchReport;
   names: Map<number, string>;
   meId: number | null;
   selected?: ReportPlayer;
-  curve: RankCurve | null;
+  curve: AsyncState<RankCurve>;
+  normal: boolean;
   onSelect(slot: number): void;
 }) {
+  const curve = curveState.data ?? null;
   const [metricId, setMetricId] = useState<MetricId>("souls");
   const [show, setShow] = useState<ShowMode>("player");
   const [values, setValues] = useState<ValueMode>("total");
@@ -186,7 +192,10 @@ export function ReportGraph({
       ? `Avg ${heroName(selected.heroId)} at ${curve.band.label}`
       : "";
 
-  const playerMarks = selected && (mode === "player" || mode === "everyone");
+  // The selected player's own markers, unless their line is hidden.
+  const playerMarks =
+    selected &&
+    (mode === "player" || (mode === "everyone" && !hidden.has(selected.slot)));
   const who = selected ? displayName(selected, names, meId) : "";
   const markers: Markers = {
     deaths:
@@ -219,7 +228,7 @@ export function ReportGraph({
               t: timeS,
               team: by,
               boss: false,
-              title: `${TEAM_NAMES[by]} destroyed a ${TEAM_NAMES[team]} objective at ${clock(timeS)}`,
+              title: `${TEAM_NAMES[by]} destroyed ${team === 0 ? "an" : "a"} ${TEAM_NAMES[team]} objective at ${clock(timeS)}`,
             };
           }),
           ...report.midBoss.map(({ timeS, team }) => ({
@@ -234,16 +243,34 @@ export function ReportGraph({
 
   const ranked = ranking(report.players, metric, values, t1);
   const top = Math.max(...ranked.map((row) => Math.abs(row.value)), 1);
+  const hero = selected ? heroName(selected.heroId) : "";
+  const end = curve?.points.at(-1)?.t ?? 0;
+  // Why there is no average line, said as honestly as the verdicts do.
+  const missing = !metric.curve
+    ? "no rank average for this stat"
+    : !normal
+      ? "rank averages cover normal matches only"
+      : curveState.loading
+        ? "loading the rank average…"
+        : curveState.error
+          ? "rank average unavailable"
+          : `too few ${hero} games at ${curve?.band.label ?? "this rank"} for a rank average`;
   const notes: Record<ShowMode, string> = {
     player: selected
       ? average
-        ? `${isMe(selected, meId) ? "You" : `${who} (${heroName(selected.heroId)})`} vs the average ${heroName(selected.heroId)} at ${curve!.band.label} · shaded band = normal range (±1 standard deviation)`
-        : `${who} · no rank average for this stat`
+        ? `${isMe(selected, meId) ? "You" : `${who} (${hero})`} vs the average ${hero} at ${curve!.band.label} · shaded band = normal range (±1 standard deviation)` +
+          (end < report.durationS
+            ? ` · the average stops at ${clock(end)}`
+            : "")
+        : `${who} · ${missing}`
       : "",
-    teams: metric.rate ? "Each team's average" : "Each team's combined total",
+    teams:
+      (metric.rate ? "Each team's average" : "Each team's combined total") +
+      " · Amber in blue, Sapphire in red",
     lead: "Above the line: Amber ahead. Below: Sapphire ahead",
     everyone:
-      "Click a hero below to hide or show their line. Gold = the player you're viewing as",
+      "Click a hero below to hide or show their line" +
+      (selected ? ". Gold = the player you're viewing as" : ""),
   };
 
   return (
@@ -315,6 +342,7 @@ export function ReportGraph({
               <input
                 type="checkbox"
                 checked={marks[key]}
+                disabled={key !== "objectives" && !playerMarks}
                 onChange={(event) =>
                   setMarks({ ...marks, [key]: event.target.checked })
                 }
@@ -328,7 +356,7 @@ export function ReportGraph({
         <div className="graph-chart" ref={chartRef}>
           {width > 0 && (
             <GraphChart
-              width={width}
+              width={Math.max(width, MIN_CHART_WIDTH)}
               {...{ lines, average, averageLabel, metric, markers, t0, t1 }}
               lead={mode === "lead"}
               perMinute={values === "perMinute" && !metric.rate}
@@ -347,7 +375,10 @@ export function ReportGraph({
                     className={
                       player.slot === selected?.slot ? "selected" : undefined
                     }
-                    aria-label={`View as ${optionLabel(player, names, meId)}`}
+                    aria-label={`View as ${optionLabel(player, names, meId)}: ${formatValue(value, metric)}`}
+                    aria-current={
+                      player.slot === selected?.slot ? "true" : undefined
+                    }
                     onClick={() => onSelect(player.slot)}
                   >
                     <Picture

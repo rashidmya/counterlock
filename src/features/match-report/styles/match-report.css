@@ -285,33 +285,33 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-.segmented {
+.report-graph .segmented {
   display: inline-flex;
   flex-wrap: wrap;
   border: 1px solid var(--line);
 }
-.segmented button {
+.report-graph .segmented button {
   padding: 4px 9px;
   color: var(--muted);
   font: 600 12px var(--font-label);
   letter-spacing: 0.06em;
 }
-.segmented button + button {
+.report-graph .segmented button + button {
   border-left: 1px solid var(--line);
 }
-.segmented button[aria-pressed="true"] {
+.report-graph .segmented button[aria-pressed="true"] {
   background: rgb(from var(--gold) r g b / 0.16);
   color: var(--cream);
 }
-.segmented button:disabled {
+.report-graph .segmented button:disabled {
   opacity: 0.4;
 }
-.graph-check {
+.report-graph .graph-check {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
-.graph-check input {
+.report-graph .graph-check input {
   padding: 0;
   accent-color: var(--gold);
 }
@@ -353,7 +353,7 @@
   fill: var(--ally);
 }
 .graph-lead-label.team-1 {
-  fill: var(--enemy);
+  fill: color-mix(in srgb, var(--enemy) 70%, var(--cream));
 }
 .graph-band {
   fill: rgb(from var(--cream) r g b / 0.1);
@@ -399,12 +399,14 @@
 .graph-hit {
   fill: transparent;
   cursor: crosshair;
+  touch-action: pan-y;
 }
 .graph-tip {
   position: absolute;
   top: 10px;
   z-index: 2;
   width: 220px;
+  max-width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--line);
   background: rgb(from var(--ink) r g b / 0.95);
