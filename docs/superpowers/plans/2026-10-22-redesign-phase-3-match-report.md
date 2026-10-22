@@ -1581,7 +1581,7 @@ export function buffs(
   curve: RankCurve | null,
 ) {
   return {
-    count: player.buffTimes.length,
+    count: player.buffCount,
     average: average(curve, "permanentBuffs", durationS),
   };
 }
@@ -3773,6 +3773,39 @@ test.describe("the graph", () => {
     await expect(g.locator(".mark-death")).toHaveCount(0);
   });
 
+  test("a match without buff pickup times has no Permanent buffs line", async ({
+    page,
+  }) => {
+    const old = matchMetadata(ACCOUNT);
+    for (const player of old.match_info.players)
+      player.power_up_buffs = [
+        {
+          type: "hp_permanent_pickup",
+          is_permanent: true,
+          value: 2,
+          pickup_times_s: [],
+        },
+      ];
+    await storeAccount(page);
+    await routeApi(page);
+    await page.route(
+      `https://api.deadlock-api.com/v1/matches/${MATCH_ID}/metadata`,
+      (route) => route.fulfill({ json: old, headers: cors }),
+    );
+    await page.goto("/");
+    await view(page)
+      .getByRole("button", { name: "Open match report →" })
+      .click();
+    await expect(
+      graph(page)
+        .getByRole("combobox", { name: "More stats" })
+        .locator("option", { hasText: "Permanent buffs" }),
+    ).toHaveCount(0);
+    await expect(
+      report(page).locator(".report-stats.buffs dd").first(),
+    ).toHaveText("2");
+  });
+
   test("clicking a ranking row switches Viewing as", async ({ page }) => {
     await openReport(page);
     await graph(page)
@@ -4316,6 +4349,10 @@ export function ReportGraph({
   }, []);
 
   const metric = metricById.get(metricId)!;
+  // Matches before 2026-09-29 have no buff pickup times, so no buffs line.
+  const metrics = METRICS.filter(
+    (m) => m.id !== "permanentBuffs" || report.buffsTimed,
+  );
   // Without a selected player, "Player vs avg" falls back to everyone.
   const mode: ShowMode = show === "player" && !selected ? "everyone" : show;
   const [t0, t1] = rangeOf(range, report.durationS);
@@ -4444,7 +4481,7 @@ export function ReportGraph({
     <div className="report-graph">
       <div className="graph-tabs">
         <div className="graph-stat-tabs" role="group" aria-label="Stat">
-          {METRICS.filter((m) => m.main).map((m) => (
+          {metrics.filter((m) => m.main).map((m) => (
             <button
               key={m.id}
               type="button"
@@ -4463,7 +4500,7 @@ export function ReportGraph({
           }
         >
           <option value="">More stats…</option>
-          {METRICS.filter((m) => !m.main).map((m) => (
+          {metrics.filter((m) => !m.main).map((m) => (
             <option key={m.id} value={m.id}>
               {m.label}
             </option>
@@ -4931,7 +4968,7 @@ In `src/features/match-report/styles/match-report.css`, insert this block just b
 - [ ] **Step 7: Run the tests and confirm they pass**
 
 Run: `npx playwright test tests/browser/match-report.spec.ts`
-Expected: PASS (14 tests).
+Expected: PASS (15 tests).
 
 - [ ] **Step 8: Check and commit**
 
@@ -5454,7 +5491,7 @@ In `web/app/styles/phone.css`, inside `@media (max-width: 640px)`:
 - [ ] **Step 5: Run the tests and confirm they pass**
 
 Run: `npm test`, `npx tsc --noEmit`, `npm run web:typecheck`, `npm run test:browser` and `npm run test:web`.
-Expected: all pass. Browser: 113 desktop and 70 website tests.
+Expected: all pass. Browser: 114 desktop and 70 website tests.
 
 - [ ] **Step 6: Commit**
 
