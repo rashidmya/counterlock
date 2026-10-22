@@ -1,6 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
-import { heroThreats } from "../../src/features/counters/utils/recommendations";
+import {
+  heroThreats,
+  recommend,
+} from "../../src/features/counters/utils/recommendations";
 import { matchPlayers, nativeWindow, updateMatch } from "./helpers";
 
 const PNG = Buffer.from(
@@ -82,6 +85,7 @@ const upgrade = catalog.items.find(
   (entry) =>
     entry.image &&
     entry.components?.length === 1 &&
+    !shopItems.includes(entry) &&
     pool.some((p) => p.className === entry.components![0]),
 )!;
 const component = pool.find((p) => p.className === upgrade.components![0])!;
@@ -524,7 +528,7 @@ test("Build tab is selected and lists the main build per phase", async ({
   ).toHaveText(names(midItems));
   await expect(
     page.locator(".build-phase[data-phase=mid] .phase-short"),
-  ).toHaveText("Only 3 items were bought often enough in this phase.");
+  ).toHaveText("Only 3 more items were bought often enough in this phase.");
   await expect(
     page.locator(".build-phase[data-phase=late] .phase-short"),
   ).toHaveText("Not enough data for this phase.");
@@ -545,6 +549,23 @@ test("Build tab is selected and lists the main build per phase", async ({
   await expect(
     page.getByRole("button", { name: "Items", exact: true }),
   ).toHaveClass(/active/);
+});
+
+test("short phases say how many items were bought often enough", async ({
+  page,
+}) => {
+  await openHaze(page, {
+    phases: [
+      [phaseRow(earlyItems[0].id, 9000, 100)],
+      [phaseRow(midItems[0].id, 9000, 700)],
+      [],
+    ],
+  });
+  await expect(page.locator(".phase-short")).toHaveText([
+    "Only 1 item was bought often enough in this phase.",
+    "Only 1 more item was bought often enough in this phase.",
+    "Not enough data for this phase.",
+  ]);
 });
 
 test("Popular builds tab shows each build exactly as authored", async ({
@@ -818,7 +839,7 @@ test("counter items: pick enemies and see what does well against them", async ({
   await openHaze(page, { heroItems: counterBase, vsEnemy: counterVs });
   const counter = section(page, "Counter items");
   await expect(counter.locator(".data-note").first()).toHaveText(
-    "Items that gain the most win rate for Haze against these heroes, compared with all Haze games and allowing for the matchup itself. Only clear gains are shown · All ranks · last 30 days.",
+    "Items not already in the main build that gain the most win rate for Haze against these heroes, compared with all Haze games and allowing for the matchup itself. Only clear gains are shown · All ranks · last 30 days.",
   );
   await expect(counter.locator(".picker-label")).toHaveText("Enemy team");
   await expect(counter).toContainText(
@@ -1059,6 +1080,36 @@ test("counter items wait for the main build, so its items never show", async ({
   expect(seen).not.toContain(upgrade.name);
 });
 
+test("counter items say when the main build already covers the clear counters", async ({
+  page,
+}) => {
+  // The main build holds strongA's first trait-based item, and that item is
+  // the only one that clearly does better against strongA.
+  const enemy = [{ heroId: strongA.id, heroName: strongA.name }];
+  const [{ item: built }] = recommend(enemy, catalog.items, 6400, []);
+  const rest = recommend(enemy, catalog.items, 6400, [built.id]);
+  expect(rest.length).toBeGreaterThan(0);
+  await openHaze(page, {
+    heroItems: [...counterBase, itemRow(built.id, 0.5)],
+    vsEnemy: {
+      [strongA.id]: [...vsRows(0.5, 0.5, 0.5), itemRow(built.id, 0.75, 3000)],
+    },
+    phases: [[phaseRow(built.id, 9000, 100)], [], []],
+  });
+  await expect(
+    page.locator(".build-phase[data-phase=early] .build-item strong"),
+  ).toHaveText([built.name]);
+  const counter = section(page, "Counter items");
+  await counter.getByRole("button", { name: "Add enemy hero" }).click();
+  await choice(page, strongA.name).click();
+  await expect(counter.locator(".data-note").nth(1)).toHaveText(
+    "Every item with a clear gain against these heroes is already in the main build. These are based on hero traits.",
+  );
+  const cards = counter.locator(".item-card h3");
+  await expect(cards).toHaveText(names(rest.map((entry) => entry.item)));
+  expect(await cards.allTextContents()).not.toContain(built.name);
+});
+
 test("six picks disable the rest of the chooser", async ({ page }) => {
   await openHaze(page);
   const counter = section(page, "Counter items");
@@ -1077,6 +1128,28 @@ test("six picks disable the rest of the chooser", async ({ page }) => {
   await expect(choice(page, rest[5].name)).toBeEnabled();
 });
 
+// The helper's roster: the local player on team 2, against Haze on team 3.
+const [localPlayer, enemyPlayer] = matchPlayers();
+const local = catalog.heroes.find((hero) => hero.id === localPlayer.heroId)!;
+
+// The match starting switches the app to Live, so this goes back to `hero`.
+async function startMatch(
+  page: Page,
+  players: unknown[],
+  hero: { name: string },
+) {
+  await updateMatch(page, { players });
+  await expect(page.getByRole("button", { name: "Live" })).toHaveClass(
+    /active/,
+  );
+  await page.getByRole("button", { name: "Heroes", exact: true }).click();
+  await page
+    .locator(".page:not([hidden]) .hero-card", { hasText: hero.name })
+    .first()
+    .click();
+  await expect(page.locator(".hero-header h1")).toHaveText(hero.name);
+}
+
 test("a live match replaces manual picks with the enemy team", async ({
   page,
 }) => {
@@ -1091,7 +1164,7 @@ test("a live match replaces manual picks with the enemy team", async ({
       vsEnemy: { [haze.id]: vsRows(0.6, 0.5, 0.4) },
       url: "/desktop/desktop.html",
     },
-    strongB,
+    local,
   );
   const counter = section(page, "Counter items");
   await counter.getByRole("button", { name: "Add enemy hero" }).click();
@@ -1100,16 +1173,7 @@ test("a live match replaces manual picks with the enemy team", async ({
     counter.getByRole("button", { name: `Remove ${strongA.name}` }),
   ).toHaveCount(1);
 
-  await updateMatch(page, { players: matchPlayers() });
-  await expect(page.getByRole("button", { name: "Live" })).toHaveClass(
-    /active/,
-  );
-  await page.getByRole("button", { name: "Heroes", exact: true }).click();
-  await page
-    .locator(".page:not([hidden]) .hero-card", { hasText: strongB.name })
-    .first()
-    .click();
-  await expect(page.locator(".hero-header h1")).toHaveText(strongB.name);
+  await startMatch(page, matchPlayers(), local);
   await expect(counter).toContainText("Enemy team from your live match.");
   await expect(counter.locator(".enemy-slot.filled")).toHaveCount(1);
   await expect(
@@ -1125,15 +1189,41 @@ test("a live match replaces manual picks with the enemy team", async ({
 test("a live team with nothing to show falls back to the picker", async ({
   page,
 }) => {
-  // The roster's only enemy is Haze, and this is Haze's own page.
   await nativeWindow(page, "desktop");
-  await openHaze(page, { url: "/desktop/desktop.html" });
+  await openHaze(page, { url: "/desktop/desktop.html" }, local);
   const counter = section(page, "Counter items");
+  await expect(counter).toContainText("Enemy team from your live match.");
+  // The only enemy now plays a hero the catalog doesn't know.
+  await updateMatch(page, {
+    players: [localPlayer, { ...enemyPlayer, heroId: 999_999 }],
+  });
   await expect(
     counter.getByRole("button", { name: "Add enemy hero" }),
   ).toBeVisible();
   await expect(counter).not.toContainText("Enemy team from your live match.");
   await expect(counter).toContainText("Pick up to 6 enemy heroes");
+});
+
+test("an enemy hero's page keeps the manual picker during a match", async ({
+  page,
+}) => {
+  await nativeWindow(page, "desktop", "normal", { players: false });
+  await openHaze(page, { url: "/desktop/desktop.html" });
+  // Haze is on the enemy team, so strongA is Haze's teammate here.
+  await startMatch(
+    page,
+    [
+      ...matchPlayers(),
+      { ...enemyPlayer, slot: "player_2", heroId: strongA.id },
+    ],
+    haze,
+  );
+  const counter = section(page, "Counter items");
+  await expect(
+    counter.getByRole("button", { name: "Add enemy hero" }),
+  ).toBeVisible();
+  await expect(counter).not.toContainText("Enemy team from your live match.");
+  await expect(counter.locator(".enemy-slot.filled")).toHaveCount(0);
 });
 
 test("in a live match the enemy team fills counter items", async ({ page }) => {
@@ -1145,7 +1235,7 @@ test("in a live match the enemy team fills counter items", async ({ page }) => {
       vsEnemy: { [haze.id]: vsRows(0.6, 0.5, 0.4) },
       url: "/desktop/desktop.html",
     },
-    strongA,
+    local,
   );
   const counter = section(page, "Counter items");
   await expect(counter).toContainText("Enemy team from your live match.");

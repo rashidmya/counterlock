@@ -131,6 +131,20 @@ describe("DeadlockApi", () => {
     );
   });
 
+  it("reports a timeout while reading the body in plain words", async () => {
+    const body = new ReadableStream({
+      start: (controller) =>
+        controller.error(new DOMException("signal timed out", "TimeoutError")),
+    });
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => new Response(body));
+    const api = new DeadlockApi(request, () => 0);
+    await expect(api.get("/v1/x", 1000)).rejects.toThrow(
+      new Error("Deadlock API timed out."),
+    );
+  });
+
   it("reports a network failure in plain words", async () => {
     const request = vi
       .fn<typeof fetch>()

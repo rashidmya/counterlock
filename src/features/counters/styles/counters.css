@@ -395,9 +395,14 @@ button.enemy-slot.filled:is(:hover, :focus-visible)::after {
 .enemy-choice:disabled {
   opacity: 0.4;
 }
+/* At most three per row: a track is never narrower than a third of the row
+   (less the two 12px gaps). */
 .counter-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(max(300px, calc((100% - 24px) / 3)), 1fr)
+  );
   gap: 12px;
 }
 .counter-cards .item-card {

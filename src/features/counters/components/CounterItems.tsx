@@ -31,6 +31,7 @@ export function CounterItems({
   picks,
   setPicks,
   liveEnemies,
+  liveAllies,
   exclude,
 }: {
   hero: Hero;
@@ -38,6 +39,7 @@ export function CounterItems({
   picks: number[];
   setPicks(picks: number[]): void;
   liveEnemies: number[];
+  liveAllies: number[];
   // Main-build items to leave out; null until the main build has settled.
   exclude: ReadonlySet<number> | null;
 }) {
@@ -46,7 +48,9 @@ export function CounterItems({
     ids
       .filter((id) => id !== hero.id && heroById.has(id))
       .slice(0, MAX_ENEMIES);
-  const liveShown = shown(liveEnemies);
+  // Only your own team's heroes face the live enemies; to an enemy hero
+  // they're teammates, so its page keeps the picker.
+  const liveShown = liveAllies.includes(hero.id) ? shown(liveEnemies) : [];
   // A live team with nothing left to show falls back to manual picks.
   const live = liveShown.length > 0;
   const enemies = live ? liveShown : shown(picks);
@@ -139,8 +143,13 @@ export function CounterItems({
       enemies.map((id) => ({ heroId: id, heroName: heroName(id) })),
       catalog.items,
       6400,
-      [],
+      [...exclude],
     );
+    // Clear counters exist, but the main build already lists all of them.
+    const covered =
+      !!data.data &&
+      counterItemsVs(data.data.baseline, data.data.versus, new Set()).length >
+        0;
     results = (
       <>
         <p className="data-note">
@@ -152,6 +161,8 @@ export function CounterItems({
                 Retry
               </button>
             </span>
+          ) : covered ? (
+            "Every item with a clear gain against these heroes is already in the main build. These are based on hero traits."
           ) : (
             "Based on hero traits — match data shows no clear counter items against these heroes yet."
           )}
@@ -179,9 +190,10 @@ export function CounterItems({
   return (
     <div className="counter-items">
       <p className="data-note">
-        Items that gain the most win rate for {hero.name} against these heroes,
-        compared with all {hero.name} games and allowing for the matchup itself.
-        Only clear gains are shown · {rankLabel(query.minBadge)} · last 30 days.
+        Items not already in the main build that gain the most win rate for{" "}
+        {hero.name} against these heroes, compared with all {hero.name} games
+        and allowing for the matchup itself. Only clear gains are shown ·{" "}
+        {rankLabel(query.minBadge)} · last 30 days.
       </p>
       <div className="enemy-picker">
         <span className="picker-label">Enemy team</span>

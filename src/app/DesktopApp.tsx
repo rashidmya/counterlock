@@ -227,6 +227,11 @@ export function DesktopApp({
                   ? counters.teams.enemies.map((p) => p.heroId)
                   : []
               }
+              liveAllies={
+                status === "in-match"
+                  ? counters.teams.allies.map((p) => p.heroId)
+                  : []
+              }
             />
           </div>
         )}

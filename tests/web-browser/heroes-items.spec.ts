@@ -6,6 +6,7 @@ import {
   heroStats,
   itemRow,
   mockApi as mockSiteApi,
+  shopItems,
 } from "./fixtures";
 
 const slugify = (name: string) =>
@@ -13,9 +14,6 @@ const slugify = (name: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-const shopItems = catalog.items
-  .filter((entry) => entry.image && entry.cost > 0)
-  .slice(0, 12);
 const [bestA, bestB] = shopItems;
 async function mockApi(page: Page, requests: string[] = []) {
   await page.route("https://assets-bucket.deadlock-api.com/**", (route) =>

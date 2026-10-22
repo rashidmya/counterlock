@@ -49,7 +49,7 @@ export const historyRow = (matchId: number, won: boolean) => ({
   match_result: won ? 0 : 1,
 });
 
-const shopItems = catalog.items
+export const shopItems = catalog.items
   .filter((entry) => entry.image && entry.cost > 0)
   .slice(0, 12);
 const HAZE = catalog.heroes.find((hero) => hero.name === "Haze")!;

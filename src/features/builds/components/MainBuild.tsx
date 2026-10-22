@@ -6,10 +6,11 @@ import {
 } from "../utils/main-build";
 import { BuildItem } from "./BuildItem";
 
-const shortLine = (count: number) =>
+// Later phases also leave out items an earlier phase listed, hence "more".
+const shortLine = (count: number, later: boolean) =>
   count === 0
     ? "Not enough data for this phase."
-    : `Only ${count} item${count === 1 ? " was" : "s were"} bought often enough in this phase.`;
+    : `Only ${count}${later ? " more" : ""} item${count === 1 ? " was" : "s were"} bought often enough in this phase.`;
 
 export function MainBuild({
   state,
@@ -38,7 +39,7 @@ export function MainBuild({
   if (!state.data) return null;
   return (
     <div className="main-build">
-      {state.data.map((phase) => (
+      {state.data.map((phase, index) => (
         <div
           key={phase.key}
           className={`build-phase${phase.key === now ? " now" : ""}`}
@@ -63,7 +64,9 @@ export function MainBuild({
             })}
           </div>
           {phase.items.length < PHASE_SIZE && (
-            <p className="phase-short">{shortLine(phase.items.length)}</p>
+            <p className="phase-short">
+              {shortLine(phase.items.length, index > 0)}
+            </p>
           )}
         </div>
       ))}

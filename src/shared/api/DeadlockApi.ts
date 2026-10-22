@@ -33,6 +33,13 @@ export class DeadlockApi {
     return run;
   }
 
+  // The timeout covers both the request and reading the body.
+  private mapTimeout(error: unknown) {
+    return error instanceof Error && error.name === "TimeoutError"
+      ? new Error("Deadlock API timed out.")
+      : error;
+  }
+
   private async fetchJson<T>(path: string): Promise<T> {
     let response: Response;
     try {
@@ -40,11 +47,9 @@ export class DeadlockApi {
         signal: AbortSignal.timeout(15_000),
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "TimeoutError")
-        throw new Error("Deadlock API timed out.");
       if (error instanceof TypeError)
         throw new Error("Deadlock API unreachable.");
-      throw error;
+      throw this.mapTimeout(error);
     }
     if (response.status === 429 || response.status === 503) {
       const header = response.headers.get("Retry-After");
@@ -64,7 +69,11 @@ export class DeadlockApi {
           ? "Data unavailable or profile protected."
           : `Deadlock API unavailable (${response.status}).`,
       );
-    return (await response.json()) as T;
+    try {
+      return (await response.json()) as T;
+    } catch (error) {
+      throw this.mapTimeout(error);
+    }
   }
 }
 

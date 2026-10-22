@@ -113,6 +113,7 @@ export function HeroDetail({
   query,
   setQuery,
   liveEnemies,
+  liveAllies,
   enemyPicks,
   setEnemyPicks,
 }: {
@@ -120,6 +121,7 @@ export function HeroDetail({
   query: AnalyticsQuery;
   setQuery(query: AnalyticsQuery): void;
   liveEnemies: number[];
+  liveAllies: number[];
   enemyPicks: number[];
   setEnemyPicks(picks: number[]): void;
 }) {
@@ -288,6 +290,7 @@ export function HeroDetail({
             picks={enemyPicks}
             setPicks={setEnemyPicks}
             liveEnemies={liveEnemies}
+            liveAllies={liveAllies}
             exclude={exclude}
           />
         </Section>

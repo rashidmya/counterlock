@@ -72,22 +72,24 @@ function HeroRoster({
   );
 }
 
-const NO_ENEMIES: number[] = [];
+const NO_HEROES: number[] = [];
 
 export function HeroesPage({
   route,
   navigate,
   query,
   setQuery,
-  liveEnemies = NO_ENEMIES,
+  liveEnemies = NO_HEROES,
+  liveAllies = NO_HEROES,
 }: {
   route: Route;
   navigate: Navigate;
   query: AnalyticsQuery;
   setQuery(query: AnalyticsQuery): void;
   catalogWhileLoading?: boolean;
-  // Enemy heroes in the desktop app's live match; the website has none.
+  // Each team's heroes in the desktop app's live match; the website has none.
   liveEnemies?: number[];
+  liveAllies?: number[];
 }) {
   const [role, setRole] = useState<RoleFilter>("all");
   const [search, setSearch] = useState("");
@@ -104,6 +106,7 @@ export function HeroesPage({
           query={query}
           setQuery={setQuery}
           liveEnemies={liveEnemies}
+          liveAllies={liveAllies}
           enemyPicks={enemyPicks}
           setEnemyPicks={setEnemyPicks}
         />
