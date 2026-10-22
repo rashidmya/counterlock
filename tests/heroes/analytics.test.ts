@@ -13,6 +13,7 @@ import {
   matchups,
   mostCommonOrder,
   rankFilterOptions,
+  rankLabel,
   summarizeHeroes,
 } from "@/features/heroes/utils/analytics";
 import {
@@ -379,4 +380,11 @@ describe("hero-analytics services", () => {
     expect(items.length).toBeGreaterThanOrEqual(1);
     expect(items.every((item) => itemById.has(item.id))).toBe(true);
   });
+});
+
+it("rankLabel names the rank filter", () => {
+  expect(rankLabel(0)).toBe("All ranks");
+  const [, first] = rankFilterOptions(catalog.ranks);
+  expect(rankLabel(first.value)).toBe(first.label);
+  expect(rankLabel(-5)).toBe("All ranks");
 });

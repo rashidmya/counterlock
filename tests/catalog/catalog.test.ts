@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { abilityById, catalog, itemByClass } from "@/shared/catalog";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { rankImage } from "@/shared/ui/gameIcons";
 
 const roles = ["assassin", "brawler", "marksman", "mystic"];
@@ -108,5 +110,17 @@ describe("catalog", () => {
     expect(rankImage(5, 3)).toBe(
       "https://api.deadlock-api.com/v1/assets/ranks/5/3/image?format=webp",
     );
+  });
+
+  it("bundles actual shop artwork for every available item", () => {
+    for (const item of catalog.items) {
+      expect(item.image, item.name).toContain("/images/items/");
+      expect(item.localImage, item.name).toMatch(
+        /^\.\/items\/\d+\.(webp|png)$/,
+      );
+      expect(existsSync(resolve("public", item.localImage!)), item.name).toBe(
+        true,
+      );
+    }
   });
 });

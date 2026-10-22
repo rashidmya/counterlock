@@ -1,5 +1,5 @@
 import type { Item, Rank } from "@/shared/catalog/types";
-import { itemByClass, itemById } from "@/shared/catalog";
+import { catalog, itemByClass, itemById } from "@/shared/catalog";
 
 export type Tier = "S" | "A" | "B" | "C" | "D";
 export interface AnalyticsQuery {
@@ -94,6 +94,16 @@ export function rankFilterOptions(
       .filter((rank) => rank.tier >= 1)
       .map((rank) => ({ value: rank.tier * 10 + 1, label: `${rank.name}+` })),
   ];
+}
+
+export function rankLabel(
+  minBadge: number,
+  ranks: Rank[] = catalog.ranks,
+): string {
+  return (
+    rankFilterOptions(ranks).find((o) => o.value === minBadge)?.label ??
+    "All ranks"
+  );
 }
 
 const TIER_CUTOFFS: [number, Tier][] = [
@@ -279,7 +289,7 @@ export function mostCommonOrder(
   return best;
 }
 
-function shopItems(rows: unknown[]): Map<number, ItemPerf> {
+export function shopItems(rows: unknown[]): Map<number, ItemPerf> {
   const totals = new Map<
     number,
     { wins: number; matches: number; buy: number; buyMatches: number }
@@ -336,7 +346,7 @@ export function bestItems(
     .slice(0, n);
 }
 
-const overallRate = (items: Map<number, ItemPerf>) => {
+export const overallRate = (items: Map<number, ItemPerf>) => {
   let wins = 0;
   let matches = 0;
   for (const item of items.values()) {
