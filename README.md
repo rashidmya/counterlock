@@ -41,7 +41,8 @@ For Overwolf development, load the built files. Avoid `debug_url` with this back
 
 - **Live** shows the current match roster, builds and counters, or a "Deadlock isn't running" / "Waiting for a match" state. The app opens on Live when Deadlock is detected running (unless you have already picked a tab); otherwise it opens on Home. It also switches to Live once per match when live data first arrives.
 - **Home** is a search (**Find a player**) followed by a **You** section for the remembered account (rank, recent form and latest match, each number explained) and **Top of the city**, the strongest heroes right now.
-- **Profile** is its own page, opened from search, **You** or the header's **My profile**: rank badge, ranked games, KDA, souls per minute, top heroes, frequent teammates and a filterable match history, in the tabs Overview, Matches, Performance and Heroes. Click a match for its scoreboard. **This is me** remembers the account; **Not you? Switch account** forgets it.
+- **Profile** is its own page, opened from search, **You** or the header's **My profile**: rank badge, ranked games, KDA, souls per minute, top heroes, frequent teammates and a filterable match history, in the tabs Overview, Matches, Performance and Heroes. Click a match for its match report. **This is me** remembers the account; **Not you? Switch account** forgets it.
+- **Match report** opens from any match row, from Home's latest match or from a shared link, for any player. **Viewing as** picks whose point of view it takes (any of the 12 players, or the whole match); it opens as you if you played, otherwise as the player you came from. It shows win or loss, verdicts (souls / min, hero damage and creep kills against the average player on that hero at that rank), **the Graph** (nine stat tabs plus "More stats…", player against the rank average, team totals, team lead or everyone, per minute, time ranges, death, item and objective markers, hover and a ranking that switches the point of view), best and worst stretches, impact, permanent buffs and a scoreboard for both teams. **Copy link** copies the website address of the report. See [Match report](#match-report).
 - **Tier list** ranks heroes S to D by win-rate percentile over the last 30 days across all ranks, with a role filter.
 - **Heroes** is the full roster with search and a role filter. A hero page (with a rank filter) shows abilities (hover, focus or tap one for its tooltip), then two tabs: **Build**, the main build (the most-bought items in each phase: Early 0–10 min, Mid 10–20 min and Late 20+ min, up to eight each), and **Popular builds**, the hero's most-favourited community builds, shown exactly as their authors set them up. **Counter items** come next: pick up to six enemy heroes to see the items, not already in the main build, that gain the most win rate against them (during a match, the desktop app uses the live enemy team instead on the pages of heroes on your team). Then come skill order, matchups, best partners, best items and **Items that beat {Hero}**, which compares an item's win rate against this hero with its overall win rate, adjusted for the hero's overall win rate. Both counter lists fall back to hero-trait heuristics, labelled "Based on hero traits", when the data is too thin. See [Hero page builds and counter items](#hero-page-builds-and-counter-items).
 - **Items** ("The Shop") is a shop-style browser with search, filtering and sorting, in columns by category and cost. An item page shows its stats, win and pick rate, and what it builds from and into.
@@ -73,6 +74,18 @@ Each list says how it is derived in one line on the page. Item stats cover the l
 - **Popular builds:** `GET /v1/builds?hero_id=…&only_latest=true&sort_by=favorites&sort_direction=desc&min_unix_timestamp=…&limit=5`, the five most-favourited builds updated in the last 60 days. Only English builds are shown; when the hero has none, builds in every language are shown instead and the note says so. When no build has a favourite count (new heroes), the builds are reloaded with `sort_by=updated_at` and the note says they are recent rather than popular. Categories, items, duplicates and author notes are shown in the author's order; unnamed categories are called "Items". Author names come from one batched `GET /v1/players/steam` and are left out if that fails.
 - **Counter items:** for each picked enemy, `GET /v1/analytics/item-stats?hero_id=…&enemy_hero_ids=…` is compared with all of the hero's games (`item-stats?hero_id=…`, the request **Best items** also uses), net of the matchup's own shift. Items need 200 games against an enemy to count, are ranked by a lower confidence bound of their average win-rate lift (lift minus three standard errors), and are shown only when that bound is above zero. Main-build items are left out. A card shows the lift and the largest single-enemy sample, for example "+5.0% vs these heroes · 3,000+ games", and names the enemies it clearly does better against. After those come items that clear the same bound against one picked enemy but not on average, as long as their average lift is still above zero; their cards show the lift and sample against that enemy, for example "+3.0% vs Seven · 3,661 games". When no item clears either bound, or the data fails to load, the rules-based suggestions are shown instead, labelled "Based on hero traits".
 
+### Match report
+
+Everything comes from `GET /v1/matches/{id}/metadata`: per-player stat snapshots (every 3 min until 15:00, then every 5 min, plus one at the end; lines connect them), deaths, purchases, permanent buff pickups, objectives and Mid Boss. Player names come from one batched `GET /v1/players/steam`. Teams are named Amber and Sapphire.
+
+- **Rank average:** `GET /v1/analytics/player-performance-curve?hero_ids=…&min_average_badge=…&max_average_badge=…&resolution=0` (absolute game time) for the selected player's hero and the whole tier of their rank at match start (from the metadata; the lobby's rank when theirs is unknown), last 30 days, normal matches only. When the tier has fewer than 100 games at 3:00, or its games stop before the match ends, it widens one tier each way and says so; steps with fewer than 30 games are dropped. The graph shades ±1 standard deviation around the average.
+- **Verdicts** compare the match's end values with the average at the same match length. The graph and verdicts use **creep kills**, which the snapshots and the average both have; the banner and scoreboard show the game's **last hits**, which is a different count.
+- **Stretches** are rule-based: the moments with the most and fewest souls against the average, where the player ended up against the normal range (the average ± 1 standard deviation) and since when, every death, and any 3+ deaths within 5 minutes. When the average stops before the match ends, they say so.
+- **Team lead** is Amber's advantage: Amber minus Sapphire, flipped for deaths so above the line always means Amber is ahead.
+- **Impact** is the player's share of their team's hero damage, objective damage and healing (bars fill at half the team's total; the line marks an even 1/6), plus kill participation.
+- **Permanent buffs** counts permanent pickups against the rank average.
+- **Copy link** copies `{VITE_SITE_URL}/matches/{id}?player={account}`; the desktop app uses Overwolf's clipboard (the manifest's "Clipboard" permission).
+
 ## Website
 
 Counterlock also builds as a public static website with the nav **Home · Tier list · Heroes · Items** (the tier list lives at `/tier-list`) and player profiles, with real URLs, pre-rendered hero and item pages and share previews. It has no **Live** page, overlay or hotkeys; Home searches for a Steam account by name or ID, and the header's **My profile** opens the remembered account. The layout is full width with side gutters and has phone layouts down to 375px. Hero pages have the same **Build** and **Popular builds** tabs and **Counter items** as the app; the website has no live match, so you always pick the enemy heroes. It lives in `web/` (React Router v8 framework mode on Vite, `ssr: false` with `prerender`) and reuses the feature code in `src/`, so the Overwolf app is unaffected.
@@ -85,9 +98,9 @@ npm run web:typecheck  # typegen + tsc for web/
 npm run test:web       # browser tests against the built site
 ```
 
-`web:build` pre-renders `/`, `/tier-list`, `/heroes`, `/items`, `/about`, every hero and item page, `sitemap.xml` and `robots.txt`. Pre-rendered HTML holds catalog facts only; statistics load in the browser. Player profiles (`/players/:accountId`) are not pre-rendered and render in the browser. After the build, `web/scripts/postbuild.mjs` writes `_redirects` and `404.html` into the output.
+`web:build` pre-renders `/`, `/tier-list`, `/heroes`, `/items`, `/about`, every hero and item page, `sitemap.xml` and `robots.txt`. Pre-rendered HTML holds catalog facts only; statistics load in the browser. Player profiles (`/players/:accountId`) and match reports (`/matches/:matchId`) are not pre-rendered and render in the browser. After the build, `web/scripts/postbuild.mjs` writes `_redirects` and `404.html` into the output.
 
-Set `VITE_SITE_URL` (for example `https://counterlock.example`, no trailing slash) at build time. It is the absolute origin used for canonical links, Open Graph tags, the sitemap and `robots.txt`; it defaults to `https://counterlock.example`.
+Set `VITE_SITE_URL` (for example `https://counterlock.example`, no trailing slash) at build time. It is the absolute origin used for canonical links, Open Graph tags, the sitemap and `robots.txt`; it defaults to `https://counterlock.example`. Set it for the desktop app's build (`npm run build`) too: the match report's **Copy link** uses it.
 
 ### Deploy to Cloudflare Pages
 
@@ -98,7 +111,7 @@ Set `VITE_SITE_URL` (for example `https://counterlock.example`, no trailing slas
 | `NODE_VERSION`   | `22.22.0` or newer (React Router 8.5 requires Node 22.22+) |
 | `VITE_SITE_URL`  | the site's public origin                                   |
 
-The only host-specific piece is the fallback for non-pre-rendered routes. The build writes `_redirects` with `/players/* /__spa-fallback.html 200`, which Cloudflare Pages and Netlify both read. For other hosts, configure the same two behaviours: serve `/__spa-fallback.html` with status 200 for `/players/*`, and serve `404.html` (a copy of the same shell, which renders the site's not-found page) with status 404 for unknown paths. Static files, including the pre-rendered `index.html` files, are served as they are.
+The only host-specific piece is the fallback for non-pre-rendered routes. The build writes `_redirects` with `/players/* /__spa-fallback.html 200` and the same for `/matches/*`, which Cloudflare Pages and Netlify both read. For other hosts, configure the same two behaviours: serve `/__spa-fallback.html` with status 200 for `/players/*` and `/matches/*`, and serve `404.html` (a copy of the same shell, which renders the site's not-found page) with status 404 for unknown paths. Static files, including the pre-rendered `index.html` files, are served as they are.
 
 ### Website privacy
 
@@ -171,7 +184,7 @@ Live player statistics and the compact overlay's community build use `/v1/player
 
 - `/v1/players/steam`, `/v1/players/rank`, `/v1/players/hero-stats`
 - `/v1/players/{id}/match-history` and `/v1/players/{id}/mate-stats`
-- `/v1/matches/{id}/metadata`
+- `/v1/matches/{id}/metadata` and `/v1/analytics/player-performance-curve` (match report)
 - `/v1/analytics/hero-stats`, `hero-counter-stats`, `hero-synergy-stats`, `ability-order-stats` and `item-stats` (also per build phase and per picked enemy)
 - `/v1/builds` (popular builds on the hero page)
 

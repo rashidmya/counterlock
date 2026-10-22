@@ -467,6 +467,8 @@ This was verified while building the prototype.
 It returns the average and standard deviation per time step for net worth,
 K/D/A, damage, healing and more.
 
+Built in phase 3: the rank band is the selected player's tier at match start, read from the metadata (`player_rank_data.initial_display_rank`), and widened one tier each way when it has fewer than 100 games or its games stop before the match ends.
+
 **Whose match it is ("Viewing as").** The report works for any match, not
 only the viewer's own (owner requirement). The viewer may be looking at
 a friend's game or a stranger's.
@@ -527,13 +529,13 @@ Sections, top to bottom:
 The prototype implements all of this. Use it as the reference.
 
 - **Stat tabs** (the most important stats, one click each): Souls, Hero
-  damage, Damage taken, Objective damage, Healing, Last hits, Kills,
+  damage, Damage taken, Objective damage, Healing, Last hits (built as **Creep kills**: the snapshots and the rank average have creep kills over time, not the game's last hits), Kills,
   Deaths and Hero hits.
 - **"More stats…" dropdown** for everything else the snapshots record:
   Accuracy %, Headshots, Assists, Damage mitigated, Creep damage, Jungle
   (neutral) damage, Denies, Level, Spirit power, Weapon power, Max health,
   Melee kills, Healing prevented, Healing to teammates and Power-ups
-  picked up.
+  picked up (built as **Permanent buffs**, counted from `power_up_buffs`, with a rank average).
 - **Data sources,** all from the per-player `stats` snapshots in match
   metadata (verified on a real match):
   - `net_worth`, `player_damage`, `player_damage_taken`, `boss_damage`,
@@ -552,7 +554,7 @@ The prototype implements all of this. Use it as the reference.
       benchmark curve has; otherwise it says "no rank average for this
       stat".
     - Team totals: Amber vs Sapphire.
-    - Team lead: Amber minus Sapphire, around a zero line.
+    - Team lead: Amber's advantage around a zero line (Amber minus Sapphire, flipped for deaths so above the line is always Amber ahead).
     - Everyone: all 12 players.
   - **Values:** Total / Per minute. Rate stats like accuracy and level
     ignore per-minute.
@@ -675,7 +677,7 @@ Build and ship in this order. Each phase gets its own plan.
    layouts). No new data features.
 2. **Hero page builds (done):** main build moved and restyled, popular
    builds as authored, counter items with enemy picker / live roster.
-3. **Match report.**
+3. **Match report (done).**
 4. **Performance tab.**
 5. **Profile Live tab** (app + web).
 6. **Overlay panels** (five windows, settings, removal of the old
