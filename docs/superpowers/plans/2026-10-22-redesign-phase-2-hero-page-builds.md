@@ -12,9 +12,9 @@
 
 ## Decisions made while planning (verified against the live API on 2026-10-22)
 
-- **Main build data works as the spec says.** `GET /v1/analytics/item-stats?hero_id=13&min_bought_at_s=0&max_bought_at_s=600` (and 600–1200, 1200+) returns rows with `item_id, wins, losses, matches, players, avg_buy_time_s, …`. For Haze, the early phase's top items are Rapid Rounds (1.02M) and Swift Striker (0.97M), which is Rapid Rounds' upgrade. **Upgrade rule:** when an item and its upgrade (direct or through a chain) both qualify in one phase, keep the **upgrade**.
+- **Main build data works as the spec says.** `GET /v1/analytics/item-stats?hero_id=13&min_bought_at_s=0&max_bought_at_s=600` (and 600–1200, 1200+) returns rows with `item_id, wins, losses, matches, players, avg_buy_time_s, …`. For Haze, the early phase's top items are Rapid Rounds (1.02M) and Swift Striker (0.97M), which is Rapid Rounds' upgrade. **Upgrade rule:** when an item and its upgrade (direct or through a chain) both qualify in one phase, keep the **upgrade**; a component of an upgrade listed in an earlier phase is not listed again later (upgrades of earlier items still can be).
 - **Noise floor:** an item must be bought in at least **5% as many matches as the phase's most-bought item**. This keeps rare heroes at high ranks from filling slots with 20-match items. This floor is what produces "fewer than 8" phases.
-- **Popular builds sort:** `sort_by=weekly_favorites` is stale. Unfiltered, it returns a 2024 build with 1,803 weekly favourites. With a date filter, every count is `null` and the order is arbitrary. Use **`sort_by=favorites&sort_direction=desc&only_latest=true`** with **`min_unix_timestamp` = 60 days ago** (UTC day-rounded so the URL is cacheable) and **`limit=5`**. Prefer English (`build_language=English`), and fall back automatically to all languages when the hero has no English builds (no toggle; YAGNI).
+- **Popular builds sort:** `sort_by=weekly_favorites` is stale. Unfiltered, it returns a 2024 build with 1,803 weekly favourites. With a date filter, every count is `null` and the order is arbitrary. Use **`sort_by=favorites&sort_direction=desc&only_latest=true`** with **`min_unix_timestamp` = 60 days ago** (UTC day-rounded so the URL is cacheable) and **`limit=5`**. Prefer English (`build_language=English`), and fall back automatically to all languages when the hero has no English builds (no toggle; YAGNI). **Newer heroes have no favourite counts** (`num_favorites: null` on every build for Violet, Nurse Harrow and Baba), so when no returned build has a count above 0 the list is re-fetched with `sort_by=updated_at` and labelled as most recently updated (`ranked: false`).
 - **Build contents as authored:** about 12% of categories have an empty name, and many use the game's localisation keys (`#Citadel_HeroBuilds_EarlyGame` …). Some categories have no items, only a description (e.g. "Notes"). Items often carry an author **annotation**. All of these are kept: mapped key names (existing rule), "Items" for an empty name, description shown, annotation in the tile's tooltip.
 - **Build authors:** builds give only `author_account_id`. Names come from one batched `GET /v1/players/steam?account_ids=…` (existing `fetchSteamProfiles`). The author is left out when the lookup fails.
 - **Counter items rank by win-rate *lift*, not raw win rate (deviation from the spec's wording).** Ranking by raw win rate returns only 6,400-soul late items, because players who are ahead can afford them; the prototype's cards (Frenzy, Glass Cannon, Spellslinger… all 6,400) show this. For each picked enemy E, `lift_E = winRate(item | hero, vs E) − winRate(item | hero) − shift_E`, where `shift_E` corrects for the matchup itself. This is the same method today's "Counter items" section uses (`counterItems()`). An item's score is the average lift over the picked enemies that have data, with missing data counted as 0. The card says which enemies it does well against (lift > 0). The one-line label says exactly this.
@@ -33,9 +33,9 @@
   - tile sub-line `55% win` (rounded whole percent) or `OWNED`;
   - short-phase lines "Only 3 items were bought often enough in this phase." and "Not enough data for this phase.";
   - main build note "Most-bought items in each phase · {rank} · last 30 days · win rate under each item", where `{rank}` is "All ranks" or e.g. "Emissary+";
-  - popular builds notes "Most-favourited builds updated in the last 60 days, shown exactly as their authors set them up." and, when not English, the prefix "No English builds yet, so these are in other languages. ";
+  - popular builds notes "Most-favourited builds updated in the last 60 days, shown exactly as their authors set them up." or, when `ranked` is false, "Most recently updated builds, shown exactly as their authors set them up. This hero has no favourite counts yet."; when not English, either gets the prefix "No English builds yet, so these are in other languages. ";
   - popular builds empty line "No community builds for this hero were updated in the last 60 days.";
-  - build meta "by {author} · Updated {10 Oct 2026} · {42} items in {6} categories · {199} favourites", with "by …" omitted when unknown;
+  - build meta "by {author} · Updated {10 Oct 2026} · {42} items in {6} categories · {199} favourites", with "by …" omitted when unknown and "· {n} favourites" omitted when `favorites` is `null`;
   - counter section title "Counter items"; its note "How much better each item does for {Hero} players against these heroes than in all {Hero} games · {rank} · last 30 days.";
   - picker label "Enemy team"; buttons "Add enemy hero", "Remove {Hero}", "Clear", "Done"; chooser group "Choose enemy heroes";
   - picker empty line "Pick up to 6 enemy heroes to see items that do well against them.";
@@ -915,11 +915,11 @@ it("accepts hero references without full player rows", () => {
   - Error: `p.build-empty[role=status]` "Popular builds unavailable: {error} " plus Retry.
   - Empty: `p.build-empty` "No community builds for this hero were updated in the last 60 days."
   - Data:
-    - `p.data-note` (English or fallback wording, see Global Constraints);
+    - `p.data-note` (ranked or most-recent wording, with the non-English prefix when `english` is false; see Global Constraints);
     - `div.popular-build-tabs[role=group][aria-label="Popular builds"]`: a `button.build-tab` per build (`aria-pressed`, text = build name, `title` = build name);
     - `article.popular-build` for the selected build (local `useState(0)`):
-      - `div.popular-build-meta`: `h3` name, then `p` meta line ("by …" only when `authors.get(authorId)` is known; date formatted with `toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })` and omitted when `updatedAt` is 0; item count = sum of category item lengths; "1 favourite" / "N favourites");
-      - one `section.build-category` per category: `h4.build-category-name`, `p.build-category-desc` (only when non-empty), and `div.build-category-items` of `BuildItem itemId note` (omitted when the category has no items).
+      - `div.popular-build-meta`: `h3` name, then `p` meta line ("by …" only when `authors.get(authorId)` is known; date formatted with `toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })` and omitted when `updatedAt` is 0; item count = sum of category item lengths; "1 favourite" / "N favourites", omitted when `favorites` is `null`);
+      - one `section.build-category` per category, keyed by index (several categories can share the name "Items"): `h4.build-category-name`, `p.build-category-desc` (only when non-empty), and `div.build-category-items` of `BuildItem itemId note` (omitted when the category has no items).
 - `HeroDetail` structure, top to bottom:
   1. `HeroHeader` (unchanged), then the summaries error notice (unchanged).
   2. `div.hero-detail-body` containing:
@@ -1063,6 +1063,7 @@ case "/v1/players/steam":
       - "Notes" shows "Only words here" and has no `.build-item`;
       - clicking the second `.build-tab` shows "Fixture Popular Two" and "1 favourite".
     - `popular builds empty state`: `openHaze(page, { popular: [] })` → tab without `.tab-count`; the panel says "No community builds for this hero were updated in the last 60 days."
+    - `popular builds without favourite counts say they are recent`: `openHaze(page, { popular: popularRows.map((row) => ({ ...row, num_favorites: null })) })`, open the tab → the note contains "Most recently updated builds" and "This hero has no favourite counts yet.", and `.popular-build-meta` does not contain "favourite".
     - `main build rows fit at the minimum window width`: `page.setViewportSize({ width: 850, height: 650 })` then `openHaze`. `.main-build` has `scrollWidth <= clientWidth`, `document.documentElement.scrollWidth <= 850`, and all 8 early tiles share the same `top`.
   - Update "thin data shows Not enough data…": also pass `phases: [[], [], []]`. Each `.phase-short` reads "Not enough data for this phase." The rest stays, but uses `section(page, "Items that beat Haze")` for the heuristic assertions.
 - [ ] **Step 2: Run** `npx playwright test tests/browser/hero-detail.spec.ts` → FAIL.
