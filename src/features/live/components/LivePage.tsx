@@ -1,4 +1,5 @@
 import type { MatchState } from "@/features/match/types";
+import type { AnalyticsQuery } from "@/features/heroes/utils/analytics";
 import type { useCounters } from "@/features/counters/hooks/useCounters";
 import { MatchOverview } from "@/features/match/components/MatchOverview";
 import type { Navigate } from "@/app/navigation";
@@ -14,6 +15,7 @@ interface Props {
   refresh: () => void;
   navigate: Navigate;
   meId: number | null;
+  query: AnalyticsQuery;
 }
 
 export function LivePage({
@@ -25,11 +27,12 @@ export function LivePage({
   refresh,
   navigate,
   meId,
+  query,
 }: Props) {
   if (status === "in-match")
     return (
       <MatchOverview
-        {...{ state, showBuild, showCounters, counters, refresh }}
+        {...{ state, showBuild, showCounters, counters, refresh, query }}
       />
     );
   const running = status === "waiting";

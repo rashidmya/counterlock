@@ -51,8 +51,11 @@ test("joining a match switches to Live once", async ({ page }) => {
     running: true,
     players: false,
   });
-  await page.route("**/analytics/hero-build-stats/**", (route) =>
-    route.fulfill({ json: [] }),
+  await page.route("**/v1/analytics/item-stats?**", (route) =>
+    route.fulfill({
+      json: [],
+      headers: { "access-control-allow-origin": "*" },
+    }),
   );
   await page.goto("/desktop/desktop.html");
   await page.getByRole("button", { name: "Heroes" }).click();
@@ -119,8 +122,11 @@ test("View your profile opens the stored account's profile", async ({
 
 test("Live intro ribbon names the local player's hero", async ({ page }) => {
   await nativeWindow(page, "desktop");
-  await page.route("**/analytics/hero-build-stats/**", (route) =>
-    route.fulfill({ json: [] }),
+  await page.route("**/v1/analytics/item-stats?**", (route) =>
+    route.fulfill({
+      json: [],
+      headers: { "access-control-allow-origin": "*" },
+    }),
   );
   await page.goto("/desktop/desktop.html");
   const hero = catalog.heroes.find((h) => h.id === 7)!.name;
@@ -133,8 +139,11 @@ test("Live intro omits the ribbon when the local hero is unresolved", async ({
   page,
 }) => {
   await nativeWindow(page, "desktop");
-  await page.route("**/analytics/hero-build-stats/**", (route) =>
-    route.fulfill({ json: [] }),
+  await page.route("**/v1/analytics/item-stats?**", (route) =>
+    route.fulfill({
+      json: [],
+      headers: { "access-control-allow-origin": "*" },
+    }),
   );
   await page.goto("/desktop/desktop.html");
   await expect(page.locator(".intro .ribbon")).toBeVisible();

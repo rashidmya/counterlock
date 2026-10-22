@@ -207,6 +207,7 @@ export function DesktopApp({
                 counters,
                 navigate,
                 meId: me.meId,
+                query,
               }}
               refresh={bridge.refresh}
             />

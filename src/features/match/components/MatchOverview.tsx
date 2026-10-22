@@ -1,4 +1,5 @@
 import type { MatchState } from "../types";
+import type { AnalyticsQuery } from "@/features/heroes/utils/analytics";
 import { catalog, heroById } from "@/shared/catalog";
 import { BuildPanel } from "@/features/builds/components/BuildPanel";
 import { CounterPanel } from "@/features/counters/components/CounterPanel";
@@ -13,6 +14,7 @@ interface Props {
   showCounters: boolean;
   counters: ReturnType<typeof useCounters>;
   refresh: () => void;
+  query: AnalyticsQuery;
 }
 export function MatchOverview({
   state,
@@ -20,6 +22,7 @@ export function MatchOverview({
   showCounters,
   counters,
   refresh,
+  query,
 }: Props) {
   const { teams, selected, setSelected } = counters;
   const missingIds = state.players.filter((p) => !p.accountId).length;
@@ -58,7 +61,12 @@ export function MatchOverview({
       <div className={`workspace ${showCounters ? "" : "without-counters"}`}>
         <div className="match-column">
           {showBuild && (
-            <BuildPanel key={state.matchId} catalog={catalog} state={state} />
+            <BuildPanel
+              key={state.matchId}
+              catalog={catalog}
+              state={state}
+              query={query}
+            />
           )}
           <div className="rosters">
             {teams.team == null && state.players.length > 0 ? (
