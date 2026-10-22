@@ -54,12 +54,20 @@ function LatestMatch({
             <dd>{duration(match.durationS)}</dd>
           </div>
         </dl>
-        <RouteLink
-          className="latest-link"
-          route={{ page: "profile", accountId }}
-        >
-          View profile →
-        </RouteLink>
+        <div className="latest-links">
+          <RouteLink
+            className="latest-link"
+            route={{ page: "match", matchId: match.matchId, accountId }}
+          >
+            Open match report →
+          </RouteLink>
+          <RouteLink
+            className="latest-link"
+            route={{ page: "profile", accountId }}
+          >
+            View profile →
+          </RouteLink>
+        </div>
       </div>
     </div>
   );

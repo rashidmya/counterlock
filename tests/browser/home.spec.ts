@@ -238,6 +238,9 @@ test("Home shows the You card and latest match for a stored account", async ({
   await expect(view(page).getByText(prompt)).toHaveCount(0);
   await expect(view(page).locator(".profile-header")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "← Back" })).toHaveCount(0);
+  await expect(
+    latest.getByRole("button", { name: "Open match report →" }),
+  ).toBeVisible();
   await latest.getByRole("button", { name: "View profile →" }).click();
   await expect(view(page).locator(".profile-header h1")).toHaveText(
     "Fixture Persona",

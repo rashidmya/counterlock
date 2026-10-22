@@ -16,7 +16,8 @@
   "permissions": [
     "GameInfo",
     "Hotkeys",
-    "Extensions"
+    "Extensions",
+    "Clipboard"
   ],
   "data": {
     "start_window": "background",

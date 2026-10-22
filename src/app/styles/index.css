@@ -18,6 +18,7 @@
 @import "../../features/heroes/styles/heroes.css";
 @import "../../features/heroes/styles/hero-detail.css";
 @import "../../features/items/styles/items.css";
+@import "../../features/match-report/styles/match-report.css";
 
 .page {
   flex: 1;

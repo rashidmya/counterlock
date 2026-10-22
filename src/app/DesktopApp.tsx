@@ -23,6 +23,7 @@ import { accountSubtitle, useDesktopMe } from "@/features/profile/me";
 import { TierListPage } from "@/features/heroes/components/TierListPage";
 import { HeroesPage } from "@/features/heroes/components/HeroesPage";
 import { ItemsPage } from "@/features/items/components/ItemsPage";
+import { MatchReportPage } from "@/features/match-report/components/MatchReportPage";
 import type { AnalyticsQuery } from "@/features/heroes/utils/analytics";
 import { LivePage } from "@/features/live/components/LivePage";
 import {
@@ -51,6 +52,10 @@ export function DesktopApp({
   const [route, setRoute] = useState<Route>({ page: "home" });
   const [visited, setVisited] = useState<Page[]>(["home"]);
   const [profileId, setProfileId] = useState<number | null>(null);
+  const [report, setReport] = useState<{
+    matchId: number;
+    accountId?: number;
+  } | null>(null);
   const me = useDesktopMe();
   const [query, setQuery] = useState<AnalyticsQuery>({ minBadge: 0 });
   const userNavigated = useRef(false);
@@ -61,7 +66,11 @@ export function DesktopApp({
   const show = (next: Route) => {
     if (next.page === "profile" && next.accountId === undefined)
       next = { page: "home" };
+    if (next.page === "match" && next.matchId === undefined)
+      next = { page: "home" };
     if (next.page === "profile") setProfileId(next.accountId ?? null);
+    if (next.page === "match")
+      setReport({ matchId: next.matchId!, accountId: next.accountId });
     setRoute(next);
     setVisited((pages) =>
       pages.includes(next.page) ? pages : [...pages, next.page],
@@ -193,6 +202,16 @@ export function DesktopApp({
                   ? accountSubtitle(me.account)
                   : undefined
               }
+            />
+          </div>
+        )}
+        {visited.includes("match") && report !== null && (
+          <div className="page" hidden={route.page !== "match"}>
+            <MatchReportPage
+              key={`${report.matchId}-${report.accountId ?? ""}`}
+              matchId={report.matchId}
+              fromId={report.accountId}
+              meId={me.meId}
             />
           </div>
         )}

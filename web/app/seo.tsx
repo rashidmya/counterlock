@@ -1,9 +1,8 @@
 import { heroById, itemById } from "@/shared/catalog";
+import { SITE_URL } from "@/shared/site";
 import { routeToPath } from "./paths";
 
-export const SITE_URL: string = (
-  import.meta.env.VITE_SITE_URL?.trim() || "https://counterlock.example"
-).replace(/\/+$/, "");
+export { SITE_URL };
 
 const SITE_NAME = "Counterlock";
 const DEFAULT_IMAGE = `${SITE_URL}/icon.png`;
