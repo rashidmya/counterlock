@@ -82,6 +82,25 @@ All checked on real ranked match 118590607 (`GET /v1/matches/118590607/metadata`
   - **Result:** on a 1600 px browser, the whole Graph block is about 460 px tall.
 - **Website route.** `/matches/:matchId` is not pre-rendered and not in the sitemap. It uses the SPA fallback, like `/players/*`: the `_redirects` line plus the preview server.
 
+- **Final review (2026-10-22):**
+  - **Final counts:** at the match end, the parser uses the game's final kills, deaths, assists and souls. The last snapshot can be one off the scoreboard, so running counts are capped at those totals.
+  - **Missing buff data:** a match with no buff data has a `null` buff count, shown as "—".
+  - **Rank notes:** the verdict note says when a player's own rank isn't recorded and the lobby's rank is used. When the average stops before the match ends, the note says there are no verdicts.
+  - **Stretches note:** it only claims a souls comparison when one is shown.
+  - **Labels:** the banner says "Street Brawl" only for mode 4. Graph lines without a Steam name show the hero once.
+  - **`VITE_SITE_URL`:** the desktop build warns when it is unset, and the Overwolf steps in the README say to set it.
+- **Follow-ups for the owner (not built):**
+  - **Website profile state:** the tab and filter reset when coming back from a report. This needs URL state in `ProfileView`.
+  - **Focus:** focus isn't returned to the row after Back.
+  - **Row layout:** the match row layout at 641–760 px needs work.
+  - **Scoreboard:** add a final-items column back to the report scoreboard.
+  - **Interpolated values:** tooltip and ranking values between snapshots are interpolated and not marked as such.
+  - **Team colours:** blue Amber and red Sapphire follow the spec, but read backwards in game terms.
+  - **Memory:** `DeadlockApi` never evicts its cache, about 1 MB per match report.
+  - **Shared links:** on the website, "← Back to profile" also appears on links shared from someone else's profile.
+  - **Formatters:** the match-report formatters (`clock`, `compact`) duplicate the profile's (`duration`, `compactSouls`).
+  - **Share previews:** match links need share tags in the fallback HTML.
+
 ## Global Constraints
 
 - Every colour comes from `src/app/styles/tokens.css` (`var(--token)`, `rgb(from var(--token) r g b / a)` or `color-mix(…)`). `tests/app/theme.test.ts` fails on any hex literal in `src/**/*.css`, `web/app/**/*.css` or `src/**/*.tsx`.
