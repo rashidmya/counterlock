@@ -5669,6 +5669,20 @@ git commit -m "feat(match-report): the Graph with stat tabs, filters, markers, h
 - Modify: `tests/web-browser/fixtures.ts` (shared match fixture and curve)
 - Test: `tests/web-browser/match-report.spec.ts` (create), `tests/web-browser/mobile.spec.ts`
 
+> **Revision (code review of Task 7):**
+> - **Code:** the route and website spec below are the reviewed versions. The match id must be above 0. `?player=` goes through `accountId()`, so 0 and junk are ignored and SteamID64 values work. The invalid-id page is `noindex`.
+> - **Layout fixes:**
+>   - `match-report.css`:
+>     - `.report-table-wrap` is `position: relative`, so the visually hidden header label can't widen the page at 521–919 px;
+>     - `.report-table :is(th, td):last-child` stays a table cell (an old phone rule hid every table's last column);
+>     - `.report-note` and `.report-stats dd` wrap long names.
+>   - `web.css`: `.report-bar` has `scroll-margin-top` of 78 px, or 120 px at 900 px and below, clearing the sticky header.
+>   - `phone.css`: report controls are at least 36 px tall.
+> - **Tests:**
+>   - `tests/web/paths.test.ts` maps `page: "match"`;
+>   - the website spec checks real ids, no sideways scroll at 700 and 900 px, and that the bar lands below the header;
+>   - the phone test checks "View as" is visible.
+
 - [ ] **Step 1: Point the website fixtures at the shared match**
 
 In `tests/web-browser/fixtures.ts`:
@@ -5757,6 +5771,46 @@ test("the report banner runs edge to edge; its text keeps the gutter", async ({
     page.locator(".report-banner .report-stats dd").nth(1),
   ).toHaveText(heroes[0].name);
 });
+
+test("ids must be real: 0 is not a match, and ?player=0 is ignored", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto("/matches/0");
+  await expect(page.locator("h1")).toHaveText("That isn't a valid match ID.");
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    "content",
+    "noindex",
+  );
+  await page.goto("/matches/1001?player=0");
+  await expect(page.locator(".report-result")).toHaveText("Amber won");
+  await expect(page.getByRole("link", { name: "← Home" })).toBeVisible();
+});
+
+test("no sideways page scroll at tablet widths", async ({ page }) => {
+  await mockApi(page);
+  for (const width of [700, 900]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`/matches/1001?player=${FARGO}`);
+    await expect(page.locator(".report-table tbody tr").first()).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(width);
+  }
+});
+
+test("View as brings the bar into sight below the sticky header", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto(`/matches/1001?player=${FARGO}`);
+  await page.locator(".graph-ranking li").first().getByRole("button").click();
+  const header = (await page.locator(".app.web > header").boundingBox())!;
+  await expect
+    .poll(async () => (await page.locator(".report-bar").boundingBox())!.y)
+    .toBeGreaterThanOrEqual(header.y + header.height);
+  await expect(viewingAs(page)).toBeFocused();
+});
 ```
 
 In `tests/web-browser/mobile.spec.ts`, change `SCROLLERS` to:
@@ -5800,13 +5854,17 @@ Expected: the new tests FAIL; `/matches/1001` renders the not-found page.
 
 ```tsx
 import { Link, useParams, useSearchParams } from "react-router";
+import { accountId } from "@/features/match/utils/game";
 import { MatchReportPage } from "@/features/match-report/components/MatchReportPage";
 import { matchPath } from "@/shared/site";
 import { useRememberedMe } from "../remembered";
 import { PageMeta } from "../seo";
 
-const id = (value: string | null | undefined) =>
-  value && /^\d+$/.test(value) && Number.isSafeInteger(Number(value))
+const matchIdOf = (value: string | undefined) =>
+  value &&
+  /^\d+$/.test(value) &&
+  Number.isSafeInteger(Number(value)) &&
+  Number(value) > 0
     ? Number(value)
     : null;
 
@@ -5814,12 +5872,14 @@ export default function MatchRoute() {
   const { matchId } = useParams();
   const [params] = useSearchParams();
   const { meId } = useRememberedMe();
-  const match = id(matchId);
-  const player = id(params.get("player")) ?? undefined;
+  const match = matchIdOf(matchId);
+  // An account id or SteamID64, as on player pages; 0 and junk are ignored.
+  const player = accountId(params.get("player")) ?? undefined;
   if (match === null)
     return (
       <section className="web-not-found">
         <title>Invalid match | Counterlock</title>
+        <meta name="robots" content="noindex" />
         <h1>That isn&apos;t a valid match ID.</h1>
         <Link to="/">Back to Counterlock</Link>
       </section>
@@ -6168,7 +6228,7 @@ In `web/app/styles/phone.css`, inside `@media (max-width: 640px)`:
 - [ ] **Step 5: Run the tests and confirm they pass**
 
 Run: `npm test`, `npx tsc --noEmit`, `npm run web:typecheck`, `npm run test:browser` and `npm run test:web`.
-Expected: all pass. Browser: 123 desktop and 70 website tests.
+Expected: all pass. Browser: 123 desktop and 73 website tests.
 
 - [ ] **Step 6: Commit**
 
