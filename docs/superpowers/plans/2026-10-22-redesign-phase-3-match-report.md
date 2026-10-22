@@ -1179,7 +1179,7 @@ export async function fetchRankCurve(
 - [ ] **Step 5: Run the tests and confirm they pass**
 
 Run: `npx vitest run tests/match-report`
-Expected: PASS (15 tests).
+Expected: PASS (19 tests).
 
 - [ ] **Step 6: Check and commit**
 
@@ -2274,6 +2274,75 @@ git commit -m "feat(match-report): graph series, time ranges and rankings"
 - Modify: `src/features/home/components/YouCard.tsx`, `src/features/home/styles/home.css` (Home's "Open match report →")
 - Test: `tests/browser/match-report.spec.ts` (create), `tests/browser/home.spec.ts` (one assertion)
 
+> **Revision (code review of Task 5):**
+> - **Shared hook:** `src/shared/api/useAsync.ts` now keys each result by the deps it was loaded for. For the one render after the deps change, it returns `{ loading: true }`, so a new player is never compared with the previous hero's average. New file content:
+>
+> ```ts
+> import { useEffect, useState } from "react";
+>
+> type Settled<T> = { data?: T; error?: string; loading: boolean };
+> export type AsyncState<T> = Settled<T> & { retry(): void };
+>
+> const same = (a: unknown[], b: unknown[]) =>
+>   a.length === b.length && a.every((value, i) => Object.is(value, b[i]));
+>
+> export function useAsync<T>(
+>   load: (() => Promise<T>) | null,
+>   deps: unknown[],
+> ): AsyncState<T> {
+>   // Each result remembers the deps it was loaded for.
+>   const [state, setState] = useState<Settled<T> & { key?: unknown[] }>({
+>     loading: !!load,
+>   });
+>   const [attempt, setAttempt] = useState(0);
+>   const key = [...deps, attempt];
+>   useEffect(() => {
+>     if (!load) {
+>       setState({ loading: false, key });
+>       return;
+>     }
+>     let stale = false;
+>     setState({ loading: true, key });
+>     load().then(
+>       (data) => {
+>         if (!stale) setState({ data, loading: false, key });
+>       },
+>       (error: unknown) => {
+>         if (!stale)
+>           setState({
+>             error: error instanceof Error ? error.message : String(error),
+>             loading: false,
+>             key,
+>           });
+>       },
+>     );
+>     return () => {
+>       stale = true;
+>     };
+>   }, key);
+>   const retry = () => setAttempt((count) => count + 1);
+>   // Until the effect catches up with new deps, the last result belongs to the
+>   // old ones: report loading rather than show it for a render.
+>   if (!state.key || !same(state.key, key)) return { loading: !!load, retry };
+>   return {
+>     data: state.data,
+>     error: state.error,
+>     loading: state.loading,
+>     retry,
+>   };
+> }
+> ```
+>
+> - **Code and tests:** the component code, CSS and tests below are the reviewed versions.
+>   - Scoped `.good` / `.bad` colours.
+>   - Focus moves to "Viewing as" after "View as".
+>   - Home's link has no origin player, so its Back link goes Home.
+>   - Loading and failure states in the cards and notes.
+>   - Copy link has a status message, a focused fallback field, and reads "Copy match link" for a player with no public account.
+>   - Scoreboard rows have `height: auto`.
+>   - Accessibility labels.
+>   - Plus four extra tests.
+
 The desktop app keeps each visited page mounted and hidden. The report is a new page `match`, keyed by match and origin, so opening another match starts fresh. Until Task 7, the website maps the `match` route to `/`. Nothing on the website links to it until Task 8.
 
 - [ ] **Step 1: Add the route type**
@@ -2321,9 +2390,8 @@ type OverwolfClipboard = {
 
 /** Overwolf's clipboard in the desktop app (needs the "Clipboard" permission), the browser's elsewhere. */
 export async function copyText(text: string): Promise<void> {
-  const place = (globalThis as OverwolfClipboard).overwolf?.utils
-    ?.placeOnClipboard;
-  if (place) return place(text);
+  const utils = (globalThis as OverwolfClipboard).overwolf?.utils;
+  if (utils?.placeOnClipboard) return utils.placeOnClipboard(text);
   if (!navigator.clipboard) throw new Error("Clipboard unavailable.");
   await navigator.clipboard.writeText(text);
 }
@@ -2504,6 +2572,16 @@ test("Home's latest match opens its report as you, against your rank", async ({
   await expect(r.locator(".report-verdicts + .data-note")).toHaveText(
     `Compared with the average ${lead.name} at Emissary at the same match length, over the last 30 days.`,
   );
+  await expect(r.locator(".verdict span").first()).toHaveCSS(
+    "color",
+    "rgb(127, 211, 154)",
+  );
+  await expect(r.locator(".verdict span").nth(2)).toHaveCSS(
+    "color",
+    "rgb(224, 122, 95)",
+  );
+  // Home's latest match has no origin player, so Back goes Home.
+  await expect(r.getByRole("button", { name: "← Home" })).toBeVisible();
   const curve = curves.at(-1)!;
   expect(curve.get("hero_ids")).toBe(String(lead.id));
   expect(curve.get("resolution")).toBe("0");
@@ -2615,6 +2693,7 @@ test("scoreboard lists the winners first by souls; View as switches player", asy
     .getByRole("button", { name: /^View as/ })
     .click();
   await expect(viewingAs(page)).toHaveValue("12");
+  await expect(viewingAs(page)).toBeFocused();
   await expect(r.locator(".report-result")).toHaveText("Defeat");
 });
 
@@ -2647,6 +2726,95 @@ test("Copy link copies the website URL for the current point of view", async ({
     `https://counterlock.example/matches/${MATCH_ID}?player=${ACCOUNT}`,
     `https://counterlock.example/matches/${MATCH_ID}`,
   ]);
+});
+
+test("switching player never compares against the previous hero's average", async ({
+  page,
+}) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await storeAccount(page);
+  await routeApi(page);
+  // The second hero's average is twice as high, and arrives late.
+  await page.route(
+    "https://api.deadlock-api.com/v1/analytics/player-performance-curve**",
+    async (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get("hero_ids") !== String(second.id))
+        return route.fallback();
+      await gate;
+      return route.fulfill({
+        json: rankCurveRows().map((row) => ({
+          ...row,
+          net_worth_avg: row.net_worth_avg * 2,
+        })),
+        headers: cors,
+      });
+    },
+  );
+  await page.goto("/");
+  await view(page).getByRole("button", { name: "Open match report →" }).click();
+  const souls = report(page).locator(".verdict span").first();
+  await expect(souls).toHaveText(`▲ 8% vs avg ${lead.name} at Emissary`);
+  await page.evaluate(() => {
+    const seen: string[] = [];
+    Object.assign(window, { seenVerdicts: seen });
+    new MutationObserver(() =>
+      document
+        .querySelectorAll(".verdict span")
+        .forEach((node) => seen.push(node.textContent ?? "")),
+    ).observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+  });
+  await viewingAs(page).selectOption("2");
+  await expect(souls).toHaveText("Loading…");
+  release();
+  // 932 souls / min against 2,000, not against the first hero's 1,000.
+  await expect(souls).toHaveText(`▼ 53% vs avg ${second.name} at Emissary`);
+  const seen = await page.evaluate(
+    () => (window as unknown as { seenVerdicts: string[] }).seenVerdicts,
+  );
+  expect(seen.filter((text) => text.startsWith("▼ 7%"))).toEqual([]);
+});
+
+test("a failed copy shows the link to copy by hand", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: async () => Promise.reject(new Error("denied")) },
+    });
+  });
+  await openReport(page);
+  await report(page).getByRole("button", { name: "Copy link" }).click();
+  await expect(report(page).getByRole("status")).toHaveText(
+    "Couldn't copy the link. Copy it from here:",
+  );
+  const field = report(page).getByRole("textbox", { name: "Match link" });
+  await expect(field).toHaveValue(
+    `https://counterlock.example/matches/${MATCH_ID}?player=${ACCOUNT}`,
+  );
+  await expect(field).toBeFocused();
+});
+
+test("a player without a public account gets the whole-match link", async ({
+  page,
+}) => {
+  const hidden = matchMetadata(ACCOUNT);
+  hidden.match_info.players[1].account_id = 0;
+  await storeAccount(page);
+  await routeApi(page);
+  await page.route(
+    `https://api.deadlock-api.com/v1/matches/${MATCH_ID}/metadata`,
+    (route) => route.fulfill({ json: hidden, headers: cors }),
+  );
+  await page.goto("/");
+  await view(page).getByRole("button", { name: "Open match report →" }).click();
+  await viewingAs(page).selectOption("2");
+  await expect(
+    report(page).getByRole("button", { name: "Copy match link" }),
+  ).toBeVisible();
 });
 
 test("a failed match load says so and Retry recovers", async ({ page }) => {
@@ -2694,12 +2862,13 @@ Expected: FAIL. There is no "Open match report →" button yet.
 `src/features/match-report/components/CopyLinkButton.tsx`:
 
 ```tsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { matchUrl } from "@/shared/site";
 import { copyText } from "@/shared/utils/clipboard";
 
 const COPIED_MS = 2500;
 
+/** `accountId` 0 is a player without a public account: the link opens the whole match. */
 export function CopyLinkButton({
   matchId,
   accountId,
@@ -2709,8 +2878,10 @@ export function CopyLinkButton({
 }) {
   const url = matchUrl(matchId, accountId);
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const field = useRef<HTMLInputElement>(null);
   useEffect(() => setState("idle"), [url]);
   useEffect(() => {
+    if (state === "failed") field.current?.focus();
     if (state !== "copied") return;
     const timer = setTimeout(() => setState("idle"), COPIED_MS);
     return () => clearTimeout(timer);
@@ -2727,10 +2898,25 @@ export function CopyLinkButton({
           )
         }
       >
-        {state === "copied" ? "Link copied" : "Copy link"}
+        {state === "copied"
+          ? "Link copied"
+          : accountId === 0
+            ? "Copy match link"
+            : "Copy link"}
       </button>
+      <span
+        role="status"
+        className={state === "failed" ? "copy-link-note" : "visually-hidden"}
+      >
+        {state === "copied"
+          ? "Link copied to the clipboard."
+          : state === "failed"
+            ? "Couldn't copy the link. Copy it from here:"
+            : ""}
+      </span>
       {state === "failed" && (
         <input
+          ref={field}
           className="copy-link-fallback"
           aria-label="Match link"
           readOnly
@@ -2828,6 +3014,7 @@ export function ReportBanner({
         <OptionalImage src={hero?.backgroundImage} className="hero-art-bg" />
       </div>
       <Picture
+        key={selected.heroId}
         className="report-banner-portrait"
         src={hero?.cardImage ?? hero?.image}
         label={heroName(selected.heroId)}
@@ -2916,7 +3103,9 @@ export function Verdicts({
           <div className="verdict" key={v.label}>
             <small>{v.label}</small>
             <b>{v.value.toLocaleString("en-US")}</b>
-            {v.change === null ? (
+            {curve.loading ? (
+              <span className="muted">Loading…</span>
+            ) : v.change === null ? (
               <span className="muted">No rank average</span>
             ) : percent(v.change) === "0%" ? (
               <span className="muted">
@@ -2953,12 +3142,7 @@ export function Verdicts({
 import { SectionHeader } from "@/shared/ui/SectionHeader";
 import { compact, percent } from "../utils/format";
 import { buffs, impact } from "../utils/insights";
-import {
-  displayName,
-  heroName,
-  isMe,
-  possessive,
-} from "../utils/perspective";
+import { displayName, heroName, isMe, possessive } from "../utils/perspective";
 import type { RankCurve } from "../utils/rank-curve";
 import type { MatchReport, ReportPlayer } from "../utils/report";
 import { stretches } from "../utils/stretches";
@@ -2972,6 +3156,7 @@ export function PlayerInsights({
   report,
   curve,
   curveLoading,
+  curveFailed,
   names,
   meId,
 }: {
@@ -2979,6 +3164,7 @@ export function PlayerInsights({
   report: MatchReport;
   curve: RankCurve | null;
   curveLoading: boolean;
+  curveFailed: boolean;
   names: Map<number, string>;
   meId: number | null;
 }) {
@@ -2997,7 +3183,9 @@ export function PlayerInsights({
             ? `Souls against the average ${hero} at ${curve.band.label} at each snapshot · normal range = ±1 standard deviation`
             : curveLoading
               ? "Loading the rank average…"
-              : "No rank average for this match, so only deaths are listed."}
+              : curveFailed
+                ? "Rank average unavailable, so only deaths are listed."
+                : "No rank average for this match, so only deaths are listed."}
         </p>
         <ul className="stretches">
           {stretches(player, curve).map((s) => (
@@ -3011,8 +3199,8 @@ export function PlayerInsights({
       <div>
         <SectionHeader title="Impact" />
         <p className="data-note">
-          {possessive(name, isMe(player, meId))} share of the team's total · bars fill at half · the
-          line marks an even 1/6 share
+          {possessive(name, isMe(player, meId))} share of the team's total ·
+          bars fill at half · the line marks an even 1/6 share
         </p>
         <div className="impact">
           {rows.map((row) => (
@@ -3057,7 +3245,11 @@ export function PlayerInsights({
               {curve ? `Avg ${hero} at ${curve.band.label}` : "Rank average"}
             </dt>
             <dd>
-              {pickups.average === null ? "—" : pickups.average.toFixed(1)}
+              {curveLoading
+                ? "…"
+                : pickups.average === null
+                  ? "—"
+                  : pickups.average.toFixed(1)}
             </dd>
           </div>
         </dl>
@@ -3116,7 +3308,9 @@ export function Scoreboard({
               <th>Obj. dmg</th>
               <th>Healing</th>
               <th>Last hits</th>
-              <th aria-label="View as" />
+              <th>
+                <span className="visually-hidden">View as</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -3143,6 +3337,11 @@ export function Scoreboard({
                           {p.accountId > 0 && (
                             <RouteLink
                               className="report-player-link"
+                              aria-label={
+                                isMe(p, meId) || names.get(p.accountId)
+                                  ? undefined
+                                  : `${heroName(p.heroId)} player's profile`
+                              }
                               route={{
                                 page: "profile",
                                 accountId: p.accountId,
@@ -3169,7 +3368,11 @@ export function Scoreboard({
                       <button
                         type="button"
                         className="view-as-link"
-                        aria-label={`View as ${optionLabel(p, names, meId)}`}
+                        aria-label={
+                          current
+                            ? undefined
+                            : `View as ${optionLabel(p, names, meId)}`
+                        }
                         disabled={current}
                         onClick={() => onSelect(p.slot)}
                       >
@@ -3190,7 +3393,7 @@ export function Scoreboard({
 `src/features/match-report/components/MatchReportPage.tsx`:
 
 ```tsx
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RouteLink } from "@/app/links";
 import { useAsync } from "@/shared/api/useAsync";
 import { SectionHeader } from "@/shared/ui/SectionHeader";
@@ -3242,11 +3445,26 @@ function Report({
     [selected?.heroId, badge, report.durationS],
   );
   const top = useRef<HTMLDivElement>(null);
+  const viewing = useRef<HTMLSelectElement>(null);
+  const refocus = useRef(false);
+  // Focus once the selector names the new player, so it is read out.
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    viewing.current?.focus({ preventScroll: true });
+  }, [slot]);
   const select = (next: number | null) => setPicked({ slot: next });
-  // "View as" sits far down the page; bring the new point of view into sight.
+  // "View as" sits far down the page: bring the new point of view into
+  // sight and move focus to the selector, which now names that player.
   const viewAs = (next: number) => {
     select(next);
-    top.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    if (next === slot) viewing.current?.focus({ preventScroll: true });
+    else refocus.current = true;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    top.current?.scrollIntoView({
+      block: "start",
+      behavior: still ? "auto" : "smooth",
+    });
   };
   return (
     <>
@@ -3264,6 +3482,7 @@ function Report({
         <label className="view-as">
           Viewing as
           <select
+            ref={viewing}
             value={slot ?? "all"}
             onChange={(event) =>
               select(
@@ -3302,6 +3521,7 @@ function Report({
           report={report}
           curve={curve.data ?? null}
           curveLoading={curve.loading}
+          curveFailed={!!curve.error}
           names={names}
           meId={meId}
         />
@@ -3364,6 +3584,32 @@ export function MatchReportPage({
 .match-report > .notice {
   margin: 0;
 }
+.match-report .good {
+  color: var(--good);
+}
+.match-report .bad {
+  color: var(--bad);
+}
+/* Notes read as one paragraph, with Retry inline after the text. */
+.match-report .data-note {
+  display: block;
+}
+.match-report .retry {
+  margin-left: 4px;
+  padding: 0;
+  color: var(--gold);
+  font: 700 12px var(--font-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.match-report .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 /* Viewing as, back link and Copy link. */
 .report-bar {
@@ -3412,6 +3658,11 @@ export function MatchReportPage({
 .copy-link .profile-action {
   margin: 0;
 }
+.copy-link-note {
+  align-self: center;
+  color: var(--bad);
+  font-size: 12px;
+}
 .copy-link-fallback {
   width: min(320px, 100%);
   font-size: 12px;
@@ -3433,24 +3684,40 @@ export function MatchReportPage({
   padding: 24px 30px;
   overflow: hidden;
   border-block: 1px solid var(--line);
+}
+/* The win or loss tint sits above the hero art and below the text. */
+.report-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   background: linear-gradient(
     90deg,
     rgb(from var(--good) r g b / 0.1),
     transparent 60%
   );
+  pointer-events: none;
 }
-.report-banner.lost {
+.report-banner.lost::before {
   background: linear-gradient(
     90deg,
     rgb(from var(--bad) r g b / 0.12),
     transparent 60%
   );
 }
-.report-banner.whole {
+.report-banner.whole::before {
   background: linear-gradient(
     90deg,
     rgb(from var(--ally) r g b / 0.14),
     rgb(from var(--enemy) r g b / 0.14)
+  );
+}
+/* A lighter wash than the hero page's keeps text readable over the art. */
+.report-banner .hero-art::after {
+  background: linear-gradient(
+    90deg,
+    rgb(from var(--ink) r g b / 0.75),
+    transparent 70%
   );
 }
 .report-banner .hero-art-bg {
@@ -3655,14 +3922,12 @@ export function MatchReportPage({
   white-space: nowrap;
 }
 .report-table td {
+  height: auto;
   padding: 7px 10px;
   border-bottom: 1px solid var(--line-soft);
   font: 600 15px var(--font-label);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-.report-table tr.selected td {
-  background: rgb(from var(--gold) r g b / 0.08);
 }
 .report-player {
   display: flex;
@@ -3693,12 +3958,18 @@ export function MatchReportPage({
   text-transform: uppercase;
 }
 .view-as-link:disabled {
-  color: var(--dim);
+  color: var(--muted);
+  opacity: 1;
 }
 
 @media (max-width: 1000px) {
   .report-cols {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .report-table th,
+  .report-table td {
+    padding-right: 7px;
+    padding-left: 7px;
   }
 }
 ```
@@ -3782,7 +4053,7 @@ with:
         <div className="latest-links">
           <RouteLink
             className="latest-link"
-            route={{ page: "match", matchId: match.matchId, accountId }}
+            route={{ page: "match", matchId: match.matchId }}
           >
             Open match report →
           </RouteLink>
@@ -5208,7 +5479,7 @@ In `src/features/match-report/styles/match-report.css`, insert this block just b
 - [ ] **Step 7: Run the tests and confirm they pass**
 
 Run: `npx playwright test tests/browser/match-report.spec.ts`
-Expected: PASS (15 tests).
+Expected: PASS (19 tests).
 
 - [ ] **Step 8: Check and commit**
 
@@ -5731,7 +6002,7 @@ In `web/app/styles/phone.css`, inside `@media (max-width: 640px)`:
 - [ ] **Step 5: Run the tests and confirm they pass**
 
 Run: `npm test`, `npx tsc --noEmit`, `npm run web:typecheck`, `npm run test:browser` and `npm run test:web`.
-Expected: all pass. Browser: 114 desktop and 70 website tests.
+Expected: all pass. Browser: 118 desktop and 70 website tests.
 
 - [ ] **Step 6: Commit**
 
