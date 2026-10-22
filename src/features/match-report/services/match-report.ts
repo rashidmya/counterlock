@@ -67,8 +67,9 @@ export async function fetchRankCurve(
       widenedFrom: band.label,
       points: keep(await load(wider)),
     };
-  } catch {
+  } catch (error) {
     // The tier's own curve is still better than none.
+    if (!kept.length) throw error;
     return { band, points: kept };
   }
 }

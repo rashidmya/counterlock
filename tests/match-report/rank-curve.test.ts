@@ -74,6 +74,7 @@ describe("averageAt", () => {
     expect(averageAt(curve, metricById.get("level")!, 600)).toBeNull();
     expect(averageAt(curve, { ...souls, rate: true }, 90)).toBeNull();
     expect(averageAt(curve, souls, -10)).toBeNull();
+    expect(averageAt(curve, souls, NaN)).toBeNull();
   });
 });
 
@@ -142,5 +143,15 @@ describe("fetchRankCurve", () => {
     expect(result.band.label).toBe("Emissary");
     expect(result.widenedFrom).toBeUndefined();
     expect(result.points.length).toBeGreaterThan(0);
+  });
+
+  it("rethrows when the wider request fails and the tier has no usable steps", async () => {
+    const api = {
+      get: async (path: string) => {
+        if (!path.includes("min_average_badge=71")) throw new Error("down");
+        return rankCurveRows(5000).map((row) => ({ ...row, samples: 10 }));
+      },
+    } as unknown as DeadlockApi;
+    await expect(fetchRankCurve(7, 73, 0, api)).rejects.toThrow("down");
   });
 });

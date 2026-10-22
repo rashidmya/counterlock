@@ -116,7 +116,7 @@ export function averageAt(
     .filter((p) => field in p.avg)
     .map((p) => ({ t: p.t, avg: p.avg[field], std: p.std[field] ?? 0 }));
   if (!metric.rate) steps.unshift({ t: 0, avg: 0, std: 0 });
-  if (!steps.length || t < steps[0].t || t > steps.at(-1)!.t) return null;
+  if (!steps.length || !(t >= steps[0].t && t <= steps.at(-1)!.t)) return null;
   const next = steps.findIndex((step) => step.t >= t);
   const b = steps[next];
   if (b.t === t) return { avg: b.avg, std: b.std };
