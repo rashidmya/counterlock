@@ -30,12 +30,25 @@ describe("rank band", () => {
       label: "Ascendant–Eternus",
     });
     expect(rankBand(0)).toEqual({ min: 0, max: 0, label: "all ranks" });
+    expect(rankBand(13, 1)).toEqual({
+      min: 11,
+      max: 26,
+      label: "Initiate–Seeker",
+    });
+    const all = { min: 0, max: 0, label: "all ranks" };
+    expect(rankBand(5)).toEqual(all);
+    expect(rankBand(120)).toEqual(all);
   });
 
   it("takes the lobby's rank from the known badges", () => {
     const players = parseMatchReport(matchMetadata(1), 1).players;
     expect(lobbyBadge(players)).toBe(73);
     expect(lobbyBadge(players.map((p) => ({ ...p, badge: 0 })))).toBe(0);
+    expect(
+      lobbyBadge(
+        players.slice(0, 2).map((p, i) => ({ ...p, badge: [76, 81][i] })),
+      ),
+    ).toBe(81);
   });
 
   it("builds the curve path with absolute time and the band", () => {
@@ -59,6 +72,8 @@ describe("averageAt", () => {
     expect(averageAt(curve, souls, 2500)).toBeNull();
     expect(averageAt(curve, metricById.get("damageTaken")!, 600)).toBeNull();
     expect(averageAt(curve, metricById.get("level")!, 600)).toBeNull();
+    expect(averageAt(curve, { ...souls, rate: true }, 90)).toBeNull();
+    expect(averageAt(curve, souls, -10)).toBeNull();
   });
 });
 
@@ -79,7 +94,7 @@ describe("fetchRankCurve", () => {
 
   it("uses the badge's tier and drops thin late steps", async () => {
     const { calls, api } = recording(() => 5000);
-    const result = await fetchRankCurve(7, 73, api);
+    const result = await fetchRankCurve(7, 73, 0, api);
     expect(calls).toEqual([curvePath(7, rankBand(73))]);
     expect(result.band.label).toBe("Emissary");
     expect(result.widenedFrom).toBeUndefined();
@@ -90,12 +105,42 @@ describe("fetchRankCurve", () => {
     const { calls, api } = recording((path) =>
       path.includes("min_average_badge=71") ? 50 : 5000,
     );
-    const result = await fetchRankCurve(7, 73, api);
+    const result = await fetchRankCurve(7, 73, 0, api);
     expect(calls).toEqual([
       curvePath(7, rankBand(73)),
       curvePath(7, rankBand(73, 1)),
     ]);
     expect(result.band.label).toBe("Ritualist–Oracle");
     expect(result.widenedFrom).toBe("Emissary");
+  });
+
+  it("widens when the tier's games stop before the match ends", async () => {
+    const { calls, api } = recording(() => 5000);
+    const result = await fetchRankCurve(7, 73, 2200, api);
+    expect(calls).toHaveLength(2);
+    expect(result.band.label).toBe("Ritualist–Oracle");
+  });
+
+  it("never widens an all-ranks band", async () => {
+    const { calls, api } = recording(() => 5000);
+    const result = await fetchRankCurve(7, 0, 9999, api);
+    expect(calls).toHaveLength(1);
+    expect(result.band.label).toBe("all ranks");
+  });
+
+  it("keeps the tier's curve when the wider request fails", async () => {
+    const api = {
+      get: async (path: string) => {
+        if (!path.includes("min_average_badge=71")) throw new Error("down");
+        return rankCurveRows(5000).map((row, index) => ({
+          ...row,
+          samples: index === 0 ? 50 : row.samples,
+        }));
+      },
+    } as unknown as DeadlockApi;
+    const result = await fetchRankCurve(7, 73, 0, api);
+    expect(result.band.label).toBe("Emissary");
+    expect(result.widenedFrom).toBeUndefined();
+    expect(result.points.length).toBeGreaterThan(0);
   });
 });

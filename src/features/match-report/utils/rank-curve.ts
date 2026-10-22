@@ -32,10 +32,15 @@ const tierName = (tier: number, ranks: Rank[]) =>
 
 /** The lobby's rank: the rounded mean of known badges, 0 when none are known. */
 export function lobbyBadge(players: ReportPlayer[]): number {
+  // Average sub-rank positions (6 per tier), not badge numbers, which jump by 10.
+  const position = (badge: number) =>
+    Math.floor(badge / 10) * 6 + Math.min(6, Math.max(1, badge % 10)) - 1;
   const known = players.map((p) => p.badge).filter((badge) => badge > 0);
-  return known.length
-    ? Math.round(known.reduce((sum, badge) => sum + badge, 0) / known.length)
-    : 0;
+  if (!known.length) return 0;
+  const mean = Math.round(
+    known.reduce((sum, badge) => sum + position(badge), 0) / known.length,
+  );
+  return Math.floor(mean / 6) * 10 + (mean % 6) + 1;
 }
 
 /** All six sub-ranks of the badge's tier, `widen` tiers either side. */
@@ -46,7 +51,8 @@ export function rankBand(
 ): RankBand {
   const tier = Math.floor(badge / 10);
   const top = Math.max(...ranks.map((rank) => rank.tier));
-  if (tier < 1 || tier > top) return { min: 0, max: 0, label: "all ranks" };
+  if (!(tier >= 1 && tier <= top))
+    return { min: 0, max: 0, label: "all ranks" };
   const low = Math.max(1, tier - widen);
   const high = Math.min(top, tier + widen);
   return {
@@ -77,6 +83,7 @@ export function parseCurve(data: unknown): CurvePoint[] {
       const avg: Record<string, number> = {};
       const std: Record<string, number> = {};
       for (const [key, value] of Object.entries(r)) {
+        if (key.startsWith("game_time")) continue;
         if (typeof value !== "number" || !Number.isFinite(value)) continue;
         if (key.endsWith("_avg")) avg[key.slice(0, -4)] = value;
         else if (key.endsWith("_std")) std[key.slice(0, -4)] = value;
@@ -112,7 +119,7 @@ export function averageAt(
   if (!steps.length || t < steps[0].t || t > steps.at(-1)!.t) return null;
   const next = steps.findIndex((step) => step.t >= t);
   const b = steps[next];
-  if (b.t === t || next === 0) return { avg: b.avg, std: b.std };
+  if (b.t === t) return { avg: b.avg, std: b.std };
   const a = steps[next - 1];
   const f = (t - a.t) / (b.t - a.t);
   return { avg: a.avg + f * (b.avg - a.avg), std: a.std + f * (b.std - a.std) };

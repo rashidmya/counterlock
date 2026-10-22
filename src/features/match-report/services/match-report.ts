@@ -7,6 +7,8 @@ import {
   curvePath,
   parseCurve,
   rankBand,
+  type CurvePoint,
+  type RankBand,
   type RankCurve,
 } from "../utils/rank-curve";
 
@@ -36,25 +38,37 @@ export async function fetchPlayerNames(
   }
 }
 
-/** The hero's rank-average curve for the badge's tier, one tier wider each way when thin. */
+/**
+ * The hero's rank-average curve for the badge's tier, widened one tier each
+ * way when the tier is thin: too few games at the first step, or too few
+ * lasting as long as the match (`durationS`).
+ */
 export async function fetchRankCurve(
   heroId: number,
   badge: number,
+  durationS = 0,
   api: DeadlockApi = deadlockApi,
 ): Promise<RankCurve> {
-  const load = (band: ReturnType<typeof rankBand>) =>
+  const load = (band: RankBand) =>
     api.get<unknown>(curvePath(heroId, band), TTL.analytics).then(parseCurve);
-  let band = rankBand(badge);
-  let points = await load(band);
-  let widenedFrom: string | undefined;
-  if (band.min > 0 && (points[0]?.samples ?? 0) < MIN_CURVE_SAMPLES) {
-    widenedFrom = band.label;
-    band = rankBand(badge, 1);
-    points = await load(band);
+  const keep = (points: CurvePoint[]) =>
+    points.filter((p) => p.samples >= MIN_STEP_SAMPLES);
+  const band = rankBand(badge);
+  const points = await load(band);
+  const kept = keep(points);
+  const thin =
+    (points[0]?.samples ?? 0) < MIN_CURVE_SAMPLES ||
+    (kept.at(-1)?.t ?? 0) < durationS;
+  if (band.min === 0 || !thin) return { band, points: kept };
+  const wider = rankBand(badge, 1);
+  try {
+    return {
+      band: wider,
+      widenedFrom: band.label,
+      points: keep(await load(wider)),
+    };
+  } catch {
+    // The tier's own curve is still better than none.
+    return { band, points: kept };
   }
-  return {
-    band,
-    widenedFrom,
-    points: points.filter((p) => p.samples >= MIN_STEP_SAMPLES),
-  };
 }
