@@ -91,6 +91,7 @@
   font-size: 12px;
 }
 .report-note {
+  overflow-wrap: anywhere;
   margin: 8px 0 12px;
   color: var(--dim);
   font-size: 12px;
@@ -188,6 +189,7 @@
   text-transform: uppercase;
 }
 .report-stats dd {
+  overflow-wrap: anywhere;
   margin: 0;
   font: 700 20px var(--font-label);
   font-variant-numeric: tabular-nums;
@@ -612,7 +614,13 @@
   color: var(--enemy);
 }
 .report-table-wrap {
+  /* Holds the visually hidden header label, which would widen the page. */
+  position: relative;
   overflow-x: auto;
+}
+/* An old phone rule hides every table's last column; keep "View as". */
+.report-table :is(th, td):last-child {
+  display: table-cell;
 }
 .report-table {
   width: 100%;

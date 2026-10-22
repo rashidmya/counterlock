@@ -21,6 +21,14 @@ describe("web paths", () => {
     expect(routeToPath({ page: "profile" })).toBe("/");
   });
 
+  it("maps match reports, with the player the viewer came from", () => {
+    expect(routeToPath({ page: "match", matchId: 5, accountId: 7 })).toBe(
+      "/matches/5?player=7",
+    );
+    expect(routeToPath({ page: "match", matchId: 5 })).toBe("/matches/5");
+    expect(routeToPath({ page: "match" })).toBe("/");
+  });
+
   it("sends app-only pages to home", () => {
     expect(routeToPath({ page: "live" })).toBe("/");
   });

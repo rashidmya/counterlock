@@ -322,4 +322,17 @@
     grid-template-columns: 96px minmax(0, 1fr) 76px;
     gap: 8px;
   }
+  .app.web
+    :is(
+      .report-back,
+      .report-graph .segmented button,
+      .graph-ranking button,
+      .report-graph .graph-check
+    ) {
+    min-height: 36px;
+  }
+  .app.web .report-player-link {
+    display: inline-block;
+    padding: 6px 0;
+  }
 }

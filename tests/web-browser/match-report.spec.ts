@@ -67,3 +67,43 @@ test("the report banner runs edge to edge; its text keeps the gutter", async ({
     page.locator(".report-banner .report-stats dd").nth(1),
   ).toHaveText(heroes[0].name);
 });
+
+test("ids must be real: 0 is not a match, and ?player=0 is ignored", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto("/matches/0");
+  await expect(page.locator("h1")).toHaveText("That isn't a valid match ID.");
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    "content",
+    "noindex",
+  );
+  await page.goto("/matches/1001?player=0");
+  await expect(page.locator(".report-result")).toHaveText("Amber won");
+  await expect(page.getByRole("link", { name: "← Home" })).toBeVisible();
+});
+
+test("no sideways page scroll at tablet widths", async ({ page }) => {
+  await mockApi(page);
+  for (const width of [700, 900]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`/matches/1001?player=${FARGO}`);
+    await expect(page.locator(".report-table tbody tr").first()).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(width);
+  }
+});
+
+test("View as brings the bar into sight below the sticky header", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto(`/matches/1001?player=${FARGO}`);
+  await page.locator(".graph-ranking li").first().getByRole("button").click();
+  const header = (await page.locator(".app.web > header").boundingBox())!;
+  await expect
+    .poll(async () => (await page.locator(".report-bar").boundingBox())!.y)
+    .toBeGreaterThanOrEqual(header.y + header.height);
+  await expect(viewingAs(page)).toBeFocused();
+});

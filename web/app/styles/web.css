@@ -152,6 +152,10 @@
 .app.web .report-banner .hero-art-bg {
   right: calc(var(--gut) + 2%);
 }
+/* "View as" scrolls the bar to the top; keep it clear of the sticky header. */
+.app.web .report-bar {
+  scroll-margin-top: 78px;
+}
 .app.web .home-hero {
   margin: calc(-1 * var(--page-top)) calc(-1 * var(--gut)) 0;
   padding: calc(var(--page-top) + 24px) var(--gut) 6px;
@@ -219,5 +223,8 @@
   }
   .app.web .tabs a {
     min-height: 44px;
+  }
+  .app.web .report-bar {
+    scroll-margin-top: 120px;
   }
 }

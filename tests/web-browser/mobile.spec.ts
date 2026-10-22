@@ -256,6 +256,9 @@ test.describe("phone width (375px)", () => {
     await expect(page.locator(".verdict span").first()).toContainText("▲");
     expect((await overflow(page)).scroll).toBeLessThanOrEqual(375);
     expect(await clipped(page, 375)).toEqual([]);
+    await expect(
+      page.locator(".report-table .view-as-link").first(),
+    ).toBeVisible();
     const wrap = page.locator(".report-table-wrap").first();
     expect(
       await wrap.evaluate((node) => node.scrollWidth > node.clientWidth),
