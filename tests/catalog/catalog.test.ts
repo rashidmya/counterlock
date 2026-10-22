@@ -123,4 +123,14 @@ describe("catalog", () => {
       );
     }
   });
+
+  it("item upgrade chains have no cycles", () => {
+    const walk = (className: string, path: string[]) => {
+      expect(path, `cycle at ${className}`).not.toContain(className);
+      for (const part of itemByClass.get(className)?.components ?? [])
+        walk(part, [...path, className]);
+    };
+    for (const item of catalog.items)
+      if (item.className) walk(item.className, []);
+  });
 });

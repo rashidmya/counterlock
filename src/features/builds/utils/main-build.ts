@@ -20,7 +20,7 @@ export interface MainBuildPhase extends Phase {
 
 export const PHASE_SIZE = 8;
 export const MIN_SHARE_OF_TOP = 0.05;
-export const PHASES: Phase[] = [
+export const PHASES: readonly Phase[] = [
   { key: "early", label: "Early", range: "0–10 min", fromS: 0, toS: 600 },
   { key: "mid", label: "Mid", range: "10–20 min", fromS: 600, toS: 1200 },
   { key: "late", label: "Late", range: "20+ min", fromS: 1200 },
@@ -62,7 +62,9 @@ export function mainBuild(rowsByPhase: ItemStatsRow[][]): MainBuildPhase[] {
   const listed = new Set<number>();
   return PHASES.map((phase, index) => {
     const items = pickPhase(rowsByPhase[index] ?? [], listed);
-    items.forEach((item) => listed.add(item.itemId));
+    items.forEach((item) =>
+      [item.itemId, ...partsOf(item.itemId)].forEach((id) => listed.add(id)),
+    );
     return { ...phase, items };
   });
 }

@@ -85,6 +85,31 @@ describe("mainBuild", () => {
     ]);
     expect(ids(early)).toEqual([chain.id]);
   });
+  it("drops a component two upgrades down even without the middle item", () => {
+    const [early] = mainBuild([
+      [row(root.id, 1000, 100), row(chain.id, 900, 300)],
+      [],
+      [],
+    ]);
+    expect(ids(early)).toEqual([chain.id]);
+  });
+  it("drops a component of an upgrade listed in an earlier phase", () => {
+    const [, mid] = mainBuild([
+      [row(upgrade.id, 1000, 300)],
+      [row(component.id, 2000, 700), row(others[0].id, 900, 800)],
+      [],
+    ]);
+    expect(ids(mid)).toEqual([others[0].id]);
+  });
+  it("keeps an upgrade of an item listed in an earlier phase", () => {
+    const [early, mid] = mainBuild([
+      [row(component.id, 1000, 100)],
+      [row(upgrade.id, 900, 700)],
+      [],
+    ]);
+    expect(ids(early)).toEqual([component.id]);
+    expect(ids(mid)).toEqual([upgrade.id]);
+  });
   it("drops items listed in an earlier phase", () => {
     const [early, mid] = mainBuild([
       [row(others[0].id, 1000, 100)],
