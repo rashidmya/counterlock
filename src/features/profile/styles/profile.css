@@ -467,7 +467,8 @@
   gap: 10px 16px;
   margin-bottom: 0;
 }
-.performance .data-note {
+.performance .data-note,
+.performance > .notice {
   margin: 0;
 }
 .performance-legend {
@@ -554,7 +555,7 @@
 }
 .perf-card-numbers span {
   font-size: 11.5px;
-  color: var(--dim);
+  color: var(--muted);
 }
 .sparkline {
   height: 80px;

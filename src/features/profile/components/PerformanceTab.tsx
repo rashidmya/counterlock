@@ -28,7 +28,8 @@ import { Sparkline } from "./Sparkline";
 const heroName = (heroId: number) =>
   heroById.get(heroId)?.name ?? `Hero ${heroId}`;
 
-const count = (games: number) => `${games} ${games === 1 ? "game" : "games"}`;
+const count = (games: number) =>
+  `${games.toLocaleString("en-US")} ${games === 1 ? "game" : "games"}`;
 
 const format = (metric: PerformanceMetric, value: number) =>
   metric.percent
@@ -38,9 +39,9 @@ const format = (metric: PerformanceMetric, value: number) =>
       : value.toFixed(1);
 
 const TRENDS = {
-  improving: "▲ Improving",
-  flat: "– Flat",
-  slipping: "▼ Slipping",
+  improving: ["▲", "Improving"],
+  flat: ["–", "Flat"],
+  slipping: ["▼", "Slipping"],
 };
 
 function PerformanceCard({
@@ -79,6 +80,14 @@ function PerformanceCard({
                   ? // Like with like: the player over the same games.
                     ` · ${compared} with a rank average: ${format(metric, comparedValue!)} vs ${format(metric, average)}`
                   : ` · rank avg ${format(metric, average)}`);
+  // No badge while what the trend needs loads or failed, or when no game
+  // has a rank average to follow.
+  const tooFew =
+    !trend &&
+    !waiting &&
+    !failed &&
+    games > 0 &&
+    (!metric.average || average !== null);
   const title = (p: GamePoint) =>
     `${heroName(p.heroId)} · ${p.won ? "Win" : "Loss"} · ${timeAgo(p.startTime * 1000)}: ` +
     format(metric, p.value!) +
@@ -87,16 +96,16 @@ function PerformanceCard({
     <section className="perf-card" aria-label={metric.label}>
       <div className="perf-card-head">
         <h3>{metric.label}</h3>
-        {trend ? (
-          <span className={`perf-trend ${trend}`}>{TRENDS[trend]}</span>
-        ) : (
-          !waiting &&
-          !failed &&
-          games > 0 && <span className="perf-trend">Too few games</span>
+        {trend && (
+          <span className={`perf-trend ${trend}`}>
+            <span aria-hidden="true">{TRENDS[trend][0]}</span>{" "}
+            {TRENDS[trend][1]}
+          </span>
         )}
+        {tooFew && <span className="perf-trend">Too few games</span>}
       </div>
       <div className="perf-card-numbers">
-        <b>{value === null ? "—" : format(metric, value)}</b>
+        <b>{value === null ? "—" : format(metric, value)}</b>{" "}
         <span>{detail}</span>
       </div>
       {games > 0 && (
@@ -150,9 +159,11 @@ export function PerformanceTab({
   history: AsyncState<HistoryMatch[]>;
 }) {
   const [range, setRange] = useState<PerformanceRange>(20);
-  const [heroId, setHeroId] = useState<number | null>(null);
+  const [picked, setPicked] = useState<number | null>(null);
   const matches = history.data ?? [];
   const heroes = heroChoices(matches);
+  // All heroes when the picked one has no games (left the history).
+  const heroId = heroes.some((h) => h.heroId === picked) ? picked : null;
   const games = gamesInRange(matches, range, heroId);
   const key = games.map((g) => g.matchId).join(",");
   const totals = useAsync(
@@ -193,7 +204,7 @@ export function PerformanceTab({
             <select
               value={heroId ?? ""}
               onChange={(event) =>
-                setHeroId(
+                setPicked(
                   event.target.value ? Number(event.target.value) : null,
                 )
               }
@@ -222,6 +233,22 @@ export function PerformanceTab({
       )}
       {!!games.length && (
         <>
+          {totals.error && (
+            <p className="notice warning" role="status">
+              Match details unavailable: {totals.error}
+              <button type="button" onClick={totals.retry}>
+                Retry
+              </button>
+            </p>
+          )}
+          {averages.error && (
+            <p className="notice warning" role="status">
+              Rank averages unavailable: {averages.error}
+              <button type="button" onClick={averages.retry}>
+                Retry
+              </button>
+            </p>
+          )}
           <div className="performance-legend" aria-hidden="true">
             <span>
               <i className="value" />
@@ -248,22 +275,6 @@ export function PerformanceTab({
               />
             ))}
           </div>
-          {totals.error && (
-            <p className="notice warning" role="status">
-              Match details unavailable: {totals.error}
-              <button type="button" onClick={totals.retry}>
-                Retry
-              </button>
-            </p>
-          )}
-          {averages.error && (
-            <p className="notice warning" role="status">
-              Rank averages unavailable: {averages.error}
-              <button type="button" onClick={averages.retry}>
-                Retry
-              </button>
-            </p>
-          )}
           {notes(games, totals.data, averages.data).map((line) => (
             <p key={line} className="data-note">
               {line}

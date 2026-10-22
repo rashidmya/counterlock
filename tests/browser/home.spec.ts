@@ -71,6 +71,7 @@ interface Fixtures {
   heroStats?: unknown[];
   failTotals?: boolean;
   failCurve?: boolean;
+  unstoredTotals?: number[];
 }
 
 async function routeApi(page: Page, fixtures: Fixtures = {}) {
@@ -127,7 +128,11 @@ async function routeApi(page: Page, fixtures: Fixtures = {}) {
     if (url.pathname === "/v1/matches/metadata")
       return fixtures.failTotals
         ? json({}, 500)
-        : json(bulkMetadata(url, ACCOUNT));
+        : json(
+            bulkMetadata(url, ACCOUNT).filter(
+              (match) => !fixtures.unstoredTotals?.includes(match.match_id),
+            ),
+          );
     if (url.pathname === "/v1/analytics/player-performance-curve")
       return fixtures.failCurve ? json({}, 500) : json(rankCurveRows());
     if (url.pathname.endsWith("/metadata")) return json(matchMetadata(ACCOUNT));
@@ -665,24 +670,24 @@ test("performance tab compares each metric with the rank average", async ({
   // Last 20: ten games at 1,000 souls a minute, then ten at 1,200.
   const souls = card(page, "Souls / min");
   await expect(souls.locator(".perf-card-numbers")).toHaveText(
-    "1,10020 games · rank avg 1,000",
+    "1,100 20 games · rank avg 1,000",
   );
   await expect(souls.locator(".perf-trend")).toHaveText("▲ Improving");
   await expect(
     card(page, "K/D/A ratio").locator(".perf-card-numbers"),
-  ).toHaveText("3.420 games · rank avg 2.7");
+  ).toHaveText("3.4 20 games · rank avg 2.7");
   await expect(card(page, "K/D/A ratio").locator(".perf-trend")).toHaveText(
     "– Flat",
   );
   await expect(
     card(page, "Hero damage / min").locator(".perf-card-numbers"),
-  ).toHaveText("1,00020 games · rank avg 500");
+  ).toHaveText("1,000 20 games · rank avg 500");
   await expect(
     card(page, "Kill participation").locator(".perf-card-numbers"),
-  ).toHaveText("57%20 games · no rank average");
+  ).toHaveText("57% 20 games · no rank average");
   await expect(
     card(page, "Hero damage share").locator(".perf-card-numbers"),
-  ).toHaveText("29%20 games · no rank average");
+  ).toHaveText("29% 20 games · no rank average");
 
   await expect(dots(page, "Souls / min")).toHaveCount(20);
   await expect(
@@ -711,13 +716,17 @@ test("performance tab compares each metric with the rank average", async ({
   await page.getByRole("button", { name: "Last 100", exact: true }).click();
   await expect(dots(page, "Souls / min")).toHaveCount(60);
 
-  // One hero: its 30 games, the newest 20 of them.
+  // One hero: its 30 games, then the newest 20 of them (odd indices 1–39,
+  // five of them at 1,200 souls a minute).
   await page
     .getByRole("combobox", { name: "Hero" })
     .selectOption({ label: `${heroName(heroes[1])} · 30 games` });
+  await expect(dots(page, "Souls / min")).toHaveCount(30);
   await page.getByRole("button", { name: "Last 20", exact: true }).click();
   await expect(dots(page, "Souls / min")).toHaveCount(20);
-  await expect(souls.locator(".perf-card-numbers")).toContainText("20 games");
+  await expect(souls.locator(".perf-card-numbers")).toHaveText(
+    "1,050 20 games · rank avg 1,000",
+  );
 });
 
 test("performance tab says so with too few games", async ({ page }) => {
@@ -758,7 +767,31 @@ test("performance tab compares like with like when a game outlasts the rank aver
   // one: 60,000 souls over 80 minutes overall, 1,000 a minute in that game.
   await expect(
     card(page, "Souls / min").locator(".perf-card-numbers"),
-  ).toHaveText("7502 games · 1 with a rank average: 1,000 vs 1,000");
+  ).toHaveText("750 2 games · 1 with a rank average: 1,000 vs 1,000");
+});
+
+test("performance tab counts games without match details yet", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, {
+    history: performanceHistory,
+    unstoredTotals: [3005, 3006],
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    view(page).getByText(
+      "2 of 20 games have no match details yet, so they're missing from damage, healing, creep kills and shares.",
+    ),
+  ).toBeVisible();
+  const damage = card(page, "Hero damage / min");
+  await expect(damage.locator(".perf-card-numbers")).toContainText("18 games");
+  // The line breaks where the two games are missing.
+  await expect(damage.locator(".spark-value")).toHaveAttribute(
+    "d",
+    /^M[^M]+M[^M]+$/,
+  );
 });
 
 test("performance tab keeps history values when details and averages fail", async ({
@@ -784,11 +817,11 @@ test("performance tab keeps history values when details and averages fail", asyn
   ).toBeVisible();
   await expect(
     card(page, "Souls / min").locator(".perf-card-numbers"),
-  ).toHaveText("1,10020 games");
+  ).toHaveText("1,100 20 games");
   await expect(dots(page, "Souls / min")).toHaveCount(20);
   await expect(
     card(page, "Hero damage / min").locator(".perf-card-numbers"),
-  ).toHaveText("—No match details");
+  ).toHaveText("— No match details");
   await expect(card(page, "Hero damage / min").locator("svg")).toHaveCount(0);
   await expect(view(page).locator(".perf-trend")).toHaveCount(0);
 });
