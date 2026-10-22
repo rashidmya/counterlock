@@ -17,7 +17,7 @@
 - **Popular builds sort:** `sort_by=weekly_favorites` is stale. Unfiltered, it returns a 2024 build with 1,803 weekly favourites. With a date filter, every count is `null` and the order is arbitrary. Use **`sort_by=favorites&sort_direction=desc&only_latest=true`** with **`min_unix_timestamp` = 60 days ago** (UTC day-rounded so the URL is cacheable) and **`limit=5`**. Prefer English (`build_language=English`), and fall back automatically to all languages when the hero has no English builds (no toggle; YAGNI). **Newer heroes have no favourite counts** (`num_favorites: null` on every build for Violet, Nurse Harrow and Baba), so when no returned build has a count above 0 the list is re-fetched with `sort_by=updated_at` and labelled as most recently updated (`ranked: false`).
 - **Build contents as authored:** about 12% of categories have an empty name, and many use the game's localisation keys (`#Citadel_HeroBuilds_EarlyGame` …). Some categories have no items, only a description (e.g. "Notes"). Items often carry an author **annotation**. All of these are kept: mapped key names (existing rule), "Items" for an empty name, description shown, annotation in the tile's tooltip.
 - **Build authors:** builds give only `author_account_id`. Names come from one batched `GET /v1/players/steam?account_ids=…` (existing `fetchSteamProfiles`). The author is left out when the lookup fails.
-- **Counter items rank by win-rate *lift*, not raw win rate (deviation from the spec's wording).** Ranking by raw win rate returns only 6,400-soul late items, because players who are ahead can afford them; the prototype's cards (Frenzy, Glass Cannon, Spellslinger… all 6,400) show this. For each picked enemy E, `lift_E = winRate(item | hero, vs E) − winRate(item | hero) − shift_E`, where `shift_E` corrects for the matchup itself. This is the same method today's "Counter items" section uses (`counterItems()`). An item's score is the average lift over the picked enemies that have data, with missing data counted as 0. The card says which enemies it does well against (lift > 0). The one-line label says exactly this.
+- **Counter items rank by win-rate *lift*, not raw win rate (deviation from the spec's wording).** Ranking by raw win rate returns only 6,400-soul late items, because players who are ahead can afford them; the prototype's cards (Frenzy, Glass Cannon, Spellslinger… all 6,400) show this. For each picked enemy E, `lift_E = winRate(item | hero, vs E) − winRate(item | hero) − shift_E`, where `shift_E` corrects for the matchup itself. This is the same method today's "Counter items" section uses (`counterItems()`). An item's lift is the average over the picked enemies that have data (at least one item row with 200+ matches), with missing data counted as 0. **Items are ranked by a lower confidence bound** (`lift − 3·SE`, binomial SE per enemy; with ~140 candidate items per enemy, 2·SE still let 2–3 noise items through in a null simulation) and kept only when that bound is above 0: on live data a plain average with a 200-match floor mostly picked lucky small samples (Refresher at 419 games vs Abrams), while the bound surfaces believable counters (Inhibitor, Silencer, Crippling Headshot vs Seven). This also lets the rules-based fallback fire when data is thin. The card says which enemies it clearly does better against (that enemy's own bound above 0) and shows the lift and "{N}+ games" (the largest single-enemy sample, a lower bound, since a game against several picked enemies would otherwise be counted more than once), not a raw win rate (a positive-lift item can sit below 50%). The one-line label says exactly this.
 - **Live tab counter panel is unchanged** (spec: Live keeps today's content). Data-driven counter items live on the hero page only.
 - **In a desktop match the counter enemies are read-only:** they come from the GEP roster, as the spec says. The picker only appears outside a match, and always on the website.
 - `CompactBuild` / `useMeasuredBuild` / `loadBuild` (overlay) stay untouched; phase 6 deletes them. `recommendedBuild()` (unused; the spec says the new main build replaces it) is deleted now.
@@ -26,7 +26,7 @@
 
 - Every colour comes from `src/app/styles/tokens.css` (`var(--token)`, `rgb(from var(--token) r g b / a)` or `color-mix(…)`). `tests/app/theme.test.ts` fails on any hex literal in `src/**/*.css`, `web/app/**/*.css` or `src/**/*.tsx`.
 - Fonts and components are as in phase 1: Rajdhani uppercase for tab labels, phase labels and category names; Playfair Display SC for the popular build's title; DM Sans for body; `SectionHeader` for section titles.
-- **Constants (export them; tests import them):** `PHASE_SIZE = 8`, `MIN_SHARE_OF_TOP = 0.05`, `POPULAR_BUILDS = 5`, `BUILD_WINDOW_DAYS = 60`, `MIN_VERSUS_MATCHES = 200`, `COUNTER_ITEMS = 6`, `MAX_ENEMIES = 6`.
+- **Constants (export them; tests import them):** `PHASE_SIZE = 8`, `MIN_SHARE_OF_TOP = 0.05`, `POPULAR_BUILDS = 5`, `BUILD_WINDOW_DAYS = 60`, `MIN_VERSUS_MATCHES = 200`, `CONFIDENCE_Z = 3`, `COUNTER_ITEMS = 6`, `MAX_ENEMIES = 6`.
 - **Copy strings fixed by this plan (tests assert them):**
   - tabs "Build" and "Popular builds" (count badge `small.tab-count`);
   - phase labels "Early" / "0–10 min", "Mid" / "10–20 min", "Late" / "20+ min", and the live-phase tag "Now";
@@ -36,11 +36,11 @@
   - popular builds notes "Most-favourited builds updated in the last 60 days, shown exactly as their authors set them up." or, when `ranked` is false, "Most recently updated builds, shown exactly as their authors set them up. This hero has no favourite counts yet."; when not English, either gets the prefix "No English builds yet, so these are in other languages. ";
   - popular builds empty line "No community builds for this hero were updated in the last 60 days.";
   - build meta "by {author} · Updated {10 Oct 2026} · {42} items in {6} categories · {199} favourites", with "by …" omitted when unknown and "· {n} favourites" omitted when `favorites` is `null`;
-  - counter section title "Counter items"; its note "How much better each item does for {Hero} players against these heroes than in all {Hero} games · {rank} · last 30 days.";
+  - counter section title "Counter items"; its note "Items that gain the most win rate for {Hero} against these heroes, compared with all {Hero} games and allowing for the matchup itself. Only clear gains are shown · {rank} · last 30 days.";
   - picker label "Enemy team"; buttons "Add enemy hero", "Remove {Hero}", "Clear", "Done"; chooser group "Choose enemy heroes";
   - picker empty line "Pick up to 6 enemy heroes to see items that do well against them.";
   - live line "Enemy team from your live match.";
-  - card body "+5.0% vs these heroes · 55.0% win · 6,000 games"; first card label "CONSIDER FIRST", others the category in upper case;
+  - card body "+5.0% vs these heroes · 3,000+ games"; first card label "CONSIDER FIRST", others the category in upper case;
   - fallback note "Based on hero traits — not enough match data for these heroes yet." and the error form "Match data unavailable: {error}. Based on hero traits instead.";
   - fallback empty line "No suggestions for these heroes yet.";
   - renamed section "Items that beat {Hero}";
@@ -64,6 +64,8 @@
 ---
 
 ### Task 1: Main build — phase picks and fetch
+
+> Revised after code review: `mainBuild` also marks the parts of each pick as listed, so a later phase never lists a component of an earlier upgrade; `PHASES` is `readonly`. The committed code is the reference.
 
 **Files:**
 - Create: `src/features/builds/utils/main-build.ts`
@@ -374,6 +376,8 @@ git commit -m "feat(builds): main build picks per phase from item stats"
 
 ### Task 2: Popular builds — parse as authored and fetch
 
+> Revised after code review: `favorites` is `number | null`, `PopularBuildsResult` has `ranked`, unranked lists reload with `sort_by=updated_at` (failure keeps the first list) and have their counts cleared, the parser has no `any`, and descriptions cap at 4000 characters. The committed code is the reference.
+
 **Files:**
 - Create: `src/features/builds/utils/popular-builds.ts`
 - Create: `src/features/builds/services/popular-builds.ts`
@@ -673,6 +677,8 @@ describe("fetchPopularBuilds", () => {
 ---
 
 ### Task 3: Counter items — per-enemy lift and fetch
+
+> Revised after code review: `counterItemsVs` ranks by a lower confidence bound and `CounterPick` has no `winRate` (see Decisions). The code below is the first version; the committed code is the reference.
 
 **Files:**
 - Create: `src/features/counters/utils/matchup-items.ts`
@@ -1100,7 +1106,7 @@ case "/v1/players/steam":
 - `DesktopApp` passes `liveEnemies={status === "in-match" ? counters.teams.enemies.map((p) => p.heroId) : []}` to `HeroesPage`. The website passes nothing.
 
 **Behaviour** (markup in `div.counter-items`):
-1. `p.data-note`: "How much better each item does for {Hero} players against these heroes than in all {Hero} games · {rankLabel} · last 30 days."
+1. `p.data-note`: "Items that gain the most win rate for {Hero} against these heroes, compared with all {Hero} games and allowing for the matchup itself. Only clear gains are shown · {rankLabel} · last 30 days."
 2. `div.enemy-picker`:
    - `span.picker-label` "Enemy team".
    - **Live** (`liveEnemies.length > 0`): a `span.enemy-slot.filled` per enemy (`Picture` with the hero's `cardImage ?? image`, `title` = name), then `p.picker-note` "Enemy team from your live match.". No buttons.
@@ -1112,7 +1118,7 @@ case "/v1/players/steam":
 4. Results:
    - No enemies: `p.muted` "Pick up to 6 enemy heroes to see items that do well against them."
    - Loading: `p.muted` "Loading…".
-   - Data (`picksVs.length`): `div.counter-cards` of `CounterCard`. Label "CONSIDER FIRST" for the first, the category upper-cased for the rest. Body `+{(lift*100).toFixed(1)}% vs these heroes · {(winRate*100).toFixed(1)}% win · {matches.toLocaleString()} games`. Targets are the `against` hero names.
+   - Data (`picksVs.length`): `div.counter-cards` of `CounterCard`. Label "CONSIDER FIRST" for the first, the category upper-cased for the rest. Body `+{(lift*100).toFixed(1)}% vs these heroes · {matches.toLocaleString()}+ games`. Targets are the `against` hero names (may be empty).
    - Fallback: `p.data-note` with "Based on hero traits — not enough match data for these heroes yet.", or "Match data unavailable: {error}. Based on hero traits instead." followed by a Retry `button.retry`. Then `div.counter-cards` of `CounterCard` with `reasons.join(" ")` and `targets`. If the fallback is empty too: `p.muted` "No suggestions for these heroes yet."
 
 **CSS** (`counters.css`, tokens only; look from the prototype's `.picker`, `.slot`, `.ccards`):
@@ -1144,13 +1150,13 @@ const counterVs = {
   - `counter items: pick enemies and see what does well against them`:
     - `openHaze(page, { heroItems: counterBase, vsEnemy: counterVs })`;
     - section "Counter items" shows "Pick up to 6 enemy heroes…";
-    - click "Add enemy hero", then the choice named `strongA.name`; the `.item-card` list is `[bestA]` with text "+10.0% vs these heroes · 60.0% win · 3,000 games" and target `strongA.name`;
+    - click "Add enemy hero", then the choice named `strongA.name`; the `.item-card` list is `[bestA]` with text "+10.0% vs these heroes · 3,000+ games" and target `strongA.name`;
     - the label is "CONSIDER FIRST";
-    - pick `strongB`: cards are `[bestA, bestB]`, the first body has "+5.0% vs these heroes · 55.0% win · 6,000 games", the second's targets are `[strongB.name]`;
+    - pick `strongB`: cards are `[bestA, bestB]`, the first body has "+5.0% vs these heroes · 3,000+ games", the second's targets are `[strongB.name]`;
     - there is no "Haze" choice in the chooser (`getByRole("button", { name: "Haze", exact: true })` inside `.enemy-choices` has count 0);
     - "Done" hides `.enemy-choices`;
     - `getByRole("button", { name: \`Remove ${strongB.name}\` })` → cards are `[bestA]`;
-    - the note contains "How much better each item does for Haze players".
+    - the note contains "Items that gain the most win rate for Haze against these heroes".
   - `re-picking an enemy reuses its cached request`:
     - record item-stats requests, reading parameters with `new URL(request.url()).searchParams` (substring checks would confuse `hero_id` with `enemy_hero_ids`);
     - pick strongA, pick strongB, remove strongB, pick strongB again;
@@ -1160,7 +1166,7 @@ const counterVs = {
   - `six picks disable the rest of the chooser`: pick 6 heroes; "Add enemy hero" is gone; 6 `.enemy-slot.filled`.
   - `in a live match the enemy team fills counter items`:
     - `nativeWindow(page, "desktop")` (import from `./helpers`; its roster has enemy hero 13 = Haze);
-    - `openHaze(page, { vsEnemy: { [haze.id]: vsRows(0.6, 0.5, 0.4) } }, strongA, "/desktop/desktop.html")`;
+    - `openHaze(page, { heroItems: counterBase, vsEnemy: { [haze.id]: vsRows(0.6, 0.5, 0.4) } }, strongA, "/desktop/desktop.html")`;
     - the section shows "Enemy team from your live match.", 1 `.enemy-slot.filled`, and no "Add enemy hero" button;
     - the first card's targets contain "Haze".
     - `openHaze` must click the Heroes tab after the auto-switch to Live, which the existing code already does via the "Heroes" button.
