@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
 import { heroThreats } from "../../src/features/counters/utils/recommendations";
-import { nativeWindow } from "./helpers";
+import { matchPlayers, nativeWindow, updateMatch } from "./helpers";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAHnOcQAAAAABJRU5ErkJggg==",
@@ -201,6 +201,8 @@ interface Fixtures {
   popular?: unknown[] | ((params: URLSearchParams) => unknown[]);
   vsEnemy?: Record<number, unknown[]>;
   url?: string;
+  // Phase (main build) responses wait for this when given.
+  phaseGate?: Promise<void>;
 }
 
 async function openHaze(
@@ -222,11 +224,12 @@ async function openHaze(
     popular = popularRows,
     vsEnemy = {},
     url: start = "/",
+    phaseGate,
   } = fixtures;
   await page.route("https://assets-bucket.deadlock-api.com/**", (route) =>
     route.fulfill({ body: PNG, contentType: "image/png", headers: cors }),
   );
-  await page.route("https://api.deadlock-api.com/**", (route) => {
+  await page.route("https://api.deadlock-api.com/**", async (route) => {
     const url = new URL(route.request().url());
     const json = (body: unknown) =>
       route.fulfill({ json: body, headers: cors });
@@ -241,8 +244,10 @@ async function openHaze(
         return json(abilityOrder);
       case "/v1/analytics/item-stats": {
         const p = url.searchParams;
-        if (p.has("min_bought_at_s"))
+        if (p.has("min_bought_at_s")) {
+          await phaseGate;
           return json(phases[Number(p.get("min_bought_at_s")) / 600] ?? []);
+        }
         if (p.has("hero_id") && p.has("enemy_hero_ids"))
           return json(vsEnemy[Number(p.get("enemy_hero_ids"))] ?? []);
         if (p.has("hero_id")) return json(forHero);
@@ -869,13 +874,18 @@ test("counter items: pick enemies and see what does well against them", async ({
   await counter.getByRole("button", { name: "Done", exact: true }).click();
   await expect(page.locator(".enemy-choices")).toBeHidden();
   await expect(add).toBeFocused();
-  await counter
-    .getByRole("button", { name: `Remove ${strongB.name}`, exact: true })
-    .click();
+  const removeB = counter.getByRole("button", {
+    name: `Remove ${strongB.name}`,
+    exact: true,
+  });
+  await expect(removeB).toHaveAttribute("title", `Remove ${strongB.name}`);
+  await removeB.click();
   await expect(cards.locator("h3")).toHaveText([bestA.name]);
+  await expect(add).toBeFocused();
   await counter.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(counter.locator(".enemy-slot.filled")).toHaveCount(0);
   await expect(counter).toContainText("Pick up to 6 enemy heroes");
+  await expect(add).toBeFocused();
 });
 
 test("enemy chooser closes on Escape and returns focus", async ({ page }) => {
@@ -963,7 +973,7 @@ test("counter items fall back to hero traits without match data", async ({
   await counter.getByRole("button", { name: "Add enemy hero" }).click();
   await choice(page, profiled.name).click();
   await expect(counter).toContainText(
-    "Based on hero traits — not enough match data for these heroes yet.",
+    "Based on hero traits — match data shows no clear counter items against these heroes yet.",
   );
   await expect(counter.locator(".item-card").first()).toBeVisible();
   await expect(counter.locator(".item-card .targets").first()).toContainText(
@@ -972,24 +982,81 @@ test("counter items fall back to hero traits without match data", async ({
   await expect(counter).not.toContainText("Not enough data");
 });
 
-test("counter items say when match data fails", async ({ page }) => {
-  const profiled = others.find((hero) => heroThreats[hero.id])!;
-  await openHaze(page);
+test("counter items say when match data fails, and Retry recovers", async ({
+  page,
+}) => {
+  // strongA has a traits profile, so the error form still has cards.
+  expect(heroThreats[strongA.id]).toBeTruthy();
+  await openHaze(page, { heroItems: counterBase, vsEnemy: counterVs });
+  let fail = true;
   await page.route(
     (url) =>
       url.pathname === "/v1/analytics/item-stats" &&
       url.searchParams.has("enemy_hero_ids") &&
       url.searchParams.has("hero_id"),
-    (route) => route.fulfill({ status: 500, headers: cors, body: "" }),
+    (route) =>
+      fail
+        ? route.fulfill({ status: 500, headers: cors, body: "" })
+        : route.fallback(),
   );
   const counter = section(page, "Counter items");
   await counter.getByRole("button", { name: "Add enemy hero" }).click();
-  await choice(page, profiled.name).click();
+  await choice(page, strongA.name).click();
   await expect(counter.locator(".data-note").nth(1)).toContainText(
     "Match data unavailable: Deadlock API unavailable (500). Based on hero traits instead.",
   );
-  await expect(counter.getByRole("button", { name: "Retry" })).toBeVisible();
   await expect(counter.locator(".item-card").first()).toBeVisible();
+  fail = false;
+  await counter.getByRole("button", { name: "Retry" }).click();
+  await expect(counter.locator(".item-card h3")).toHaveText([bestA.name]);
+  await expect(counter.locator(".item-card p")).toHaveText([
+    "+10.0% vs these heroes · 3,000+ games",
+  ]);
+  await expect(counter).not.toContainText("Match data unavailable");
+});
+
+test("counter items wait for the main build, so its items never show", async ({
+  page,
+}) => {
+  let release!: () => void;
+  const phaseGate = new Promise<void>((resolve) => (release = resolve));
+  // Against strongA, the main build's `upgrade` has the biggest lift.
+  await openHaze(page, {
+    heroItems: [...counterBase, itemRow(upgrade.id, 0.5)],
+    vsEnemy: {
+      [strongA.id]: [...vsRows(0.6, 0.5, 0.4), itemRow(upgrade.id, 0.75, 3000)],
+    },
+    phaseGate,
+  });
+  await page.evaluate(() => {
+    const seen: string[] = [];
+    Object.assign(window, { seenCards: seen });
+    new MutationObserver(() =>
+      document
+        .querySelectorAll(".counter-items .item-card h3")
+        .forEach((node) => seen.push(node.textContent ?? "")),
+    ).observe(document.body, { childList: true, subtree: true });
+  });
+  const counter = section(page, "Counter items");
+  const versus = page.waitForResponse((response) => {
+    const params = new URL(response.url()).searchParams;
+    return params.has("hero_id") && params.has("enemy_hero_ids");
+  });
+  await counter.getByRole("button", { name: "Add enemy hero" }).click();
+  await choice(page, strongA.name).click();
+  await versus;
+  await expect(counter).toContainText("Loading…");
+  await expect(counter.locator(".item-card")).toHaveCount(0);
+  release();
+  await expect(
+    page.locator(".build-phase[data-phase=early] .build-item strong").first(),
+  ).toHaveText(upgrade.name);
+  await expect(counter.locator(".item-card h3")).toHaveText([bestA.name]);
+  const seen = await page.evaluate(
+    () => (window as unknown as { seenCards: string[] }).seenCards,
+  );
+  expect(seen).toContain(bestA.name);
+  expect(seen).not.toContain(upgrade.name);
 });
 
 test("six picks disable the rest of the chooser", async ({ page }) => {
@@ -1008,6 +1075,65 @@ test("six picks disable the rest of the chooser", async ({ page }) => {
   await choice(page, first.name).click();
   await expect(counter.locator(".enemy-slot.filled")).toHaveCount(5);
   await expect(choice(page, rest[5].name)).toBeEnabled();
+});
+
+test("a live match replaces manual picks with the enemy team", async ({
+  page,
+}) => {
+  await nativeWindow(page, "desktop", "normal", {
+    running: true,
+    players: false,
+  });
+  await openHaze(
+    page,
+    {
+      heroItems: counterBase,
+      vsEnemy: { [haze.id]: vsRows(0.6, 0.5, 0.4) },
+      url: "/desktop/desktop.html",
+    },
+    strongB,
+  );
+  const counter = section(page, "Counter items");
+  await counter.getByRole("button", { name: "Add enemy hero" }).click();
+  await choice(page, strongA.name).click();
+  await expect(
+    counter.getByRole("button", { name: `Remove ${strongA.name}` }),
+  ).toHaveCount(1);
+
+  await updateMatch(page, { players: matchPlayers() });
+  await expect(page.getByRole("button", { name: "Live" })).toHaveClass(
+    /active/,
+  );
+  await page.getByRole("button", { name: "Heroes", exact: true }).click();
+  await page
+    .locator(".page:not([hidden]) .hero-card", { hasText: strongB.name })
+    .first()
+    .click();
+  await expect(page.locator(".hero-header h1")).toHaveText(strongB.name);
+  await expect(counter).toContainText("Enemy team from your live match.");
+  await expect(counter.locator(".enemy-slot.filled")).toHaveCount(1);
+  await expect(
+    counter.getByRole("img", { name: haze.name, exact: true }),
+  ).toHaveCount(1);
+  await expect(counter.getByRole("button")).toHaveCount(0);
+  await expect(counter).not.toContainText(strongA.name);
+  await expect(counter.locator(".item-card .targets").first()).toContainText(
+    haze.name,
+  );
+});
+
+test("a live team with nothing to show falls back to the picker", async ({
+  page,
+}) => {
+  // The roster's only enemy is Haze, and this is Haze's own page.
+  await nativeWindow(page, "desktop");
+  await openHaze(page, { url: "/desktop/desktop.html" });
+  const counter = section(page, "Counter items");
+  await expect(
+    counter.getByRole("button", { name: "Add enemy hero" }),
+  ).toBeVisible();
+  await expect(counter).not.toContainText("Enemy team from your live match.");
+  await expect(counter).toContainText("Pick up to 6 enemy heroes");
 });
 
 test("in a live match the enemy team fills counter items", async ({ page }) => {

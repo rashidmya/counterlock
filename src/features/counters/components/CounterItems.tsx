@@ -38,13 +38,18 @@ export function CounterItems({
   picks: number[];
   setPicks(picks: number[]): void;
   liveEnemies: number[];
-  exclude: ReadonlySet<number>;
+  // Main-build items to leave out; null until the main build has settled.
+  exclude: ReadonlySet<number> | null;
 }) {
-  const live = liveEnemies.length > 0;
   // Picks are shared between hero pages, so this hero is hidden, not removed.
-  const enemies = (live ? liveEnemies : picks)
-    .filter((id) => id !== hero.id && heroById.has(id))
-    .slice(0, MAX_ENEMIES);
+  const shown = (ids: number[]) =>
+    ids
+      .filter((id) => id !== hero.id && heroById.has(id))
+      .slice(0, MAX_ENEMIES);
+  const liveShown = shown(liveEnemies);
+  // A live team with nothing left to show falls back to manual picks.
+  const live = liveShown.length > 0;
+  const enemies = live ? liveShown : shown(picks);
   const full = enemies.length >= MAX_ENEMIES;
   const data = useAsync(
     enemies.length ? () => fetchCounterData(hero.id, enemies, query) : null,
@@ -52,7 +57,7 @@ export function CounterItems({
   );
   const picksVs = useMemo(
     () =>
-      data.data
+      data.data && exclude
         ? counterItemsVs(data.data.baseline, data.data.versus, exclude)
         : [],
     [data.data, exclude],
@@ -106,7 +111,7 @@ export function CounterItems({
         them.
       </p>
     );
-  else if (data.loading || (!data.data && !data.error))
+  else if (!exclude || data.loading || (!data.data && !data.error))
     results = <p className="muted">Loading…</p>;
   else if (picksVs.length)
     results = (
@@ -148,7 +153,7 @@ export function CounterItems({
               </button>
             </span>
           ) : (
-            "Based on hero traits — not enough match data for these heroes yet."
+            "Based on hero traits — match data shows no clear counter items against these heroes yet."
           )}
         </p>
         {fallback.length ? (
@@ -208,7 +213,7 @@ export function CounterItems({
                   type="button"
                   className="enemy-slot filled"
                   aria-label={`Remove ${enemy.name}`}
-                  title={enemy.name}
+                  title={`Remove ${enemy.name}`}
                   onClick={() => remove(id)}
                 >
                   <Picture src={portrait(enemy)} label={enemy.name} />
@@ -283,9 +288,11 @@ export function CounterItems({
               );
             })}
           </div>
-          <button type="button" className="text-button" onClick={close}>
-            Done
-          </button>
+          <div className="enemy-chooser-actions">
+            <button type="button" className="text-button" onClick={close}>
+              Done
+            </button>
+          </div>
         </div>
       )}
       {results}

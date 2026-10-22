@@ -141,13 +141,18 @@ export function HeroDetail({
   const heuristic = useMemo(() => heuristicCounterItems(heroId), [heroId]);
   const build = useAsync(() => fetchMainBuild(heroId, query), deps);
   const popular = useAsync(() => fetchPopularBuilds(heroId), [heroId]);
-  // Counter items leave out what the main build already lists.
+  // Counter items leave out what the main build already lists, so they
+  // wait for it to settle (an empty set if it failed).
   const exclude = useMemo(
     () =>
-      new Set(
-        build.data?.flatMap((phase) => phase.items.map((item) => item.itemId)),
-      ),
-    [build.data],
+      build.loading
+        ? null
+        : new Set(
+            build.data?.flatMap((phase) =>
+              phase.items.map((item) => item.itemId),
+            ),
+          ),
+    [build.loading, build.data],
   );
   const tabsId = useId();
   const [tab, setTab] = useState<TabKey>("build");
