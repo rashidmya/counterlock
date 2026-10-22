@@ -10,23 +10,25 @@ export function curveNote(
   curve: AsyncState<RankCurve>,
   normal: boolean,
   durationS: number,
+  fromLobby: boolean,
 ) {
   if (!normal) return "Rank averages cover normal matches only.";
   if (curve.loading) return "Loading the rank average…";
   if (!curve.data) return `Rank average unavailable: ${curve.error ?? ""}`;
   const { band, widenedFrom, points } = curve.data;
-  if (!points.length)
-    return `Too few ${hero} games at ${band.label} in the last 30 days.`;
-  const end = points.at(-1)!.t;
-  return (
-    `Compared with the average ${hero} at ${band.label} at the same match length, over the last 30 days.` +
+  const notes =
     (widenedFrom
       ? ` Too few ${hero} games at ${widenedFrom} alone, so this covers ${band.label}.`
       : "") +
-    (end < durationS
-      ? ` Too few ${hero} games at ${band.label} ran this long, so the average stops at ${clock(end)}.`
-      : "")
-  );
+    (fromLobby
+      ? " This player's rank isn't recorded for this match, so the average uses the lobby's rank."
+      : "");
+  if (!points.length)
+    return `Too few ${hero} games at ${band.label} in the last 30 days.${notes}`;
+  const end = points.at(-1)!.t;
+  if (end < durationS)
+    return `Too few ${hero} games at ${band.label} ran as long as this match (${clock(durationS)}), so there are no verdicts; the average stops at ${clock(end)}.${notes}`;
+  return `Compared with the average ${hero} at ${band.label} at the same match length, over the last 30 days.${notes}`;
 }
 
 export function Verdicts({
@@ -34,10 +36,12 @@ export function Verdicts({
   durationS,
   curve,
   normal,
+  fromLobby,
 }: {
   player: ReportPlayer;
   durationS: number;
   curve: AsyncState<RankCurve>;
+  fromLobby: boolean;
   normal: boolean;
 }) {
   const hero = heroName(player.heroId);
@@ -67,7 +71,7 @@ export function Verdicts({
         ))}
       </div>
       <p className="data-note">
-        {curveNote(hero, curve, normal, durationS)}
+        {curveNote(hero, curve, normal, durationS, fromLobby)}
         {curve.error && (
           <>
             {" "}

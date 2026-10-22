@@ -119,6 +119,7 @@ function Report({
           durationS={report.durationS}
           curve={curve}
           normal={normal}
+          fromLobby={!selected.badge}
         />
       )}
       <SectionHeader title="Graph" />

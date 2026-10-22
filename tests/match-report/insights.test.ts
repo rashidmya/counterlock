@@ -70,6 +70,9 @@ describe("verdicts", () => {
   it("counts permanent buffs against the average", () => {
     expect(buffs(lead, DURATION_S, curve)).toEqual({ count: 3, average: 3 });
     expect(buffs(lead, DURATION_S, null).average).toBeNull();
+    expect(
+      buffs({ ...lead, buffCount: null }, DURATION_S, curve).count,
+    ).toBeNull();
   });
 });
 

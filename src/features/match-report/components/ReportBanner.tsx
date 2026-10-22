@@ -7,6 +7,7 @@ import { displayName, heroName } from "../utils/perspective";
 import { lobbyBadge } from "../utils/rank-curve";
 import {
   NORMAL_MODE,
+  STREET_BRAWL_MODE,
   TEAM_NAMES,
   teamOf,
   type MatchReport,
@@ -17,9 +18,9 @@ function eyebrow(report: MatchReport) {
   const tier = Math.floor(lobbyBadge(report.players) / 10);
   const rank = catalog.ranks.find((r) => r.tier === tier && tier > 0)?.name;
   const lobby =
-    report.gameMode !== NORMAL_MODE
+    report.gameMode === STREET_BRAWL_MODE
       ? "Street Brawl"
-      : rank
+      : report.gameMode === NORMAL_MODE && rank
         ? `${rank}-level lobby`
         : undefined;
   return [

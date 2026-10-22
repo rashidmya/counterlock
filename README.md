@@ -22,7 +22,7 @@ The root preview redirects to `/desktop/desktop.html`. Open `/in_game/in_game.ht
 ## Load in Overwolf on Windows
 
 1. Obtain an [Overwolf developer-whitelisted account](https://dev.overwolf.com/ow-native/getting-started/onboarding-resources/setting-up-dev-environment/), install Overwolf, and log in. Overwolf currently requires whitelisting for unpacked/unreleased apps.
-2. Run `npm run build`, then copy the entire `dist/` folder to the Windows PC.
+2. Run `npm run build`, then copy the entire `dist/` folder to the Windows PC. Set `VITE_SITE_URL` to the website's address for the build (for example `VITE_SITE_URL=https://counterlock.gg npm run build`): the match report's **Copy link** copies links to it, and the build warns when it is missing.
 3. In Overwolf, open **Settings → About → Development options → Load unpacked extension**. Select the folder containing `manifest.json`, not the project root.
 4. Launch Deadlock and enable its Overwolf overlay. The app targets Overwolf game ID **24482** and starts automatically with the game.
 5. Use **Ctrl+Shift+S** to show or hide Counterlock's in-game window. The binding can be changed in Overwolf. Drag the app header to move the window. The gear button exposes overlay visibility and opacity while Deadlock is running; desktop rows remain compact.

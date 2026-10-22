@@ -394,6 +394,80 @@ test("a match row opens the report; Back returns to the profile", async ({
   );
 });
 
+async function openWith(page: Page, metadata: unknown) {
+  await storeAccount(page);
+  await routeApi(page);
+  await page.route(
+    `https://api.deadlock-api.com/v1/matches/${MATCH_ID}/metadata`,
+    (route) => route.fulfill({ json: metadata, headers: cors }),
+  );
+  await page.goto("/");
+  await view(page).getByRole("button", { name: "Open match report →" }).click();
+  await expect(report(page).locator(".report-result")).toBeVisible();
+}
+
+test("a player without a recorded rank is compared at the lobby's rank, and the note says so", async ({
+  page,
+}) => {
+  const unranked = matchMetadata(ACCOUNT);
+  delete (unranked.match_info.players[0] as Record<string, unknown>)
+    .player_rank_data;
+  await openWith(page, unranked);
+  await expect(
+    report(page).locator(".report-verdicts + .data-note"),
+  ).toHaveText(
+    `Compared with the average ${lead.name} at Emissary at the same match length, over the last 30 days. This player's rank isn't recorded for this match, so the average uses the lobby's rank.`,
+  );
+});
+
+test("Street Brawl reports say rank averages cover normal matches only", async ({
+  page,
+}) => {
+  const brawl = matchMetadata(ACCOUNT);
+  brawl.match_info.game_mode = 4;
+  await openWith(page, brawl);
+  const r = report(page);
+  await expect(r.locator(".report-banner .eyebrow")).toHaveText(
+    /^Match 1001 · Street Brawl · 1h ago$/,
+  );
+  await expect(r.locator(".report-verdicts + .data-note")).toHaveText(
+    "Rank averages cover normal matches only.",
+  );
+  await expect(r.locator(".graph-foot")).toHaveText(
+    "You · rank averages cover normal matches only. Snapshots every 3 min until 15:00, then every 5 min; lines connect them.",
+  );
+});
+
+test("when the average stops before the match ends, there are no verdicts and the notes say why", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page);
+  await page.route(
+    "https://api.deadlock-api.com/v1/analytics/player-performance-curve**",
+    (route) =>
+      route.fulfill({
+        json: rankCurveRows().filter((row) => row.game_time <= 1500),
+        headers: cors,
+      }),
+  );
+  await page.goto("/");
+  await view(page).getByRole("button", { name: "Open match report →" }).click();
+  const r = report(page);
+  // Too short at Emissary, so the band widens; still too short.
+  await expect(r.locator(".report-verdicts + .data-note")).toHaveText(
+    `Too few ${lead.name} games at Ritualist–Oracle ran as long as this match (30:00), so there are no verdicts; the average stops at 25:00. Too few ${lead.name} games at Emissary alone, so this covers Ritualist–Oracle.`,
+  );
+  await expect(r.locator(".verdict span")).toHaveText([
+    "No rank average",
+    "No rank average",
+    "No rank average",
+  ]);
+  await expect(r.locator(".graph-foot")).toHaveText(
+    `You vs the average ${lead.name} at Ritualist–Oracle · shaded band = normal range (±1 standard deviation) · the average stops at 25:00. Snapshots every 3 min until 15:00, then every 5 min; lines connect them.`,
+  );
+});
+
 test("a failed match load says so and Retry recovers", async ({ page }) => {
   let fail = true;
   await storeAccount(page);

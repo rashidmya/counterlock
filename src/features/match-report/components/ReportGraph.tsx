@@ -140,10 +140,11 @@ export function ReportGraph({
   );
   const colorOf = (p: ReportPlayer) =>
     p.slot === selected?.slot ? "var(--gold)" : colors.get(p.slot)!;
-  const lineName = (p: ReportPlayer) =>
-    isMe(p, meId)
-      ? "You"
-      : `${heroName(p.heroId)} · ${displayName(p, names, meId)}`;
+  const lineName = (p: ReportPlayer) => {
+    if (isMe(p, meId)) return "You";
+    const name = names.get(p.accountId);
+    return name ? `${heroName(p.heroId)} · ${name}` : heroName(p.heroId);
+  };
   let lines: ChartLine[];
   if (mode === "player" && selected)
     lines = [

@@ -31,6 +31,8 @@ export function PlayerInsights({
   const hero = heroName(player.heroId);
   const { rows, killParticipation } = impact(player, report.players);
   const pickups = buffs(player, report.durationS, curve);
+  const lines = stretches(player, curve);
+  const compared = lines.some((s) => s.label === "Strongest");
   const bar = (share: number) =>
     `${Math.min(share / BAR_FULL_SHARE, 1) * 100}%`;
   return (
@@ -38,16 +40,18 @@ export function PlayerInsights({
       <div>
         <SectionHeader title="Best & worst stretches" />
         <p className="data-note">
-          {curve
-            ? `Souls against the average ${hero} at ${curve.band.label} at each snapshot · normal range = ±1 standard deviation`
-            : curveLoading
-              ? "Loading the rank average…"
-              : curveFailed
-                ? "Rank average unavailable, so only deaths are listed."
-                : "No rank average for this match, so only deaths are listed."}
+          {compared
+            ? `Souls against the average ${hero} at ${curve!.band.label} at each snapshot · normal range = ±1 standard deviation`
+            : curve
+              ? `Too few ${hero} games at ${curve.band.label} to compare souls, so only deaths are listed.`
+              : curveLoading
+                ? "Loading the rank average…"
+                : curveFailed
+                  ? "Rank average unavailable, so only deaths are listed."
+                  : "No rank average for this match, so only deaths are listed."}
         </p>
         <ul className="stretches">
-          {stretches(player, curve).map((s) => (
+          {lines.map((s) => (
             <li key={s.label} className="stretch">
               <b className={s.tone}>{s.label}</b>
               <span>{s.text}</span>
@@ -89,14 +93,14 @@ export function PlayerInsights({
             <dt>Picked up</dt>
             <dd
               className={
-                pickups.average === null
+                pickups.average === null || pickups.count === null
                   ? undefined
                   : pickups.count >= pickups.average
                     ? "good"
                     : "bad"
               }
             >
-              {pickups.count}
+              {pickups.count ?? "—"}
             </dd>
           </div>
           <div>

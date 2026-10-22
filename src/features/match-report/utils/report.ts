@@ -10,6 +10,7 @@ export type Team = 0 | 1;
 // API team 0 is the game's team 2 ("Amber" in MatchOverview), team 1 is 3.
 export const TEAM_NAMES: Record<Team, string> = { 0: "Amber", 1: "Sapphire" };
 export const NORMAL_MODE = 1;
+export const STREET_BRAWL_MODE = 4;
 
 export interface ReportPlayer {
   accountId: number;
@@ -31,8 +32,9 @@ export interface ReportPlayer {
   purchases: { timeS: number; itemId: number }[];
   // Permanent buff pickup times; empty before the game recorded them (2026-09-29).
   buffTimes: number[];
-  // Permanent buffs picked up (each entry's `value`).
-  buffCount: number;
+  // Permanent buffs picked up (each entry's `value`); null when the match
+  // has no buff data at all.
+  buffCount: number | null;
 }
 
 export interface MatchReport {
@@ -62,10 +64,19 @@ const rows = (value: unknown): Row[] =>
     : [];
 const isTeam = (value: unknown): value is Team => value === 0 || value === 1;
 
+// Running totals the game's final scoreboard also records.
+const FINAL_FIELDS: [MetricId, string][] = [
+  ["kills", "kills"],
+  ["deaths", "deaths"],
+  ["assists", "assists"],
+  ["souls", "net_worth"],
+];
+
 function parsePlayer(
   p: Row,
   index: number,
   headshotsId: number | undefined,
+  durationS: number,
 ): ReportPlayer {
   const permanent = rows(p.power_up_buffs).filter(
     (buff) => buff.is_permanent === true,
@@ -75,11 +86,13 @@ function parsePlayer(
       ? buff.pickup_times_s.filter(isNumber)
       : [];
   const buffTimes = permanent.flatMap(pickupTimes).sort((a, b) => a - b);
-  const buffCount = permanent.reduce(
-    (sum, buff) =>
-      sum + (isNumber(buff.value) ? buff.value : pickupTimes(buff).length),
-    0,
-  );
+  const buffCount = Array.isArray(p.power_up_buffs)
+    ? permanent.reduce(
+        (sum, buff) =>
+          sum + (isNumber(buff.value) ? buff.value : pickupTimes(buff).length),
+        0,
+      )
+    : null;
   const stats = rows(p.stats)
     .filter((stat) => isNumber(stat.time_stamp_s) && stat.time_stamp_s > 0)
     .sort((a, b) => num(a.time_stamp_s) - num(b.time_stamp_s))
@@ -93,6 +106,18 @@ function parsePlayer(
       stats.map((stat) => snapshotValue(m.id, stat, headshotsId, buffTimes)),
     ]),
   ) as Record<MetricId, number[]>;
+  // The snapshot at the match end can be one off the game's own scoreboard,
+  // which the banner and scoreboard show: use the scoreboard's numbers, and
+  // never let a running count above them.
+  if (durationS > 0 && num(stats.at(-1)?.time_stamp_s) >= durationS)
+    for (const [id, field] of FINAL_FIELDS) {
+      const final = p[field];
+      if (!isNumber(final)) continue;
+      const series = values[id];
+      series[series.length - 1] = final;
+      if (id !== "souls")
+        values[id] = series.map((value) => Math.min(value, final));
+    }
   const rank = p.player_rank_data as Row | undefined;
   return {
     accountId: num(p.account_id),
@@ -140,7 +165,12 @@ export function parseMatchReport(data: unknown, matchId: number): MatchReport {
   const players = rows(info.players)
     .filter((p) => isTeam(p.team) && isNumber(p.hero_id))
     .map((p, index) =>
-      parsePlayer(p, index, isNumber(headshotsId) ? headshotsId : undefined),
+      parsePlayer(
+        p,
+        index,
+        isNumber(headshotsId) ? headshotsId : undefined,
+        num(info.duration_s),
+      ),
     )
     .sort((a, b) => a.team - b.team || a.slot - b.slot);
   if (!players.length) throw new Error("Match details unavailable.");

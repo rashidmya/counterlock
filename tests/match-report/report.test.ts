@@ -128,6 +128,25 @@ describe("parseMatchReport", () => {
     ]);
   });
 
+  it("uses the game's final kills, deaths, assists and souls at the match end", () => {
+    const data = matchMetadata(ACCOUNT);
+    const stats = data.match_info.players[0].stats;
+    // One kill more than the scoreboard's 8 in the last two snapshots.
+    stats.at(-1)!.kills = 9;
+    stats.at(-2)!.kills = 9;
+    const parsed = parseMatchReport(data, 1001).players[0];
+    expect(finalValue(parsed, "kills")).toBe(8);
+    expect(Math.max(...parsed.values.kills)).toBe(8);
+    expect(finalValue(parsed, "souls")).toBe(32400);
+  });
+
+  it("has no buff count when the match has no buff data", () => {
+    const data = matchMetadata(ACCOUNT);
+    delete (data.match_info.players[0] as Record<string, unknown>)
+      .power_up_buffs;
+    expect(parseMatchReport(data, 1001).players[0].buffCount).toBeNull();
+  });
+
   it("throws when the metadata has no match or no players", () => {
     expect(() => parseMatchReport({}, 1)).toThrow(/unavailable/i);
     expect(() =>
