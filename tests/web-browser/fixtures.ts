@@ -53,6 +53,52 @@ const shopItems = catalog.items
   .filter((entry) => entry.image && entry.cost > 0)
   .slice(0, 12);
 const HAZE = catalog.heroes.find((hero) => hero.name === "Haze")!;
+
+// Main build: eight early items, four mid, none late. Items without
+// components, so no upgrade rule drops one.
+const phaseItems = catalog.items
+  .filter((entry) => entry.image && entry.cost > 0 && !entry.components?.length)
+  .slice(12, 24);
+const phaseRow = (itemId: number, i: number) => ({
+  ...itemRow(itemId, 0.55),
+  avg_buy_time_s: 100 + i * 10,
+});
+const phaseRows: Record<string, unknown[]> = {
+  "0": phaseItems.slice(0, 8).map((entry, i) => phaseRow(entry.id, i)),
+  "600": phaseItems.slice(8, 12).map((entry, i) => phaseRow(entry.id, i)),
+  "1200": [],
+};
+// Haze vs any enemy: the first shop item gains 10 points net of the matchup.
+const versusRows = [
+  itemRow(shopItems[0].id, 0.7),
+  ...shopItems.slice(1, 6).map((entry) => itemRow(entry.id, 0.58)),
+];
+const popularBuild = {
+  hero_build: {
+    hero_id: HAZE.id,
+    hero_build_id: 900,
+    author_account_id: FARGO,
+    last_updated_timestamp: 1_791_000_000,
+    name: "Web Fixture Build",
+    details: {
+      mod_categories: [
+        {
+          name: "#Citadel_HeroBuilds_EarlyGame",
+          mods: shopItems.slice(0, 3).map((entry) => ({
+            ability_id: entry.id,
+          })),
+        },
+        {
+          name: "Late",
+          mods: shopItems.slice(3, 6).map((entry) => ({
+            ability_id: entry.id,
+          })),
+        },
+      ],
+    },
+  },
+  num_favorites: 12,
+};
 const player = (teamHero: number, id: number, team: number) => ({
   account_id: id,
   team,
@@ -89,12 +135,20 @@ export async function mockApi(page: Page) {
     switch (path) {
       case "/v1/analytics/hero-stats":
         return json(heroStats);
-      case "/v1/analytics/item-stats":
+      case "/v1/analytics/item-stats": {
+        const params = url.searchParams;
+        const phase = params.get("min_bought_at_s");
+        if (phase !== null) return json(phaseRows[phase] ?? []);
+        if (params.has("hero_id") && params.has("enemy_hero_ids"))
+          return json(versusRows);
         return json(
-          url.searchParams.has("hero_id")
+          params.has("hero_id")
             ? shopItems.slice(0, 6).map((entry) => itemRow(entry.id, 0.58))
             : shopItems.map((entry) => itemRow(entry.id, 0.5)),
         );
+      }
+      case "/v1/builds":
+        return json([popularBuild]);
       case "/v1/analytics/hero-counter-stats":
         return json(
           catalog.heroes.map((hero, index) => ({

@@ -43,12 +43,12 @@ For Overwolf development, load the built files. Avoid `debug_url` with this back
 - **Home** is a search (**Find a player**) followed by a **You** section for the remembered account (rank, recent form and latest match, each number explained) and **Top of the city**, the strongest heroes right now.
 - **Profile** is its own page, opened from search, **You** or the header's **My profile**: rank badge, ranked games, KDA, souls per minute, top heroes, frequent teammates and a filterable match history, in the tabs Overview, Matches, Performance and Heroes. Click a match for its scoreboard. **This is me** remembers the account; **Not you? Switch account** forgets it.
 - **Tier list** ranks heroes S to D by win-rate percentile over the last 30 days across all ranks, with a role filter.
-- **Heroes** is the full roster with search and a role filter. A hero page (with a rank filter) shows abilities (hover, focus or tap one for its tooltip), skill order, a build, matchups, best partners and best items, with counter items listed separately. Counter items use measured data (an item's win rate against the hero compared with its overall win rate, adjusted for the hero's overall win rate) and fall back to hero-trait heuristics, labelled "Based on hero traits", when there is not enough data.
+- **Heroes** is the full roster with search and a role filter. A hero page (with a rank filter) shows abilities (hover, focus or tap one for its tooltip), then two tabs: **Build**, the main build (the most-bought items in each phase: Early 0–10 min, Mid 10–20 min and Late 20+ min, up to eight each), and **Popular builds**, the hero's most-favourited community builds, shown exactly as their authors set them up. **Counter items** come next: pick up to six enemy heroes to see the items that gain the most win rate against them (during a match, the desktop app uses the live enemy team instead). Then come skill order, matchups, best partners, best items and **Items that beat {Hero}**, which compares an item's win rate against this hero with its overall win rate, adjusted for the hero's overall win rate. Both counter lists fall back to hero-trait heuristics, labelled "Based on hero traits", when the data is too thin. See [Hero page builds and counter items](#hero-page-builds-and-counter-items).
 - **Items** ("The Shop") is a shop-style browser with search, filtering and sorting, in columns by category and cost. An item page shows its stats, win and pick rate, and what it builds from and into.
 
 **Live match overlays and roster:**
 
-- Shows a community build for the selected hero, with recorded win rate and match count. The hero selector follows your hero by default; owned items are marked and the desktop build can be collapsed. Compact build overlays follow the local hero and provide a group selector. Build statistics are unavailable in Street Brawl.
+- The Live tab's build panel (**Your build**) shows the same main build as the hero page, so the two never disagree. The hero selector follows your hero by default; owned items are marked, the current phase is tagged **Now**, and the panel can be collapsed. Compact build overlays still show one community build, with its recorded win rate and match count; they follow the local hero and provide a group selector. Build statistics are unavailable in Street Brawl.
 - Uses the full in-game shop artwork for both builds and counter cards. All **173 item icons** are bundled locally, so item artwork works without the asset CDN.
 - Identifies your team using the local roster entry; enemy detection waits until that identity is available. Team sizes are dynamic, including Street Brawl.
 - Shows the latest recorded rank, **hero-specific** win rate and recorded games, plus live K/D/A. The API's hero history is filtered to the active game mode and ranked/unranked matches.
@@ -59,17 +59,23 @@ For Overwolf development, load the built files. Avoid `debug_url` with this back
 
 Rank comes from the latest recorded ranked match, not a live rank feed or a historical MMR estimate. API coverage can be incomplete; no row returned does not prove the player has never played that hero. Protected profiles are left unavailable. Overwolf may supply blank Steam IDs, and numeric SteamID64 values already rounded by an upstream parser cannot be recovered. Stringified numeric Steam IDs are preserved before parsing.
 
-The counter engine is a transparent set of strategic heuristics, not a learned optimal build or a statistical claim that an item causes more wins. It does not calculate your build's damage, automatically buy items, or modify Deadlock's files. The budget is a **per-item price limit**, not a shopping-list total or your remaining souls.
+The Live counter engine, which is also the hero page's fallback, is a transparent set of strategic heuristics, not a learned optimal build or a statistical claim that an item causes more wins. It does not calculate your build's damage, automatically buy items, or modify Deadlock's files. The budget is a **per-item price limit**, not a shopping-list total or your remaining souls.
 
-The displayed community build is selected by recorded match count among builds with at least 20 matches in the API's aggregate bucket. Its win rate is measured over the last 30 days of ranked and unranked matches and can span multiple build versions. Item groups come from the selected community build. These are adaptable suggestions, not a mandatory purchase order or a claim that the build causes more wins.
+The compact overlay's community build is selected by recorded match count among builds with at least 20 matches in the API's aggregate bucket. Its win rate is measured over the last 30 days of ranked and unranked matches and can span multiple build versions. Item groups come from the selected community build. These are adaptable suggestions, not a mandatory purchase order or a claim that the build causes more wins.
 
-The separate catalog phase-recommendation utility remains available under `features/builds/utils/recommendations.ts`, with coverage for eight distinct picks per phase and match-clock boundaries. It is not the source of the current community-build UI.
+Home and the hero and item pages use Deadlock API aggregates, so figures reflect community data for the filters shown, not a complete record. Hero tiers are relative to the current win-rate distribution, not an official ranking. A hero page makes ten analytics requests, plus one for each picked enemy, and the Deadlock API limits analytics to 200 requests per minute per IP, so very rapid browsing can hit the cooldown. Picking an enemy again reuses its cached request.
 
-Home and the hero and item pages use Deadlock API aggregates, so figures reflect community data for the filters shown, not a complete record. Hero tiers are relative to the current win-rate distribution, not an official ranking. Each hero detail view makes several analytics requests and the Deadlock API limits analytics to 200 requests per minute per IP, so very rapid browsing can hit the cooldown.
+### Hero page builds and counter items
+
+Each list says how it is derived in one line on the page. Item stats cover the last 30 days, with the page's rank filter.
+
+- **Main build:** `GET /v1/analytics/item-stats?hero_id=…&min_bought_at_s=…&max_bought_at_s=…`, one request per phase (0–600 s, 600–1200 s and 1200 s onwards). Each phase lists up to eight of its most-bought items, ordered by average buy time. An item must be bought in at least 5% as many matches as the phase's top item, so a phase can list fewer than eight, and it then says why. An upgrade is kept over its components, and an item listed in an earlier phase, or a component of one, is not listed again. The Live tab's build panel uses the same code.
+- **Popular builds:** `GET /v1/builds?hero_id=…&only_latest=true&sort_by=favorites&sort_direction=desc&min_unix_timestamp=…&limit=5`, the five most-favourited builds updated in the last 60 days. English builds come first; when the hero has none, builds in every language are shown and the note says so. When no build has a favourite count (new heroes), the builds are reloaded with `sort_by=updated_at` and the note says they are recent rather than popular. Categories, items, duplicates and author notes are shown in the author's order; unnamed categories are called "Items". Author names come from one batched `GET /v1/players/steam` and are left out if that fails.
+- **Counter items:** for each picked enemy, `GET /v1/analytics/item-stats?hero_id=…&enemy_hero_ids=…` is compared with all of the hero's games (`item-stats?hero_id=…`, the request **Best items** also uses), net of the matchup's own shift. Items need 200 games against an enemy to count, are ranked by a lower confidence bound of their average win-rate lift (lift minus three standard errors), and are shown only when that bound is above zero. Main-build items are left out. A card shows the lift and the largest single-enemy sample, for example "+5.0% vs these heroes · 3,000+ games", and names the enemies it clearly does better against. When no item clears the bound, or the data fails to load, the rules-based suggestions are shown instead, labelled "Based on hero traits".
 
 ## Website
 
-Counterlock also builds as a public static website with the nav **Home · Tier list · Heroes · Items** (the tier list lives at `/tier-list`) and player profiles, with real URLs, pre-rendered hero and item pages and share previews. It has no **Live** page, overlay or hotkeys; Home searches for a Steam account by name or ID, and the header's **My profile** opens the remembered account. The layout is full width with side gutters and has phone layouts down to 375px. It lives in `web/` (React Router v8 framework mode on Vite, `ssr: false` with `prerender`) and reuses the feature code in `src/`, so the Overwolf app is unaffected.
+Counterlock also builds as a public static website with the nav **Home · Tier list · Heroes · Items** (the tier list lives at `/tier-list`) and player profiles, with real URLs, pre-rendered hero and item pages and share previews. It has no **Live** page, overlay or hotkeys; Home searches for a Steam account by name or ID, and the header's **My profile** opens the remembered account. The layout is full width with side gutters and has phone layouts down to 375px. Hero pages have the same **Build** and **Popular builds** tabs and **Counter items** as the app; the website has no live match, so you always pick the enemy heroes. It lives in `web/` (React Router v8 framework mode on Vite, `ssr: false` with `prerender`) and reuses the feature code in `src/`, so the Overwolf app is unaffected.
 
 ```sh
 npm run web:dev        # dev server
@@ -108,7 +114,7 @@ The noir look is defined once, in `src/app/styles/tokens.css`: the palette (ink,
 npm run catalog:refresh
 ```
 
-This fetches active heroes (with roles and abilities), popular items, shop items (with tiers and stats) and ranks from the current Deadlock API asset endpoints into `src/shared/catalog/catalog.json`, then downloads the shop artwork into `public/items/`. Run `npm run assets:sync` to retry only the artwork download. Review `src/features/counters/utils/recommendations.ts` when a patch changes heroes or item effects. Coverage tests validate eight build picks per phase for the current catalog and counter advice for every active hero. Removed items are excluded automatically because recommendations resolve IDs against the current snapshot. Future heroes without profiles have a manual threat fallback in the UI.
+This fetches active heroes (with roles and abilities), popular items, shop items (with tiers and stats) and ranks from the current Deadlock API asset endpoints into `src/shared/catalog/catalog.json`, then downloads the shop artwork into `public/items/`. Run `npm run assets:sync` to retry only the artwork download. Review `src/features/counters/utils/recommendations.ts` when a patch changes heroes or item effects. Coverage tests validate counter advice for every active hero. Removed items are excluded automatically because recommendations resolve IDs against the current snapshot. Future heroes without profiles have a manual threat fallback in the UI.
 
 Catalog metadata and item icons are bundled, while portraits, rank images and fonts load from their providers. Item icons use the local file first, then the source URL if it fails, then text. No backend, analytics or persistent player database is included. Public player IDs are sent to Deadlock API to retrieve statistics. API responses are cached only in memory. Home also remembers the last account ID on this PC in `localStorage` under `counterlock.profile.account`, alongside the existing overlay preferences. Production distribution should include the appropriate privacy notice and asset attribution.
 
@@ -139,8 +145,8 @@ Before a public release, test in Windows with a live match: game startup and shu
 | `src/features/roster/`                            | Team tables, player rows, roster and inventory styles                                              |
 | `src/features/player-stats/`                      | Batched statistics client, cache/cooldowns, response types, win-rate utility                       |
 | `src/features/home/`                              | Home: search, You card (rank, recent form, latest match) and Top of the city                       |
-| `src/features/builds/`                            | Desktop/compact builds, shared request hook, build analytics, phase recommendations, styles        |
-| `src/features/counters/`                          | Counter rules, threat types, selection state, desktop/compact panels, styles                       |
+| `src/features/builds/`                            | Main build (hero page and Live panel), popular builds, compact overlay build, build analytics      |
+| `src/features/counters/`                          | Hero-page counter items and enemy picker, counter rules, threat types, desktop/compact panels      |
 | `src/features/overlay/`                           | Visibility preferences, persisted keys, settings UI, overlay styles                                |
 | `src/platform/overwolf/`                          | Background lifecycle, store bridge, game detection, window controls and native window hooks        |
 | `src/shared/api/`                                 | Shared cached Deadlock API client and async request hook                                           |
@@ -161,12 +167,13 @@ Feature styles are composed centrally by `src/app/styles/index.css`. Its import 
 
 ## API endpoints
 
-Live player statistics and community builds use `/v1/players/hero-stats`, `/v1/players/rank`, `/v1/analytics/hero-build-stats` and `/v1/builds`, and the catalog uses `/v1/assets/*`. The companion pages add these routes, all fetched through the shared client in `src/shared/api`:
+Live player statistics and the compact overlay's community build use `/v1/players/hero-stats`, `/v1/players/rank`, `/v1/analytics/hero-build-stats` and `/v1/builds`, and the catalog uses `/v1/assets/*`. The companion pages add these routes, all fetched through the shared client in `src/shared/api`:
 
 - `/v1/players/steam`, `/v1/players/rank`, `/v1/players/hero-stats`
 - `/v1/players/{id}/match-history` and `/v1/players/{id}/mate-stats`
 - `/v1/matches/{id}/metadata`
-- `/v1/analytics/hero-stats`, `hero-counter-stats`, `hero-synergy-stats`, `ability-order-stats` and `item-stats`
+- `/v1/analytics/hero-stats`, `hero-counter-stats`, `hero-synergy-stats`, `ability-order-stats` and `item-stats` (also per build phase and per picked enemy)
+- `/v1/builds` (popular builds on the hero page)
 
 The client caches in memory (two to ten minutes depending on the data), times out after 15 seconds, shares in-flight requests and honours `Retry-After` cooldowns.
 

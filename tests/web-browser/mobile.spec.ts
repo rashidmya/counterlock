@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
 import { FARGO, mockApi } from "./fixtures";
 
 const SCROLLERS = ".hero-table-wrap, .scoreboard-team, .skill-order";
@@ -58,6 +59,9 @@ test.describe("phone width (375px)", () => {
           page.locator(".detail-section .item-tile").first(),
         ).toBeVisible();
         await expect(page.locator(".matchup").first()).toBeVisible();
+        await expect(
+          page.locator(".build-phase .build-item").first(),
+        ).toBeVisible();
       },
     ],
     [
@@ -103,6 +107,44 @@ test.describe("phone width (375px)", () => {
         expect(await clipped(page, 375)).toEqual([]);
         await page.keyboard.press("Escape");
         await expect(tip).toBeHidden();
+
+        const fits = async () => {
+          expect((await overflow(page)).scroll).toBeLessThanOrEqual(375);
+          expect(await clipped(page, 375)).toEqual([]);
+        };
+        await page.getByRole("tab", { name: /^Popular builds/ }).click();
+        await expect(page.locator("article.popular-build")).toBeVisible();
+        await fits();
+
+        await page.getByRole("tab", { name: "Build", exact: true }).click();
+        await page.getByRole("button", { name: "Add enemy hero" }).click();
+        const chooser = page.getByRole("group", {
+          name: "Choose enemy heroes",
+        });
+        for (const enemy of catalog.heroes
+          .filter((hero) => hero.name !== "Haze")
+          .slice(0, 2))
+          await chooser
+            .getByRole("button", { name: enemy.name, exact: true })
+            .click();
+        await expect(page.locator(".enemy-slot.filled")).toHaveCount(2);
+        await expect(page.locator(".counter-cards .item-card")).toHaveCount(1);
+        await fits();
+        const choices = (await chooser.boundingBox())!;
+        expect(choices.x + choices.width).toBeLessThanOrEqual(375);
+
+        // Eight early tiles wrap to at most four per line.
+        const tops = await page
+          .locator('.build-phase[data-phase="early"] .build-item')
+          .evaluateAll((nodes) =>
+            nodes.map((node) => Math.round(node.getBoundingClientRect().top)),
+          );
+        expect(tops).toHaveLength(8);
+        expect(new Set(tops).size).toBeGreaterThanOrEqual(2);
+        for (const top of new Set(tops))
+          expect(
+            tops.filter((other) => other === top).length,
+          ).toBeLessThanOrEqual(4);
       }
 
       const links = page.locator("nav").getByRole("link");
@@ -202,6 +244,30 @@ test.describe("phone width (375px)", () => {
     expect((await overflow(page)).scroll).toBeLessThanOrEqual(375);
     expect(await clipped(page, 375)).toEqual([]);
   });
+});
+
+test("main build tiles never squeeze below their art on the website", async ({
+  page,
+}) => {
+  await mockApi(page);
+  for (const width of [640, 680, 720, 760, 800, 840]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/heroes/haze");
+    const tiles = page.locator('.build-phase[data-phase="early"] .build-item');
+    await expect(tiles).toHaveCount(8);
+    const squeezed = await tiles.evaluateAll((nodes) =>
+      nodes.flatMap((node) => {
+        const tile = node.getBoundingClientRect().width;
+        const art = node
+          .querySelector(".build-art")!
+          .getBoundingClientRect().width;
+        return tile + 0.5 < art ? [`${tile}px tile, ${art}px art`] : [];
+      }),
+    );
+    expect(squeezed, `at ${width}px`).toEqual([]);
+    const { scroll, client } = await overflow(page);
+    expect(scroll, `at ${width}px`).toBeLessThanOrEqual(client);
+  }
 });
 
 test("at desktop width the hero art sits to the right of the identity column", async ({

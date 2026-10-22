@@ -663,8 +663,8 @@ Build and ship in this order. Each phase gets its own plan.
    new tabs, Home search (replacing Player lookup), and restyling of every
    existing page and state, in the app and on the website (including phone
    layouts). No new data features.
-2. **Hero page builds:** main build moved and restyled, popular builds as
-   authored, counter items with enemy picker / live roster.
+2. **Hero page builds (done):** main build moved and restyled, popular
+   builds as authored, counter items with enemy picker / live roster.
 3. **Match report.**
 4. **Performance tab.**
 5. **Profile Live tab** (app + web).

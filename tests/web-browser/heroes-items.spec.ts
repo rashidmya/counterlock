@@ -1,6 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
-import { PNG, cors, heroStats, itemRow } from "./fixtures";
+import {
+  PNG,
+  cors,
+  heroStats,
+  itemRow,
+  mockApi as mockSiteApi,
+} from "./fixtures";
 
 const slugify = (name: string) =>
   name
@@ -82,6 +88,39 @@ test("hero → item → back uses client navigation and keeps history", async ({
   await expect(page).toHaveURL(/\/heroes\/haze$/);
   await expect(page.locator(".hero-header h1")).toHaveText("Haze");
   expect(await marker(page)).toBe("alive");
+});
+
+test("hero page builds tabs and counter picks work on the website", async ({
+  page,
+}) => {
+  await mockSiteApi(page);
+  await page.goto("/heroes/haze");
+  await expect(page.locator(".build-phase")).toHaveCount(3);
+  const early = page.locator('.build-phase[data-phase="early"] a.build-item');
+  await expect(early).toHaveCount(8);
+  for (const href of await early.evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("href")),
+  ))
+    expect(href).toMatch(/^\/items\//);
+
+  const popular = page.getByRole("tab", { name: /^Popular builds/ });
+  await expect(popular.locator(".tab-count")).toHaveText("1");
+  await popular.click();
+  const build = page.locator("article.popular-build");
+  await expect(
+    build.getByRole("heading", { name: "Web Fixture Build" }),
+  ).toBeVisible();
+  await expect(build).toContainText("by A Rather Long Persona Name Fixture");
+
+  const enemy = catalog.heroes.find((hero) => hero.name !== "Haze")!;
+  await page.getByRole("button", { name: "Add enemy hero" }).click();
+  await page
+    .getByRole("group", { name: "Choose enemy heroes" })
+    .getByRole("button", { name: enemy.name, exact: true })
+    .click();
+  const cards = page.locator(".counter-cards .item-card");
+  await expect(cards).toHaveCount(1);
+  await expect(cards).toContainText(shopItems[0].name);
 });
 
 test("hero cards are real links and clicking one navigates in-page", async ({
