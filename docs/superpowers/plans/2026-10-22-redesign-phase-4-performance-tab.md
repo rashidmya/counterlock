@@ -23,12 +23,12 @@ Each card shows one point per game (win or loss dot) with the dashed rank averag
 **Spec:** `docs/superpowers/specs/2026-10-21-redesign-design.md`: "Performance tab", "Profile" and phase 4 of "Delivery phases". Visual reference: `docs/superpowers/specs/2026-10-21-redesign-prototype.html` (open "Performance"; tick "Show as website" for web sizes). Where this plan and the prototype differ, this plan wins.
 
 **Every code block in this plan was built and run before the plan was written.** The full result:
-- `npm test` 365 passed;
+- `npm test` 369 passed;
 - `npm run test:browser` 130 passed;
 - `npm run test:web` 74 passed;
 - both type checks, `npm run build`, `npm run web:build` and `npm run validate:manifest` passed.
 
-Each task's end state was also checked on its own: type check and unit tests after every task (334, 339, 363, 375, 375, 375 and 365 tests), and both browser suites after Tasks 5 and 6. Copy the code as given. If something fails, fix the cause rather than the test.
+Each task's end state was also checked on its own: type check and unit tests after every task (334, 339, 363, 375, 379, 379 and 369 tests), and both browser suites after Tasks 5 and 6. Copy the code as given. If something fails, fix the cause rather than the test.
 
 ## Decisions made while planning (verified against the live API on 2026-10-22)
 
@@ -1720,13 +1720,14 @@ git commit -m "feat(profile): fetch match totals and rank averages for a range o
 - Create: `src/shared/ui/useElementWidth.ts`
 - Create: `src/features/profile/components/Sparkline.tsx`
 - Modify: `src/features/match-report/components/ReportGraph.tsx`
+- Test: `tests/profile/sparkline.test.ts`
 
 **The width hook:** the Graph measures its chart with a `ResizeObserver`. That code moves into a shared hook, which the sparkline uses too. The Graph's behaviour is unchanged; its browser tests cover it.
 
 **The sparkline:**
 - **Size:** the measured width, 80 px tall.
-- **Lines:** a gold value line and a dashed rank-average line, both broken at games without a value.
-- **Dots:** one per game with a value, filled by win or loss, each with a `<title>` tooltip.
+- **Lines:** a gold value line and a dashed rank-average line, both broken at games without a value. The exported `linePath()` builds them; a value with no neighbour gets a 4 px tick centred on it (one dash of the dashed average), so a lone game's average still shows (Task 5 review).
+- **Dots:** one per game with a value, filled by win or loss, each with a `<title>` tooltip. The radius shrinks with the spacing (3 px down to 1.25 px), so the gold line stays readable at Last 50 and Last 100, where points sit 2–5 px apart (Task 5 review).
 
 Nothing renders the sparkline until Task 6.
 
@@ -1793,6 +1794,28 @@ const PAD_X = 6;
 const PAD_Y = 8;
 
 /**
+ * A path through the values, broken at games without one. A value with no
+ * neighbour on either side gets a 4 px tick centred on it (one dash of the
+ * dashed average), so it still shows.
+ */
+export function linePath(
+  values: (number | null)[],
+  x: (index: number) => number,
+  y: (value: number) => number,
+) {
+  return values
+    .map((value, index) => {
+      if (value === null) return "";
+      const before = values[index - 1] ?? null;
+      const after = values[index + 1] ?? null;
+      if (before === null && after === null)
+        return `M${(x(index) - 2).toFixed(1)},${y(value).toFixed(1)}h4`;
+      return `${before === null ? "M" : "L"}${x(index).toFixed(1)},${y(value).toFixed(1)}`;
+    })
+    .join("");
+}
+
+/**
  * One point per game, oldest on the left: the player's line with a win or
  * loss dot per game, and the dashed rank average. Drawn at its real width.
  */
@@ -1820,22 +1843,30 @@ export function Sparkline({
     max === min
       ? HEIGHT / 2
       : PAD_Y + ((max - value) * (HEIGHT - 2 * PAD_Y)) / (max - min);
-  // Breaks the line at games without a value.
-  const path = (pick: (p: GamePoint) => number | null) =>
-    points
-      .map((p, index) => {
-        const value = pick(p);
-        if (value === null) return "";
-        const previous = index > 0 ? pick(points[index - 1]) : null;
-        return `${previous === null ? "M" : "L"}${x(index).toFixed(1)},${y(value).toFixed(1)}`;
-      })
-      .join("");
+  // Dots shrink as games crowd together, so the line stays visible.
+  const step =
+    points.length > 1 ? (width - 2 * PAD_X) / (points.length - 1) : width;
+  const radius = Math.min(3, Math.max(1.25, step * 0.4));
   return (
     <div className="sparkline" ref={box}>
       {width > 0 && values.length > 0 && (
         <svg width={width} height={HEIGHT} role="img" aria-label={label}>
-          <path className="spark-average" d={path((p) => p.average)} />
-          <path className="spark-value" d={path((p) => p.value)} />
+          <path
+            className="spark-average"
+            d={linePath(
+              points.map((p) => p.average),
+              x,
+              y,
+            )}
+          />
+          <path
+            className="spark-value"
+            d={linePath(
+              points.map((p) => p.value),
+              x,
+              y,
+            )}
+          />
           {points.map((p, index) =>
             p.value === null ? null : (
               <circle
@@ -1843,7 +1874,7 @@ export function Sparkline({
                 className={p.won ? "win" : "loss"}
                 cx={x(index)}
                 cy={y(p.value)}
-                r={3}
+                r={radius}
               >
                 <title>{title(p)}</title>
               </circle>
@@ -1856,17 +1887,53 @@ export function Sparkline({
 }
 ```
 
-- [ ] **Step 4: Check that nothing broke**
+- [ ] **Step 4: Test the path builder**
+
+`tests/profile/sparkline.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { linePath } from "@/features/profile/components/Sparkline";
+
+const x = (index: number) => index * 10;
+const y = (value: number) => value;
+
+describe("linePath", () => {
+  it("joins consecutive values", () => {
+    expect(linePath([1, 2, 3], x, y)).toBe("M0.0,1.0L10.0,2.0L20.0,3.0");
+    // Zero is a value, not a missing game.
+    expect(linePath([0, 0], x, y)).toBe("M0.0,0.0L10.0,0.0");
+  });
+
+  it("breaks at games without a value", () => {
+    expect(linePath([1, 2, null, 4, 5], x, y)).toBe(
+      "M0.0,1.0L10.0,2.0M30.0,4.0L40.0,5.0",
+    );
+  });
+
+  it("draws a short tick for a value with no neighbour", () => {
+    expect(linePath([null, 2, null], x, y)).toBe("M8.0,2.0h4");
+    expect(linePath([7], x, y)).toBe("M-2.0,7.0h4");
+    expect(linePath([1, null, 3], x, y)).toBe("M-2.0,1.0h4M18.0,3.0h4");
+  });
+
+  it("is empty without values", () => {
+    expect(linePath([null, null], x, y)).toBe("");
+  });
+});
+```
+
+- [ ] **Step 5: Check that nothing broke**
 
 Run: `npx tsc --noEmit && npm test && npx playwright test tests/browser/match-report.spec.ts`
-Expected: PASS. 375 unit tests, and every match report browser test (the Graph still sizes and redraws).
+Expected: PASS. 379 unit tests (4 new), and every match report browser test (the Graph still sizes and redraws).
 
-- [ ] **Step 5: Check and commit**
+- [ ] **Step 6: Check and commit**
 
 ```bash
 npm run web:typecheck
-npx prettier --write src/shared/ui/useElementWidth.ts src/features/profile/components/Sparkline.tsx src/features/match-report/components/ReportGraph.tsx
-git add src/shared/ui/useElementWidth.ts src/features/profile/components/Sparkline.tsx src/features/match-report/components/ReportGraph.tsx
+npx prettier --write src/shared/ui/useElementWidth.ts src/features/profile/components/Sparkline.tsx src/features/match-report/components/ReportGraph.tsx tests/profile/sparkline.test.ts
+git add src/shared/ui/useElementWidth.ts src/features/profile/components/Sparkline.tsx src/features/match-report/components/ReportGraph.tsx tests/profile/sparkline.test.ts
 git commit -m "feat(profile): sparkline drawn at its real width"
 ```
 
@@ -2575,7 +2642,7 @@ Run: `npx playwright test tests/browser/home.spec.ts -g "performance"`
 Expected: PASS (5 tests).
 
 Then run `npm test`, `npm run test:browser` and `npm run test:web`.
-Expected: PASS (375, 130 and 74).
+Expected: PASS (379, 130 and 74).
 
 - [ ] **Step 7: Look at it**
 
@@ -2652,7 +2719,7 @@ In `tests/profile/match-history.test.ts`, remove `form` from the import and dele
 - [ ] **Step 4: Run everything**
 
 Run: `npx tsc --noEmit && npm run web:typecheck && npm test`
-Expected: PASS (365 tests).
+Expected: PASS (369 tests).
 
 Run: `grep -rn "LineChart\|fetchSummaryHeroStats\|SUMMARY_HERO_STATS\|performanceSeries\|combatAverages\|chart-card" src web/app tests`
 Expected: no output.
@@ -2715,7 +2782,7 @@ Built in phase 4: eight metrics (souls / min, K/D/A ratio, hero damage, objectiv
 - [ ] **Step 3: Final check**
 
 Run all of these; every one must pass:
-- `npm test` (365)
+- `npm test` (369)
 - `npx tsc --noEmit`
 - `npm run web:typecheck`
 - `npm run test:browser` (130)
