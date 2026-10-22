@@ -652,3 +652,21 @@ test.describe("the graph", () => {
     await expect(title(page)).toHaveText("Most souls");
   });
 });
+
+test.describe("the graph on a touch screen", () => {
+  test.use({ hasTouch: true });
+
+  test("a tap shows the tooltip and a tap outside the chart hides it", async ({
+    page,
+  }) => {
+    await openReport(page);
+    const chart = report(page).locator(".report-graph");
+    const hit = (await chart.locator(".graph-hit").boundingBox())!;
+    await page.touchscreen.tap(hit.x + hit.width / 2, hit.y + hit.height / 2);
+    const tip = chart.locator(".graph-tip");
+    await expect(tip).toBeVisible();
+    const title = (await report(page).locator(".report-result").boundingBox())!;
+    await page.touchscreen.tap(title.x + 5, title.y + 5);
+    await expect(tip).toBeHidden();
+  });
+});

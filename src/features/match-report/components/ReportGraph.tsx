@@ -251,7 +251,7 @@ export function ReportGraph({
     : !normal
       ? "rank averages cover normal matches only"
       : curveState.loading
-        ? "loading the rank average…"
+        ? "loading the rank average"
         : curveState.error
           ? "rank average unavailable"
           : `too few ${hero} games at ${curve?.band.label ?? "this rank"} for a rank average`;

@@ -189,11 +189,11 @@ export function formatValue(value: number, metric: Metric) {
   return `${value < 0 ? "−" : ""}${rounded.toLocaleString("en-US", { maximumFractionDigits: digits })}`;
 }
 
-/** A round step near span ÷ count: 1, 2, 2.5 or 5 times a power of ten. */
+/** A round step near span ÷ count: 1, 2 or 5 times a power of ten. */
 function niceStep(span: number, count: number) {
   const raw = Math.max(span, 1e-9) / count;
   const power = 10 ** Math.floor(Math.log10(raw));
-  return ([1, 2, 2.5, 5].find((m) => m * power >= raw) ?? 10) * power;
+  return ([1, 2, 5].find((m) => m * power >= raw) ?? 10) * power;
 }
 
 const steps = (from: number, to: number, step: number) =>

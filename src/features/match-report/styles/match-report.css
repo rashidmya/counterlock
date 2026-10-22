@@ -332,6 +332,8 @@
 }
 .graph-svg {
   display: block;
+  /* On the SVG itself: Chromium ignores touch-action on its children. */
+  touch-action: pan-y;
   font: 600 11px var(--font-label);
 }
 .graph-grid {
@@ -399,7 +401,6 @@
 .graph-hit {
   fill: transparent;
   cursor: crosshair;
-  touch-action: pan-y;
 }
 .graph-tip {
   position: absolute;

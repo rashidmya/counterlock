@@ -1,4 +1,4 @@
-import { useId, useState, type PointerEvent } from "react";
+import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
 import { clock } from "../utils/format";
 import {
   formatValue,
@@ -76,7 +76,18 @@ export function GraphChart({
   perMinute: boolean;
 }) {
   const clip = useId();
+  const svg = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null);
+  const hovering = hover !== null;
+  // A tapped tooltip stays put; tapping anywhere outside the chart clears it.
+  useEffect(() => {
+    if (!hovering) return;
+    const clear = (event: Event) => {
+      if (!svg.current?.contains(event.target as Node)) setHover(null);
+    };
+    document.addEventListener("pointerdown", clear);
+    return () => document.removeEventListener("pointerdown", clear);
+  }, [hovering]);
   const height = plotHeight(width);
   const x = (t: number) =>
     LEFT + ((t - t0) / Math.max(1, t1 - t0)) * (width - LEFT - RIGHT);
@@ -151,6 +162,7 @@ export function GraphChart({
   return (
     <>
       <svg
+        ref={svg}
         className="graph-svg"
         width={width}
         height={height + LANES}
