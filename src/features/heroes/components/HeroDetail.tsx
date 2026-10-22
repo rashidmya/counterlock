@@ -140,6 +140,8 @@ export function HeroDetail({
   const panelId = (key: TabKey) => `${tabsId}-${key}-panel`;
   // Roving focus: arrows wrap, Home and End jump to the ends.
   const onTabKey = (event: KeyboardEvent, index: number) => {
+    // Leave browser shortcuts such as Alt+ArrowLeft (Back) alone.
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
     const last = TABS.length - 1;
     const moves: Partial<Record<string, number>> = {
       ArrowLeft: index === 0 ? last : index - 1,
@@ -229,7 +231,10 @@ export function HeroDetail({
             >
               {label}
               {key === "popular" && popularCount > 0 && (
-                <small className="tab-count">{popularCount}</small>
+                <>
+                  {" "}
+                  <small className="tab-count">{popularCount}</small>
+                </>
               )}
             </button>
           ))}

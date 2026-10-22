@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AsyncState } from "@/shared/api/useAsync";
+import { itemById } from "@/shared/catalog";
 import {
   BUILD_WINDOW_DAYS,
   type PopularBuildsResult,
@@ -10,17 +11,31 @@ import { BuildItem } from "./BuildItem";
 const plural = (count: number, word: string, many = `${word}s`) =>
   `${count.toLocaleString()} ${count === 1 ? word : many}`;
 
-const updated = (seconds: number) =>
-  new Date(seconds * 1000).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+// Fixed month names: en-GB locale data writes September as "Sept".
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+const updated = (seconds: number) => {
+  const date = new Date(seconds * 1000);
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${day} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+};
 
 function note({ english, ranked }: PopularBuildsResult) {
   const how = ranked
     ? `Most-favourited builds updated in the last ${BUILD_WINDOW_DAYS} days, shown exactly as their authors set them up.`
-    : "Most recently updated builds, shown exactly as their authors set them up. This hero has no favourite counts yet.";
+    : `Community builds updated in the last ${BUILD_WINDOW_DAYS} days, shown exactly as their authors set them up. This hero has no favourite counts yet.`;
   return english
     ? how
     : `No English builds yet, so these are in other languages. ${how}`;
@@ -112,6 +127,20 @@ export function PopularBuilds({
                   <BuildItem key={j} itemId={entry.itemId} note={entry.note} />
                 ))}
               </div>
+            )}
+            {/* Notes as text too: the tile tooltip never shows on touch. */}
+            {group.items.some((entry) => entry.note) && (
+              <ul className="build-notes">
+                {group.items.map(
+                  ({ itemId, note }, j) =>
+                    note && (
+                      <li key={j}>
+                        <b>{itemById.get(itemId)?.name ?? `Item #${itemId}`}</b>{" "}
+                        {note}
+                      </li>
+                    ),
+                )}
+              </ul>
             )}
           </section>
         ))}

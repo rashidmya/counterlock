@@ -377,7 +377,7 @@
   color: var(--cream);
 }
 .build-tabs .tab-count {
-  margin-left: 6px;
+  margin-left: 4px;
   padding: 1px 6px;
   background: var(--line);
   color: var(--cream);

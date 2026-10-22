@@ -149,7 +149,7 @@ const popularRows = [
       hero_id: haze.id,
       hero_build_id: 502,
       author_account_id: AUTHOR,
-      last_updated_timestamp: 1_791_000_000,
+      last_updated_timestamp: 1_789_473_600, // 15 Sep 2026, 12:00 UTC
       name: "Fixture Popular Two",
       details: {
         mod_categories: [{ name: "Core", mods: [{ ability_id: counterA.id }] }],
@@ -196,7 +196,7 @@ interface Fixtures {
   versus?: unknown[];
   base?: unknown[];
   phases?: unknown[][];
-  popular?: unknown;
+  popular?: unknown[] | ((params: URLSearchParams) => unknown[]);
   vsEnemy?: Record<number, unknown[]>;
   url?: string;
 }
@@ -248,7 +248,9 @@ async function openHaze(
         return json(base);
       }
       case "/v1/builds":
-        return json(popular);
+        return json(
+          typeof popular === "function" ? popular(url.searchParams) : popular,
+        );
       case "/v1/players/steam":
         return json([{ account_id: AUTHOR, personaname: "Fixture Author" }]);
       default:
@@ -545,6 +547,9 @@ test("Popular builds tab shows each build exactly as authored", async ({
   const build = page.getByRole("tab", { name: "Build", exact: true });
   const popularTab = page.getByRole("tab", { name: /Popular builds/ });
   await expect(popularTab.locator("small.tab-count")).toHaveText("2");
+  await expect(
+    page.getByRole("tab", { name: "Popular builds 2", exact: true }),
+  ).toHaveCount(1);
   await build.focus();
   await page.keyboard.press("ArrowRight");
   await expect(popularTab).toHaveAttribute("aria-selected", "true");
@@ -580,15 +585,20 @@ test("Popular builds tab shows each build exactly as authored", async ({
   await expect(first.locator("strong")).toHaveText(names([bestA, bestB]));
   await expect(first.first()).toHaveAttribute("title", /rush it/);
   await expect(first.first()).toHaveClass(/\bhas-note\b/);
+  await expect(categories.nth(0).locator(".build-notes li")).toHaveText([
+    `${bestA.name} rush it`,
+  ]);
   await expect(categories.nth(1).locator(".build-item strong")).toHaveText(
     names([losing, bestA]),
   );
+  await expect(categories.nth(1).locator(".build-notes")).toHaveCount(0);
   await expect(categories.nth(2)).toContainText("Only words here");
   await expect(categories.nth(2).locator(".build-item")).toHaveCount(0);
 
   await buttons.nth(1).click();
   await expect(buttons.nth(1)).toHaveAttribute("aria-pressed", "true");
   await expect(article.locator("h3")).toHaveText("Fixture Popular Two");
+  await expect(meta).toContainText("Updated 15 Sep 2026");
   await expect(meta).toContainText("1 favourite");
   await expect(meta).not.toContainText("1 favourites");
 });
@@ -624,6 +634,8 @@ test("build tabs keep one tab stop and move with arrows, Home and End", async ({
   await selected(popularTab);
   await page.keyboard.press("Home");
   await selected(build);
+  await page.keyboard.press("Control+ArrowRight");
+  await selected(build);
   await expect(
     page.getByRole("tabpanel", { name: "Build", exact: true }),
   ).toBeVisible();
@@ -632,13 +644,27 @@ test("build tabs keep one tab stop and move with arrows, Home and End", async ({
 test("popular builds empty state", async ({ page }) => {
   await openHaze(page, { popular: [] });
   const popularTab = page.getByRole("tab", { name: /Popular builds/ });
-  await expect(page.locator(".build-phase").first()).toBeVisible();
-  await expect(popularTab.locator(".tab-count")).toHaveCount(0);
   await popularTab.click();
   await expect(
     page.getByRole("tabpanel", { name: /Popular builds/ }),
   ).toContainText(
     "No community builds for this hero were updated in the last 60 days.",
+  );
+  await expect(popularTab.locator(".tab-count")).toHaveCount(0);
+});
+
+test("popular builds in other languages say so", async ({ page }) => {
+  await openHaze(page, {
+    popular: (params) =>
+      params.get("build_language") === "English" ? [] : popularRows,
+  });
+  await page.getByRole("tab", { name: /Popular builds/ }).click();
+  const panel = page.getByRole("tabpanel", { name: /Popular builds/ });
+  await expect(panel.locator(".data-note")).toHaveText(
+    /^No English builds yet, so these are in other languages\. /,
+  );
+  await expect(panel.locator(".popular-build h3")).toHaveText(
+    "Fixture Popular One",
   );
 });
 
@@ -651,7 +677,7 @@ test("popular builds without favourite counts say they are recent", async ({
   await page.getByRole("tab", { name: /Popular builds/ }).click();
   const panel = page.getByRole("tabpanel", { name: /Popular builds/ });
   await expect(panel.locator(".data-note")).toContainText(
-    "Most recently updated builds",
+    "Community builds updated in the last 60 days",
   );
   await expect(panel.locator(".data-note")).toContainText(
     "This hero has no favourite counts yet.",
@@ -680,6 +706,16 @@ test("main build rows fit at the minimum window width", async ({ page }) => {
     nodes.map((node) => node.getBoundingClientRect().top),
   );
   expect(new Set(tops).size).toBe(1);
+  // No tile is squeezed narrower than its art.
+  const squeezed = await tiles.evaluateAll(
+    (nodes) =>
+      nodes.filter(
+        (node) =>
+          node.getBoundingClientRect().width <
+          node.querySelector(".build-art")!.getBoundingClientRect().width,
+      ).length,
+  );
+  expect(squeezed).toBe(0);
 });
 
 test("clicking a matchup hero opens that hero's detail", async ({ page }) => {
