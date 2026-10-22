@@ -107,3 +107,22 @@ test("View as brings the bar into sight below the sticky header", async ({
     .toBeGreaterThanOrEqual(header.y + header.height);
   await expect(viewingAs(page)).toBeFocused();
 });
+
+test("profile match rows link to the report and Back returns", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto(`/players/${FARGO}`);
+  const row = page.locator("a.match-open").first();
+  await expect(row).toHaveAttribute("href", `/matches/1001?player=${FARGO}`);
+  await row.click();
+  await expect(page).toHaveURL(`/matches/1001?player=${FARGO}`);
+  await expect(page.locator(".report-table tbody tr")).toHaveCount(12);
+  await expect(
+    page.locator(".report-table").first().getByRole("link", {
+      name: "A Rather Long Persona Name Fixture",
+    }),
+  ).toHaveAttribute("href", `/players/${FARGO}`);
+  await page.getByRole("link", { name: "← Back to profile" }).click();
+  await expect(page).toHaveURL(`/players/${FARGO}`);
+});

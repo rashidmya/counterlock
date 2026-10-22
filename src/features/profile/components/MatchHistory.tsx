@@ -8,7 +8,6 @@ import type { HistoryFilter, HistoryMatch } from "../types";
 import { compactSouls, duration, timeAgo } from "../utils/format";
 import { isWin, matchesFilter, modeLabel } from "../utils/match-history";
 import { HistoryFilterButtons } from "./HistoryFilterButtons";
-import { MatchDetail } from "./MatchDetail";
 
 const PAGE_SIZE = 20;
 const PREVIEW_SIZE = 3;
@@ -29,7 +28,6 @@ export function MatchHistory({
   onShowAll?(): void;
 }) {
   const [visible, setVisible] = useState(PAGE_SIZE);
-  const [open, setOpen] = useState<number | null>(null);
   useEffect(() => setVisible(PAGE_SIZE), [filter]);
   const filtered = preview
     ? [...matches]
@@ -61,7 +59,6 @@ export function MatchHistory({
           const hero = heroById.get(match.heroId);
           const name = hero?.name ?? `Hero ${match.heroId}`;
           const won = isWin(match);
-          const expanded = open === match.matchId;
           return (
             <li
               key={match.matchId}
@@ -79,10 +76,9 @@ export function MatchHistory({
                   />
                   {name}
                 </RouteLink>
-                <button
-                  className="match-toggle"
-                  aria-expanded={expanded}
-                  onClick={() => setOpen(expanded ? null : match.matchId)}
+                <RouteLink
+                  className="match-open"
+                  route={{ page: "match", matchId: match.matchId, accountId }}
                 >
                   <span className="match-kda">
                     <img src={gameIcons.kill} alt="Kills" />
@@ -99,11 +95,9 @@ export function MatchHistory({
                   <span className="match-date">
                     {timeAgo(match.startTime * 1000)}
                   </span>
-                </button>
+                  <span className="match-report-link">Report →</span>
+                </RouteLink>
               </div>
-              {expanded && (
-                <MatchDetail matchId={match.matchId} accountId={accountId} />
-              )}
             </li>
           );
         })}

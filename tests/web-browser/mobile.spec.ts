@@ -2,8 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
 import { FARGO, mockApi } from "./fixtures";
 
-const SCROLLERS =
-  ".hero-table-wrap, .scoreboard-team, .report-table-wrap, .skill-order";
+const SCROLLERS = ".hero-table-wrap, .report-table-wrap, .skill-order";
 const clipped = (page: Page, limit: number) =>
   page.evaluate(
     ([scrollers, max]) => {
@@ -224,11 +223,7 @@ test.describe("phone width (375px)", () => {
     await mockApi(page);
     await page.goto(`/players/${FARGO}`);
     await expect(page.locator(".profile-header h1")).toContainText("Persona");
-    await expect(page.locator(".match-toggle").first()).toBeVisible();
-    expect(await clipped(page, 375)).toEqual([]);
-    await page.locator(".match-toggle").first().click();
-    await expect(page.locator(".score-row").first()).toBeVisible();
-    expect((await overflow(page)).scroll).toBeLessThanOrEqual(375);
+    await expect(page.locator(".match-open").first()).toBeVisible();
     expect(await clipped(page, 375)).toEqual([]);
 
     await page.getByRole("tab", { name: "Heroes" }).click();

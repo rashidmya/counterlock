@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { DeadlockApi } from "@/shared/api/DeadlockApi";
-import { itemById } from "@/shared/catalog";
 import {
   SUMMARY_HERO_STATS,
   fetchMatchHistory,
   fetchMates,
   fetchPlayerHeroStats,
   fetchRank,
-  fetchScoreboard,
   fetchSummaryHeroStats,
   fetchSteamProfiles,
   heroStatsQueries,
@@ -27,8 +25,6 @@ function fakeApi(routes: Record<string, unknown>) {
   } as unknown as DeadlockApi;
   return { api, calls };
 }
-
-const [itemA, itemB, itemC] = [...itemById.keys()];
 
 describe("heroStatsQueries", () => {
   it("builds one query per mode and two for all", () => {
@@ -132,62 +128,6 @@ describe("fetchPlayerHeroStats", () => {
         {},
     });
     expect(await fetchPlayerHeroStats(7, "ranked", api)).toEqual([]);
-  });
-});
-
-describe("fetchScoreboard", () => {
-  it("drops sold items and non-catalog ids, dedupes and keeps purchase order", async () => {
-    const { api, calls } = fakeApi({
-      "/v1/matches/99/metadata": {
-        match_info: {
-          match_id: 99,
-          duration_s: 2047,
-          winning_team: 1,
-          players: [
-            {
-              account_id: 5,
-              team: 0,
-              hero_id: 6,
-              kills: 3,
-              deaths: 2,
-              assists: 1,
-              net_worth: 1000,
-              last_hits: 50,
-              denies: 4,
-              level: 20,
-              items: [
-                { item_id: itemA, game_time_s: 10, sold_time_s: 0 },
-                { item_id: 123456789, game_time_s: 20, sold_time_s: 0 },
-                { item_id: itemB, game_time_s: 30, sold_time_s: 300 },
-                { item_id: itemC, game_time_s: 40, sold_time_s: 0 },
-                { item_id: itemA, game_time_s: 50, sold_time_s: 0 },
-              ],
-            },
-            { account_id: "bad", team: 1 },
-          ],
-        },
-      },
-    });
-    const board = await fetchScoreboard(99, api);
-    expect(calls).toEqual(["/v1/matches/99/metadata"]);
-    expect(board).toMatchObject({
-      matchId: 99,
-      durationS: 2047,
-      winningTeam: 1,
-    });
-    expect(board.players).toHaveLength(1);
-    expect(board.players[0]).toMatchObject({
-      accountId: 5,
-      heroId: 6,
-      netWorth: 1000,
-      level: 20,
-      items: [itemA, itemC],
-    });
-  });
-
-  it("rejects when metadata is missing", async () => {
-    const { api } = fakeApi({ "/v1/matches/1/metadata": {} });
-    await expect(fetchScoreboard(1, api)).rejects.toThrow(/unavailable/i);
   });
 });
 

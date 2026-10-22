@@ -378,6 +378,22 @@ test("a player without a public account gets the whole-match link", async ({
   ).toBeVisible();
 });
 
+test("a match row opens the report; Back returns to the profile", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "My profile", exact: true }).click();
+  await view(page).getByRole("tab", { name: "Matches" }).click();
+  await view(page).locator(".match-open").first().click();
+  await expect(report(page).locator(".report-result")).toHaveText("Victory");
+  await report(page).getByRole("button", { name: "← Back to profile" }).click();
+  await expect(view(page).locator(".profile-header h1")).toHaveText(
+    "Fixture Persona",
+  );
+});
+
 test("a failed match load says so and Retry recovers", async ({ page }) => {
   let fail = true;
   await storeAccount(page);

@@ -1,6 +1,5 @@
 import type { PlayerRank } from "@/features/player-stats/types";
 import { DeadlockApi, TTL, deadlockApi } from "@/shared/api/DeadlockApi";
-import { itemById } from "@/shared/catalog";
 import type { HistoryFilter, HistoryMatch } from "../types";
 import { parseHistory } from "../utils/match-history";
 
@@ -13,25 +12,6 @@ export interface MateStat {
   accountId: number;
   games: number;
   wins: number;
-}
-export interface ScoreboardPlayer {
-  accountId: number;
-  team: number;
-  heroId: number;
-  kills: number;
-  deaths: number;
-  assists: number;
-  netWorth: number;
-  lastHits: number;
-  denies: number;
-  level: number;
-  items: number[];
-}
-export interface Scoreboard {
-  matchId: number;
-  durationS: number;
-  winningTeam: number;
-  players: ScoreboardPlayer[];
 }
 export interface PlayerHeroStat {
   heroId: number;
@@ -212,54 +192,4 @@ async function fetchHeroStats(
     accuracy: t.accuracy / t.matches,
     damagePerMin: t.damage / t.matches,
   }));
-}
-
-function finalItems(value: unknown): number[] {
-  const kept = rows(value)
-    .filter(
-      (item) =>
-        item.sold_time_s === 0 &&
-        isNumber(item.item_id) &&
-        itemById.has(item.item_id),
-    )
-    .sort((a, b) => count(a.game_time_s) - count(b.game_time_s));
-  return [...new Set(kept.map((item) => item.item_id as number))];
-}
-
-export async function fetchScoreboard(
-  matchId: number,
-  api: DeadlockApi = deadlockApi,
-): Promise<Scoreboard> {
-  const data = await api.get<{ match_info?: Row }>(
-    `/v1/matches/${matchId}/metadata`,
-    TTL.analytics,
-  );
-  const info = data?.match_info;
-  if (!info || !isNumber(info.winning_team))
-    throw new Error("Match details unavailable.");
-  const players = rows(info.players).flatMap((p) =>
-    isNumber(p.account_id) && isNumber(p.team) && isNumber(p.hero_id)
-      ? [
-          {
-            accountId: p.account_id,
-            team: p.team,
-            heroId: p.hero_id,
-            kills: count(p.kills),
-            deaths: count(p.deaths),
-            assists: count(p.assists),
-            netWorth: count(p.net_worth),
-            lastHits: count(p.last_hits),
-            denies: count(p.denies),
-            level: count(p.level),
-            items: finalItems(p.items),
-          },
-        ]
-      : [],
-  );
-  return {
-    matchId: isNumber(info.match_id) ? info.match_id : matchId,
-    durationS: count(info.duration_s),
-    winningTeam: info.winning_team,
-    players,
-  };
 }

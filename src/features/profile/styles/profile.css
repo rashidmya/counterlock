@@ -354,10 +354,10 @@
   font-weight: 600;
   text-align: left;
 }
-.match-toggle {
+.match-open {
   flex: 1;
   display: grid;
-  grid-template-columns: 1.2fr 0.9fr 0.9fr 0.6fr 0.5fr 0.8fr;
+  grid-template-columns: 1.2fr 0.9fr 0.9fr 0.6fr 0.5fr 0.8fr 0.7fr;
   align-items: center;
   gap: 8px;
   padding: 12px 10px;
@@ -365,7 +365,8 @@
   font: 600 14px var(--font-label);
   color: var(--cream);
 }
-.match-toggle:hover:not(:disabled) {
+.match-open:hover:not(:disabled) {
+  text-decoration: none;
   background: rgb(from var(--cream) r g b / 0.04);
   color: var(--cream);
 }
@@ -385,6 +386,13 @@
   text-align: right;
   color: var(--dim);
 }
+.match-report-link {
+  color: var(--gold);
+  font: 700 12px var(--font-label);
+  letter-spacing: 0.14em;
+  text-align: right;
+  text-transform: uppercase;
+}
 .show-more {
   display: block;
   margin: 12px auto 0;
@@ -394,75 +402,6 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--gold);
-}
-.match-detail {
-  padding: 8px 12px 14px;
-}
-.scoreboard {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-.scoreboard-team {
-  background: var(--surface-2);
-  border: 1px solid var(--line-soft);
-  overflow: hidden;
-}
-.scoreboard-team.winner {
-  border-color: rgb(from var(--good) r g b / 0.4);
-}
-.scoreboard-team h3 {
-  padding: 8px 12px 0;
-  font: 700 12px var(--font-label);
-  letter-spacing: 0.16em;
-  color: var(--bad);
-}
-.scoreboard-team.winner h3 {
-  color: var(--good);
-}
-.scoreboard table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.scoreboard th {
-  padding: 6px 8px;
-  font: 600 11px var(--font-label);
-  letter-spacing: 0.14em;
-  text-align: left;
-  color: var(--muted);
-}
-.scoreboard .score-row td {
-  height: 38px;
-  padding: 3px 8px;
-  font-size: 12px;
-}
-.scoreboard th:last-child,
-.scoreboard td:last-child {
-  text-align: left;
-}
-.scoreboard .score-row.local {
-  background: rgb(from var(--gold) r g b / 0.08);
-}
-.scoreboard .hero-link {
-  display: inline-flex;
-  flex: none;
-  padding: 0;
-}
-.you {
-  margin-left: 8px;
-  padding: 1px 6px;
-  background: var(--gold);
-  font: 700 10px var(--font-label);
-  letter-spacing: 0.14em;
-  color: var(--ink);
-}
-.score-items {
-  display: flex;
-  gap: 2px;
-}
-.scoreboard .item-icon {
-  width: 26px;
-  height: 26px;
 }
 .heroes-tab {
   display: grid;

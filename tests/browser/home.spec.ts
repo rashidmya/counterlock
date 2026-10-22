@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
+import { matchMetadata } from "../fixtures/match-report";
 
 const ACCOUNT = 100000000;
 const STORAGE_KEY = "counterlock.profile.account";
@@ -8,7 +9,6 @@ const PNG = Buffer.from(
   "base64",
 );
 const heroes = catalog.heroes.slice(0, 4).map((hero) => hero.id);
-const items = catalog.items.slice(0, 4).map((item) => item.id);
 const names: Record<number, string> = {
   [ACCOUNT]: "Fixture Persona",
   200: "Teammate Tess",
@@ -48,31 +48,6 @@ const history = [
   historyRow(1003, heroes[2], 4, 1, true, now - 10800),
   historyRow(1004, heroes[3], 2, 3, false, now - 14400),
 ];
-
-const scoreboard = {
-  match_info: {
-    match_id: 1001,
-    duration_s: 1800,
-    winning_team: 0,
-    players: Array.from({ length: 12 }, (_, index) => ({
-      account_id: index === 0 ? ACCOUNT : 5000 + index,
-      team: index < 6 ? 0 : 1,
-      hero_id: heroes[index % heroes.length],
-      kills: index,
-      deaths: 2,
-      assists: 3,
-      net_worth: 20000 + index * 1000,
-      last_hits: 100,
-      denies: 4,
-      level: 20,
-      items: items.map((item_id, slot) => ({
-        item_id,
-        game_time_s: 100 * slot,
-        sold_time_s: 0,
-      })),
-    })),
-  },
-};
 
 const heroSummaryRows = catalog.heroes.map((hero, index) => {
   const matches = 20000;
@@ -146,7 +121,7 @@ async function routeApi(page: Page, fixtures: Fixtures = {}) {
         { mate_id: 200, matches_played: 12, wins: 9 },
         { mate_id: 201, matches_played: 5, wins: 2 },
       ]);
-    if (url.pathname.endsWith("/metadata")) return json(scoreboard);
+    if (url.pathname.endsWith("/metadata")) return json(matchMetadata(ACCOUNT));
     return json([]);
   });
 }
@@ -449,20 +424,17 @@ test("empty history says no recorded matches", async ({ page }) => {
   await expect(view(page).getByText("No recorded matches")).toBeVisible();
 });
 
-test("match detail shows both teams with items", async ({ page }) => {
+test("a match row opens that match's report", async ({ page }) => {
   await storeAccount(page);
   await routeApi(page);
   await openMyProfile(page);
-  await view(page).locator(".match-row").first().click();
-  await expect(view(page).locator(".scoreboard .score-row")).toHaveCount(12);
-  await expect(
-    view(page).locator(".scoreboard .score-row.local"),
-  ).toContainText("YOU");
-  await expect(
-    view(page).locator(".scoreboard img.item-icon").first(),
-  ).toBeVisible();
-  await view(page).locator(".match-row").first().click();
-  await expect(view(page).locator(".scoreboard")).toHaveCount(0);
+  const row = view(page).locator(".match-open").first();
+  await expect(row).toContainText("Report →");
+  await row.click();
+  await expect(view(page).locator(".match-report .report-result")).toHaveText(
+    "Victory",
+  );
+  await expect(view(page).locator(".report-table tbody tr")).toHaveCount(12);
 });
 
 test("hero cross-link opens the Heroes tab", async ({ page }) => {

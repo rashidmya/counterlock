@@ -246,28 +246,19 @@
     padding: 10px 0 0;
     font-size: 14px;
   }
-  .app.web .match-toggle {
+  .app.web .match-open {
     flex: 1 1 100%;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px 6px;
     padding: 8px 0 12px;
     font-size: 12px;
   }
-  .app.web .match-date {
+  .app.web :is(.match-date, .match-report-link) {
     text-align: left;
   }
   .app.web .show-more {
     min-height: 40px;
     font-size: 13px;
-  }
-  .app.web .scoreboard {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .app.web .scoreboard-team {
-    overflow-x: auto;
-  }
-  .app.web .scoreboard-team table {
-    min-width: 440px;
   }
   .app.web .hero-table th button {
     min-height: 36px;
