@@ -50,11 +50,18 @@ function Report({
     [selected?.heroId, badge, report.durationS],
   );
   const top = useRef<HTMLDivElement>(null);
+  const viewing = useRef<HTMLSelectElement>(null);
   const select = (next: number | null) => setPicked({ slot: next });
-  // "View as" sits far down the page; bring the new point of view into sight.
+  // "View as" sits far down the page: bring the new point of view into
+  // sight and move focus to the selector, which now names that player.
   const viewAs = (next: number) => {
     select(next);
-    top.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    viewing.current?.focus({ preventScroll: true });
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    top.current?.scrollIntoView({
+      block: "start",
+      behavior: still ? "auto" : "smooth",
+    });
   };
   return (
     <>
@@ -72,6 +79,7 @@ function Report({
         <label className="view-as">
           Viewing as
           <select
+            ref={viewing}
             value={slot ?? "all"}
             onChange={(event) =>
               select(
@@ -110,6 +118,7 @@ function Report({
           report={report}
           curve={curve.data ?? null}
           curveLoading={curve.loading}
+          curveFailed={!!curve.error}
           names={names}
           meId={meId}
         />

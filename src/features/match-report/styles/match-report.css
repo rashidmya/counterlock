@@ -7,6 +7,32 @@
 .match-report > .notice {
   margin: 0;
 }
+.match-report .good {
+  color: var(--good);
+}
+.match-report .bad {
+  color: var(--bad);
+}
+/* Notes read as one paragraph, with Retry inline after the text. */
+.match-report .data-note {
+  display: block;
+}
+.match-report .retry {
+  margin-left: 4px;
+  padding: 0;
+  color: var(--gold);
+  font: 700 12px var(--font-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.match-report .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 /* Viewing as, back link and Copy link. */
 .report-bar {
@@ -55,6 +81,11 @@
 .copy-link .profile-action {
   margin: 0;
 }
+.copy-link-note {
+  align-self: center;
+  color: var(--bad);
+  font-size: 12px;
+}
 .copy-link-fallback {
   width: min(320px, 100%);
   font-size: 12px;
@@ -95,6 +126,10 @@
     rgb(from var(--ally) r g b / 0.14),
     rgb(from var(--enemy) r g b / 0.14)
   );
+}
+/* The hero page's dark wash would hide the win or loss tint. */
+.report-banner .hero-art::after {
+  display: none;
 }
 .report-banner .hero-art-bg {
   top: -80px;
@@ -298,14 +333,12 @@
   white-space: nowrap;
 }
 .report-table td {
+  height: auto;
   padding: 7px 10px;
   border-bottom: 1px solid var(--line-soft);
   font: 600 15px var(--font-label);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-.report-table tr.selected td {
-  background: rgb(from var(--gold) r g b / 0.08);
 }
 .report-player {
   display: flex;
@@ -336,11 +369,17 @@
   text-transform: uppercase;
 }
 .view-as-link:disabled {
-  color: var(--dim);
+  color: var(--muted);
+  opacity: 1;
 }
 
 @media (max-width: 1000px) {
   .report-cols {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .report-table th,
+  .report-table td {
+    padding-right: 7px;
+    padding-left: 7px;
   }
 }

@@ -57,7 +57,7 @@ function LatestMatch({
         <div className="latest-links">
           <RouteLink
             className="latest-link"
-            route={{ page: "match", matchId: match.matchId, accountId }}
+            route={{ page: "match", matchId: match.matchId }}
           >
             Open match report →
           </RouteLink>

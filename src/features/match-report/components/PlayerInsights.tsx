@@ -15,6 +15,7 @@ export function PlayerInsights({
   report,
   curve,
   curveLoading,
+  curveFailed,
   names,
   meId,
 }: {
@@ -22,6 +23,7 @@ export function PlayerInsights({
   report: MatchReport;
   curve: RankCurve | null;
   curveLoading: boolean;
+  curveFailed: boolean;
   names: Map<number, string>;
   meId: number | null;
 }) {
@@ -40,7 +42,9 @@ export function PlayerInsights({
             ? `Souls against the average ${hero} at ${curve.band.label} at each snapshot · normal range = ±1 standard deviation`
             : curveLoading
               ? "Loading the rank average…"
-              : "No rank average for this match, so only deaths are listed."}
+              : curveFailed
+                ? "Rank average unavailable, so only deaths are listed."
+                : "No rank average for this match, so only deaths are listed."}
         </p>
         <ul className="stretches">
           {stretches(player, curve).map((s) => (
@@ -100,7 +104,11 @@ export function PlayerInsights({
               {curve ? `Avg ${hero} at ${curve.band.label}` : "Rank average"}
             </dt>
             <dd>
-              {pickups.average === null ? "—" : pickups.average.toFixed(1)}
+              {curveLoading
+                ? "…"
+                : pickups.average === null
+                  ? "—"
+                  : pickups.average.toFixed(1)}
             </dd>
           </div>
         </dl>

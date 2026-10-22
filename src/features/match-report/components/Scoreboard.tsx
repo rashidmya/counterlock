@@ -44,7 +44,9 @@ export function Scoreboard({
               <th>Obj. dmg</th>
               <th>Healing</th>
               <th>Last hits</th>
-              <th aria-label="View as" />
+              <th>
+                <span className="visually-hidden">View as</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -71,6 +73,11 @@ export function Scoreboard({
                           {p.accountId > 0 && (
                             <RouteLink
                               className="report-player-link"
+                              aria-label={
+                                isMe(p, meId) || names.get(p.accountId)
+                                  ? undefined
+                                  : `${heroName(p.heroId)} player's profile`
+                              }
                               route={{
                                 page: "profile",
                                 accountId: p.accountId,
@@ -97,7 +104,11 @@ export function Scoreboard({
                       <button
                         type="button"
                         className="view-as-link"
-                        aria-label={`View as ${optionLabel(p, names, meId)}`}
+                        aria-label={
+                          current
+                            ? undefined
+                            : `View as ${optionLabel(p, names, meId)}`
+                        }
                         disabled={current}
                         onClick={() => onSelect(p.slot)}
                       >

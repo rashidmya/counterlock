@@ -49,7 +49,9 @@ export function Verdicts({
           <div className="verdict" key={v.label}>
             <small>{v.label}</small>
             <b>{v.value.toLocaleString("en-US")}</b>
-            {v.change === null ? (
+            {curve.loading ? (
+              <span className="muted">Loading…</span>
+            ) : v.change === null ? (
               <span className="muted">No rank average</span>
             ) : percent(v.change) === "0%" ? (
               <span className="muted">

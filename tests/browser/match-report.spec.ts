@@ -132,6 +132,16 @@ test("Home's latest match opens its report as you, against your rank", async ({
   await expect(r.locator(".report-verdicts + .data-note")).toHaveText(
     `Compared with the average ${lead.name} at Emissary at the same match length, over the last 30 days.`,
   );
+  await expect(r.locator(".verdict span").first()).toHaveCSS(
+    "color",
+    "rgb(127, 211, 154)",
+  );
+  await expect(r.locator(".verdict span").nth(2)).toHaveCSS(
+    "color",
+    "rgb(224, 122, 95)",
+  );
+  // Home's latest match has no origin player, so Back goes Home.
+  await expect(r.getByRole("button", { name: "← Home" })).toBeVisible();
   const curve = curves.at(-1)!;
   expect(curve.get("hero_ids")).toBe(String(lead.id));
   expect(curve.get("resolution")).toBe("0");
@@ -243,6 +253,7 @@ test("scoreboard lists the winners first by souls; View as switches player", asy
     .getByRole("button", { name: /^View as/ })
     .click();
   await expect(viewingAs(page)).toHaveValue("12");
+  await expect(viewingAs(page)).toBeFocused();
   await expect(r.locator(".report-result")).toHaveText("Defeat");
 });
 
@@ -275,6 +286,95 @@ test("Copy link copies the website URL for the current point of view", async ({
     `https://counterlock.example/matches/${MATCH_ID}?player=${ACCOUNT}`,
     `https://counterlock.example/matches/${MATCH_ID}`,
   ]);
+});
+
+test("switching player never compares against the previous hero's average", async ({
+  page,
+}) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await storeAccount(page);
+  await routeApi(page);
+  // The second hero's average is twice as high, and arrives late.
+  await page.route(
+    "https://api.deadlock-api.com/v1/analytics/player-performance-curve**",
+    async (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get("hero_ids") !== String(second.id))
+        return route.fallback();
+      await gate;
+      return route.fulfill({
+        json: rankCurveRows().map((row) => ({
+          ...row,
+          net_worth_avg: row.net_worth_avg * 2,
+        })),
+        headers: cors,
+      });
+    },
+  );
+  await page.goto("/");
+  await view(page).getByRole("button", { name: "Open match report →" }).click();
+  const souls = report(page).locator(".verdict span").first();
+  await expect(souls).toHaveText(`▲ 8% vs avg ${lead.name} at Emissary`);
+  await page.evaluate(() => {
+    const seen: string[] = [];
+    Object.assign(window, { seenVerdicts: seen });
+    new MutationObserver(() =>
+      document
+        .querySelectorAll(".verdict span")
+        .forEach((node) => seen.push(node.textContent ?? "")),
+    ).observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+  });
+  await viewingAs(page).selectOption("2");
+  await expect(souls).toHaveText("Loading…");
+  release();
+  // 932 souls / min against 2,000, not against the first hero's 1,000.
+  await expect(souls).toHaveText(`▼ 53% vs avg ${second.name} at Emissary`);
+  const seen = await page.evaluate(
+    () => (window as unknown as { seenVerdicts: string[] }).seenVerdicts,
+  );
+  expect(seen.filter((text) => text.startsWith("▼ 7%"))).toEqual([]);
+});
+
+test("a failed copy shows the link to copy by hand", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: async () => Promise.reject(new Error("denied")) },
+    });
+  });
+  await openReport(page);
+  await report(page).getByRole("button", { name: "Copy link" }).click();
+  await expect(report(page).getByRole("status")).toHaveText(
+    "Couldn't copy the link. Copy it from here:",
+  );
+  const field = report(page).getByRole("textbox", { name: "Match link" });
+  await expect(field).toHaveValue(
+    `https://counterlock.example/matches/${MATCH_ID}?player=${ACCOUNT}`,
+  );
+  await expect(field).toBeFocused();
+});
+
+test("a player without a public account gets the whole-match link", async ({
+  page,
+}) => {
+  const hidden = matchMetadata(ACCOUNT);
+  hidden.match_info.players[1].account_id = 0;
+  await storeAccount(page);
+  await routeApi(page);
+  await page.route(
+    `https://api.deadlock-api.com/v1/matches/${MATCH_ID}/metadata`,
+    (route) => route.fulfill({ json: hidden, headers: cors }),
+  );
+  await page.goto("/");
+  await view(page).getByRole("button", { name: "Open match report →" }).click();
+  await viewingAs(page).selectOption("2");
+  await expect(
+    report(page).getByRole("button", { name: "Copy match link" }),
+  ).toBeVisible();
 });
 
 test("a failed match load says so and Retry recovers", async ({ page }) => {
