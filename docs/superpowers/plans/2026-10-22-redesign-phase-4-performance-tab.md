@@ -40,6 +40,7 @@ Checked on account 400239835 (Eternus 6, 5,699 games) and three Archon–Arcanis
   - **Size:** 50 games is 250 KB (59 KB gzipped) and about 5.5 s. Full metadata is about 1 MB per game, so 20 games would be 20 MB. `include_player_final_stats` is about 36 KB per game, mostly custom stats, and isn't needed.
   - **Limits and fields:** 30 requests per minute per IP, and CORS is open. Teams are `"Team0"` / `"Team1"` here, against `0` / `1` in single-match metadata. The endpoint's default `match_mode` is `ranked,unranked`, which is all the tab asks for.
   - **Batches and caching:** at most 50 games per request (`TOTALS_BATCH`). The service keeps totals per match (per client, so tests start empty), so Last 20 → Last 50 asks only for the 30 new games. A game the API hasn't stored yet is left out, asked for again next time, and counted in a note.
+  - **Unreadable players (Task 2 review):** a match with any player that can't be read (no snapshots, no team) is left out whole, as if not stored yet. Dropping just that player would shrink the team totals, inflate kill participation and damage share, and cache the wrong numbers.
 - **Each game's rank.**
   - **Ranked games:** match history's `ranked_display_badge`, which phase 3 found equals `initial_display_rank` at match start. It is now kept as `HistoryMatch.badge`.
   - **Unranked games:** they have none. All 4,762 unranked rows of the test account are null, and bulk metadata for unranked matches has no badges and a null `average_badge`. As the spec says ("or the player's current rank"), they use `/v1/players/rank`, which is asked only when some game lacks a badge and is already cached by the header. With no current rank, all ranks are used.
@@ -356,15 +357,21 @@ describe("parseMatchTotals", () => {
     expect(parseMatchTotals([{ ...match, players }]).get(5)![0].team).toBe(1);
   });
 
-  it("drops players without snapshots or a team, and matches without players", () => {
-    const match = bulkMatch(5, 77);
-    match.players[0].stats_player_damage = [];
-    match.players[1].team = "Spectator";
-    const empty = { ...bulkMatch(6, 77), players: [] };
-    const totals = parseMatchTotals([match, empty, null, { match_id: "7" }]);
-    expect([...totals.keys()]).toEqual([5]);
-    expect(totals.get(5)!.map((p) => p.accountId)).not.toContain(77);
-    expect(totals.get(5)).toHaveLength(10);
+  it("leaves out a match with a player it can't read, and matches without players", () => {
+    const noSnapshots = bulkMatch(5, 77);
+    noSnapshots.players[3].stats_player_damage = [];
+    const noTeam = bulkMatch(6, 77);
+    noTeam.players[1].team = "Spectator";
+    const empty = { ...bulkMatch(7, 77), players: [] };
+    const totals = parseMatchTotals([
+      noSnapshots,
+      noTeam,
+      empty,
+      bulkMatch(8, 77),
+      null,
+      { match_id: "9" },
+    ]);
+    expect([...totals.keys()]).toEqual([8]);
   });
 
   it("is empty for anything but an array", () => {
@@ -425,7 +432,7 @@ const rows = (value: unknown): Row[] =>
     : [];
 
 // Bulk metadata names the teams "Team0" and "Team1".
-const teamOf = (value: unknown) =>
+const parseTeam = (value: unknown) =>
   value === "Team0" || value === 0
     ? 0
     : value === "Team1" || value === 1
@@ -439,7 +446,7 @@ const final = (player: Row, field: string) => {
 };
 
 function parsePlayer(player: Row): PlayerTotals | null {
-  const team = teamOf(player.team);
+  const team = parseTeam(player.team);
   if (!isNumber(player.account_id) || team === null) return null;
   const heroDamage = final(player, STATS.heroDamage);
   const objectiveDamage = final(player, STATS.objectiveDamage);
@@ -465,13 +472,17 @@ function parsePlayer(player: Row): PlayerTotals | null {
   };
 }
 
-/** Players' totals by match id; matches without usable players are left out. */
+/**
+ * Players' totals by match id. A match with a player that can't be read is
+ * left out, as if not stored yet: its team totals would be wrong.
+ */
 export function parseMatchTotals(data: unknown): Map<number, PlayerTotals[]> {
   const matches = new Map<number, PlayerTotals[]>();
   for (const match of rows(data)) {
     if (!isNumber(match.match_id)) continue;
-    const players = rows(match.players).flatMap((p) => parsePlayer(p) ?? []);
-    if (players.length) matches.set(match.match_id, players);
+    const players = rows(match.players).map(parsePlayer);
+    if (players.length && players.every((p): p is PlayerTotals => !!p))
+      matches.set(match.match_id, players);
   }
   return matches;
 }
