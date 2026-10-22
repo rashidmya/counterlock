@@ -1917,9 +1917,12 @@ describe("series", () => {
       [0, 0],
       [100, 10],
     ];
-    expect([valueAt(points, 50), valueAt(points, 500), valueAt([], 5)]).toEqual(
-      [5, 10, 0],
-    );
+    expect([
+      valueAt(points, 50),
+      valueAt(points, 500),
+      valueAt([], 5),
+      valueAt([[180, 5]], 0),
+    ]).toEqual([5, 10, 0, 5]);
   });
 
   it("sums teams, averages rate stats, and leads Amber minus Sapphire", () => {
@@ -1937,12 +1940,55 @@ describe("series", () => {
     ]);
   });
 
+  it("leads by Amber's advantage: fewer deaths count as ahead", () => {
+    // Amber died 9 times (4 + 5 × 1), Sapphire 6 times.
+    expect(leadSeries(report.players, deaths, "total").at(-1)).toEqual([
+      1800, -3,
+    ]);
+    expect(
+      leadSeries(report.players, accuracy, "total").at(-1)?.[1],
+    ).toBeCloseTo(0);
+  });
+
+  it("divides a team's total by minutes, even when someone's snapshots stop early", () => {
+    const keep = 3;
+    const early = {
+      ...lead,
+      times: lead.times.slice(0, keep),
+      values: Object.fromEntries(
+        Object.entries(lead.values).map(([id, v]) => [id, v.slice(0, keep)]),
+      ) as typeof lead.values,
+    };
+    const players = [early, ...report.players.slice(1)];
+    const total = teamSeries(players, 0, souls, "total").at(-1)!;
+    const rate = teamSeries(players, 0, souls, "perMinute").at(-1)!;
+    expect(rate[0]).toBe(1800);
+    expect(rate[1]).toBeCloseTo(total[1] / 30);
+  });
+
+  it("leaves out players without snapshots", () => {
+    const empty = {
+      ...lead,
+      times: [],
+      values: Object.fromEntries(
+        Object.keys(lead.values).map((id) => [id, []]),
+      ) as unknown as typeof lead.values,
+    };
+    const players = [empty, ...report.players.slice(1)];
+    expect(ranking(players, deaths, "total", 1800)).toHaveLength(11);
+    expect(
+      teamSeries(players, 0, metricById.get("level")!, "total").at(-1)?.[1],
+    ).toBe(30);
+  });
+
   it("gives the rank average up to match end, per minute too", () => {
     const avg = averageSeries(curve, souls, "total", 1800)!;
     expect(avg[0]).toEqual([0, 0, 0]);
     expect(avg.at(-1)).toEqual([1800, 30000, 3000]);
     const rate = averageSeries(curve, souls, "perMinute", 1800)!;
     expect(rate[0]).toEqual([180, 1000, 100]);
+    const short = { ...curve, points: curve.points.filter((p) => p.t <= 900) };
+    expect(averageSeries(short, souls, "total", 1800)!.at(-1)?.[0]).toBe(900);
     expect(averageSeries(null, souls, "total", 1800)).toBeNull();
     expect(averageSeries(curve, accuracy, "total", 1800)).toBeNull();
   });
@@ -1956,6 +2002,8 @@ describe("ranges and ranking", () => {
     expect(rangeOf("late", 1800)).toEqual([1200, 1800]);
     expect(rangeAvailable("late", 1100)).toBe(false);
     expect(rangeAvailable("mid", 1100)).toBe(true);
+    expect(rangeAvailable("mid", 630)).toBe(false);
+    expect(rangeAvailable("mid", 660)).toBe(true);
   });
 
   it("ranks everyone at a time, fewest first for deaths", () => {
@@ -1965,6 +2013,10 @@ describe("ranges and ranking", () => {
     expect(most.findIndex((r) => r.player.slot === 1)).toBe(6);
     const fewest = ranking(report.players, deaths, "total", 1800);
     expect(fewest[0].value).toBe(1);
+    // Eleven players died once; ties go by slot.
+    expect(fewest.slice(0, 11).map((r) => r.player.slot)).toEqual([
+      2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+    ]);
     expect(fewest.at(-1)?.player.slot).toBe(1);
   });
 
@@ -1981,6 +2033,12 @@ describe("ranges and ranking", () => {
   it("formats axis values", () => {
     expect(formatValue(32400, souls)).toBe("32.4K");
     expect(formatValue(62.6666, accuracy)).toBe("62.7");
+    expect(formatValue(-2.66, accuracy)).toBe("−2.7");
+    expect(formatValue(-0.04, accuracy)).toBe("0");
+    expect(formatValue(0.067, deaths)).toBe("0.07");
+    expect(formatValue(-0.25, deaths)).toBe("−0.25");
+    expect(formatValue(0.004, deaths)).toBe("0");
+    expect(formatValue(-29160, souls)).toBe("−29.2K");
   });
 });
 ```
@@ -2004,6 +2062,7 @@ export type ShowMode = "player" | "teams" | "lead" | "everyone";
 export type ValueMode = "total" | "perMinute";
 export type TimeRange = "all" | "early" | "mid" | "late";
 export type Point = [t: number, value: number];
+export type BandPoint = [t: number, average: number, std: number];
 
 export const TIME_RANGES: { id: TimeRange; label: string }[] = [
   { id: "all", label: "Whole match" },
@@ -2047,25 +2106,37 @@ export function valueAt(points: Point[], t: number): number {
   return points.at(-1)![1];
 }
 
-/** A team's total at every snapshot time (an average for rate stats). */
+/**
+ * A team's total at every snapshot time (an average for rate stats), over
+ * the players who have snapshots. Per minute divides the team total by the
+ * minutes, so a player whose snapshots stop early isn't credited with
+ * earning at the same pace after that.
+ */
 export function teamSeries(
   players: ReportPlayer[],
   team: Team,
   metric: Metric,
   mode: ValueMode,
 ): Point[] {
-  const members = players.filter((p) => p.team === team);
-  const series = members.map((p) => playerSeries(p, metric, mode));
+  const members = players.filter((p) => p.team === team && p.times.length);
+  const series = members.map((p) => playerSeries(p, metric, "total"));
   const times = [...new Set(series.flat().map(([t]) => t))].sort(
     (a, b) => a - b,
   );
-  return times.map((t) => {
+  const totals = times.map((t): Point => {
     const sum = series.reduce((total, points) => total + valueAt(points, t), 0);
-    return [t, metric.rate && members.length ? sum / members.length : sum];
+    return [t, metric.rate ? sum / members.length : sum];
   });
+  return perMinute(metric, mode)
+    ? totals.filter(([t]) => t > 0).map(([t, value]) => [t, value / (t / 60)])
+    : totals;
 }
 
-/** Amber minus Sapphire. */
+/**
+ * Amber's advantage at every snapshot time: Amber minus Sapphire, or the
+ * other way round for stats where fewer is better (deaths), so above zero
+ * always means Amber is ahead.
+ */
 export function leadSeries(
   players: ReportPlayer[],
   metric: Metric,
@@ -2073,23 +2144,33 @@ export function leadSeries(
 ): Point[] {
   const amber = teamSeries(players, 0, metric, mode);
   const sapphire = teamSeries(players, 1, metric, mode);
-  return amber.map(([t, value]) => [t, value - valueAt(sapphire, t)]);
+  const sign = metric.lowerBetter ? -1 : 1;
+  const times = [...new Set([...amber, ...sapphire].map(([t]) => t))].sort(
+    (a, b) => a - b,
+  );
+  return times.map((t) => [
+    t,
+    sign * (valueAt(amber, t) - valueAt(sapphire, t)),
+  ]);
 }
 
-/** [t, average, standard deviation] up to the end of the match; null without an average. */
+/**
+ * The rank average and standard deviation up to the match end or the
+ * curve's last step, whichever comes first; null without an average.
+ */
 export function averageSeries(
   curve: RankCurve | null,
   metric: Metric,
   mode: ValueMode,
   durationS: number,
-): [number, number, number][] | null {
+): BandPoint[] | null {
   if (!curve || !metric.curve) return null;
   const times = [
     ...(metric.rate ? [] : [0]),
     ...curve.points.map((p) => p.t).filter((t) => t > 0 && t < durationS),
     durationS,
   ];
-  const points = times.flatMap((t): [number, number, number][] => {
+  const points = times.flatMap((t): BandPoint[] => {
     const at = averageAt(curve, metric, t);
     if (!at) return [];
     if (!perMinute(metric, mode)) return [[t, at.avg, at.std]];
@@ -2105,11 +2186,16 @@ export function rangeOf(range: TimeRange, durationS: number): [number, number] {
   return [0, durationS];
 }
 
+// A range needs at least a minute of match to be worth showing.
+const MIN_RANGE_S = 60;
+
 /** Whether the match is long enough for the range to show anything. */
 export const rangeAvailable = (range: TimeRange, durationS: number) =>
   range === "all" ||
-  durationS > (range === "early" ? 0 : range === "mid" ? 600 : 1200);
+  durationS >=
+    (range === "early" ? 0 : range === "mid" ? 600 : 1200) + MIN_RANGE_S;
 
+/** Everyone with snapshots, best first (fewest first for deaths), ties by slot. */
 export function ranking(
   players: ReportPlayer[],
   metric: Metric,
@@ -2117,6 +2203,7 @@ export function ranking(
   at: number,
 ) {
   return players
+    .filter((player) => player.times.length)
     .map((player) => ({
       player,
       value: valueAt(playerSeries(player, metric, mode), at),
@@ -2143,11 +2230,19 @@ export function rankingTitle(
   );
 }
 
-/** Axis and tooltip numbers: one decimal for rate stats, otherwise compact. */
-export const formatValue = (value: number, metric: Metric) =>
-  metric.rate
-    ? (Math.round(value * 10) / 10).toLocaleString("en-US")
-    : compact(value);
+/**
+ * Axis and tooltip numbers: one decimal for rate stats, two for small
+ * fractions (deaths per minute), otherwise compact.
+ */
+export function formatValue(value: number, metric: Metric) {
+  const size = Math.abs(value);
+  const small = size > 0 && size < 1 && !Number.isInteger(size);
+  if (!metric.rate && !small) return compact(value);
+  const digits = small && !metric.rate ? 2 : 1;
+  const rounded = Number(size.toFixed(digits));
+  if (rounded === 0) return "0";
+  return `${value < 0 ? "−" : ""}${rounded.toLocaleString("en-US", { maximumFractionDigits: digits })}`;
+}
 ```
 
 - [ ] **Step 4: Run the tests and confirm they pass**
@@ -4009,6 +4104,11 @@ function visible<T extends [number, ...number[]]>(
   return points.slice(first, after === -1 ? undefined : after + 1);
 }
 
+// Tooltip rows only where a series has data: no values held before its
+// first snapshot or after the rank average stops.
+const covers = (points: [number, ...number[]][], t: number) =>
+  points.length > 0 && t >= points[0][0] && t <= points.at(-1)![0];
+
 export function GraphChart({
   width,
   lines,
@@ -4078,6 +4178,7 @@ export function GraphChart({
       ? []
       : [
           ...shown
+            .filter((line) => covers(line.points, hover))
             .map((line) => ({
               key: line.key,
               label: line.label,
@@ -4085,7 +4186,7 @@ export function GraphChart({
               value: valueAt(line.points, hover),
             }))
             .sort((a, b) => b.value - a.value),
-          ...(band.length
+          ...(covers(band, hover)
             ? [
                 {
                   key: "avg",
@@ -4335,7 +4436,7 @@ export function GraphChart({
           onPointerLeave={() => setHover(null)}
         />
       </svg>
-      {hover !== null && (
+      {hover !== null && hoverRows.length > 0 && (
         <div
           className="graph-tip"
           role="status"
@@ -5688,7 +5789,8 @@ In `docs/superpowers/specs/2026-10-21-redesign-design.md`:
 - Under "Delivery phases", change item 3 to `3. **Match report (done).**`.
 - Under "The Graph":
   - in the stat tabs list, change "Last hits" to "Last hits (built as **Creep kills**: the snapshots and the rank average have creep kills over time, not the game's last hits)";
-  - in the "More stats…" list, change "Power-ups picked up" to "Power-ups picked up (built as **Permanent buffs**, counted from `power_up_buffs`, with a rank average)".
+  - in the "More stats…" list, change "Power-ups picked up" to "Power-ups picked up (built as **Permanent buffs**, counted from `power_up_buffs`, with a rank average)";
+  - change "Team lead: Amber minus Sapphire, around a zero line." to "Team lead: Amber's advantage around a zero line (Amber minus Sapphire, flipped for deaths so above the line is always Amber ahead)."
 - Under "Match report", after the benchmark paragraph, add: "Built in phase 3: the rank band is the selected player's tier at match start, read from the metadata (`player_rank_data.initial_display_rank`), and widened one tier each way when it has fewer than 100 games."
 
 - [ ] **Step 3: Final check**
