@@ -77,6 +77,7 @@
     .item-detail,
     .hero-detail,
     .profile,
+    .match-report,
     .web-about,
     .web-not-found
   ) {
@@ -141,6 +142,15 @@
   margin: calc(-1 * var(--page-top)) calc(-1 * var(--gut)) 0;
   padding-right: var(--gut);
   padding-left: var(--gut);
+}
+.app.web .report-banner {
+  margin-right: calc(-1 * var(--gut));
+  margin-left: calc(-1 * var(--gut));
+  padding-right: var(--gut);
+  padding-left: var(--gut);
+}
+.app.web .report-banner .hero-art-bg {
+  right: calc(var(--gut) + 2%);
 }
 .app.web .home-hero {
   margin: calc(-1 * var(--page-top)) calc(-1 * var(--gut)) 0;

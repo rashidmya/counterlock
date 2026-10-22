@@ -2,7 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
 import { FARGO, mockApi } from "./fixtures";
 
-const SCROLLERS = ".hero-table-wrap, .scoreboard-team, .skill-order";
+const SCROLLERS =
+  ".hero-table-wrap, .scoreboard-team, .report-table-wrap, .skill-order";
 const clipped = (page: Page, limit: number) =>
   page.evaluate(
     ([scrollers, max]) => {
@@ -242,6 +243,25 @@ test.describe("phone width (375px)", () => {
     await page.getByRole("tab", { name: "Performance" }).click();
     await expect(page.locator(".chart-card").first()).toBeVisible();
     expect((await overflow(page)).scroll).toBeLessThanOrEqual(375);
+    expect(await clipped(page, 375)).toEqual([]);
+  });
+
+  test("match report has no page scroll; the scoreboard scrolls inside its container", async ({
+    page,
+  }) => {
+    await mockApi(page);
+    await page.goto(`/matches/1001?player=${FARGO}`);
+    await expect(page.locator(".report-result")).toHaveText("Victory");
+    await expect(page.locator(".graph-svg")).toBeVisible();
+    await expect(page.locator(".verdict span").first()).toContainText("▲");
+    expect((await overflow(page)).scroll).toBeLessThanOrEqual(375);
+    expect(await clipped(page, 375)).toEqual([]);
+    const wrap = page.locator(".report-table-wrap").first();
+    expect(
+      await wrap.evaluate((node) => node.scrollWidth > node.clientWidth),
+    ).toBe(true);
+    await page.getByRole("button", { name: "Everyone" }).click();
+    await expect(page.locator(".graph-legend")).toBeVisible();
     expect(await clipped(page, 375)).toEqual([]);
   });
 });

@@ -41,7 +41,7 @@ createServer((request, response) => {
   }
   const file = resolve(pathname);
   if (file) return send(response, 200, file);
-  if (pathname.startsWith("/players/"))
+  if (pathname.startsWith("/players/") || pathname.startsWith("/matches/"))
     return send(response, 200, join(root, "__spa-fallback.html"));
   send(response, 404, join(root, "404.html"));
 }).listen(port, "127.0.0.1", () =>

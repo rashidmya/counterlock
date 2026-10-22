@@ -1,7 +1,15 @@
 /* Phone layouts for the website only; everything is scoped under `.web`. Loaded after web.css. */
 
 .app.web
-  :is(.heroes-page, .items-page, .item-detail, .hero-detail, .profile, .home) {
+  :is(
+    .heroes-page,
+    .items-page,
+    .item-detail,
+    .hero-detail,
+    .profile,
+    .home,
+    .match-report
+  ) {
   overflow: visible;
 }
 .app.web
@@ -263,5 +271,55 @@
   }
   .app.web .hero-table th button {
     min-height: 36px;
+  }
+
+  .app.web .report-back {
+    flex-basis: 100%;
+  }
+  .app.web .view-as {
+    flex: 1 1 100%;
+  }
+  .app.web .view-as select {
+    flex: 1;
+    max-width: none;
+  }
+  .app.web .report-note {
+    text-align: left;
+  }
+  .app.web .report-banner {
+    gap: 14px;
+  }
+  .app.web .report-banner .hero-art {
+    display: none;
+  }
+  .app.web .report-banner-portrait {
+    width: 72px;
+    height: 72px;
+  }
+  .app.web .report-result {
+    font-size: 30px;
+  }
+  .app.web .report-stats {
+    gap: 6px 18px;
+  }
+  .app.web .report-stats dd {
+    font-size: 17px;
+  }
+  .app.web .report-verdicts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app.web .report-graph {
+    padding: 10px;
+  }
+  .app.web .graph-tabs select {
+    margin-left: 0;
+  }
+  .app.web .stretch {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .app.web .impact-row {
+    grid-template-columns: 96px minmax(0, 1fr) 76px;
+    gap: 8px;
   }
 }

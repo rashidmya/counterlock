@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
+import { matchMetadata, rankCurveRows } from "../fixtures/match-report";
 
 export const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAHnOcQAAAAABJRU5ErkJggg==",
@@ -99,24 +100,6 @@ const popularBuild = {
   },
   num_favorites: 12,
 };
-const player = (teamHero: number, id: number, team: number) => ({
-  account_id: id,
-  team,
-  hero_id: teamHero,
-  kills: 7,
-  deaths: 3,
-  assists: 9,
-  net_worth: 28000,
-  last_hits: 140,
-  denies: 4,
-  level: 22,
-  items: shopItems.map((entry, index) => ({
-    item_id: entry.id,
-    game_time_s: index * 60,
-    sold_time_s: 0,
-  })),
-});
-
 export async function mockApi(page: Page) {
   await page.route("https://assets-bucket.deadlock-api.com/**", (route) =>
     route.fulfill({ body: PNG, contentType: "image/png", headers: cors }),
@@ -194,21 +177,9 @@ export async function mockApi(page: Page) {
           })),
         );
       case "/v1/matches/1001/metadata":
-        return json({
-          match_info: {
-            match_id: 1001,
-            duration_s: 1800,
-            winning_team: 0,
-            players: [
-              ...Array.from({ length: 6 }, (_, i) =>
-                player(catalog.heroes[i].id, i === 0 ? FARGO : 5000 + i, 0),
-              ),
-              ...Array.from({ length: 6 }, (_, i) =>
-                player(catalog.heroes[i + 6].id, 6000 + i, 1),
-              ),
-            ],
-          },
-        });
+        return json(matchMetadata(FARGO));
+      case "/v1/analytics/player-performance-curve":
+        return json(rankCurveRows());
       default:
         return json([]);
     }
