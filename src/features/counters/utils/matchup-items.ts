@@ -7,7 +7,7 @@ import {
 export const MIN_VERSUS_MATCHES = 200;
 export const COUNTER_ITEMS = 6;
 export const MAX_ENEMIES = 6;
-export const CONFIDENCE_Z = 2;
+export const CONFIDENCE_Z = 3;
 
 export interface VersusRows {
   heroId: number;
@@ -16,7 +16,7 @@ export interface VersusRows {
 export interface CounterPick {
   itemId: number;
   lift: number; // average over counted enemies, net of the matchup; missing counts as 0
-  matches: number; // the item's versus matches summed over counted enemies
+  matches: number; // largest single-enemy sample; a lower bound on games with this item against these heroes
   against: number[]; // enemies where it clearly does better, strongest first
 }
 
@@ -57,7 +57,7 @@ export function counterItemsVs(
           (item.winRate * (1 - item.winRate)) / item.matches +
           (reference.winRate * (1 - reference.winRate)) / reference.matches,
       });
-      total.matches += item.matches;
+      total.matches = Math.max(total.matches, item.matches);
       totals.set(item.itemId, total);
     }
   }

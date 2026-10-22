@@ -26,7 +26,7 @@ describe("counterItemsVs", () => {
     const picks = counterItemsVs(baseline, [vsX, vsY]);
     expect(picks.map((p) => p.itemId)).toEqual([A, B]);
     expect(picks[0].lift).toBeCloseTo(0.05);
-    expect(picks[0].matches).toBe(6000);
+    expect(picks[0].matches).toBe(3000);
     expect(picks[0].against).toEqual([X]);
     expect(picks[1].lift).toBeCloseTo(0.03);
     expect(picks[1].against).toEqual([Y]);
@@ -82,16 +82,23 @@ describe("counterItemsVs", () => {
     expect(top.against).toEqual([X]);
   });
   it("ranks by the lower bound", () => {
-    // P: lift 0.06 on 400 matches. Q: lift 0.05 on 40,000. R offsets the shift.
-    const rate = (0.5 * 80400 - (0.56 * 400 + 0.55 * 40000)) / 40000;
+    // P: lift 0.06 on 1,500 matches. Q: lift 0.05 on 40,000. R offsets the shift.
+    const rate = (0.5 * 81500 - (0.56 * 1500 + 0.55 * 40000)) / 40000;
     const enemy = {
       heroId: X,
-      rows: [row(A, 0.56, 400), row(B, 0.55, 40000), row(L, rate, 40000)],
+      rows: [row(A, 0.56, 1500), row(B, 0.55, 40000), row(L, rate, 40000)],
     };
     const picks = counterItemsVs(baseline, [enemy]);
     expect(picks.map((p) => p.itemId)).toEqual([B, A]);
     expect(picks[0].lift).toBeCloseTo(0.05);
     expect(picks[1].lift).toBeCloseTo(0.06);
+  });
+  it("reports the largest single-enemy sample as matches", () => {
+    const big = { heroId: X, rows: [row(A, 0.6, 5000), row(L, 0.4, 5000)] };
+    const small = { heroId: Y, rows: [row(A, 0.6, 2000), row(L, 0.4, 2000)] };
+    const [top] = counterItemsVs(baseline, [small, big]);
+    expect(top.itemId).toBe(A);
+    expect(top.matches).toBe(5000);
   });
   it("returns at most n items and nothing without data", () => {
     expect(counterItemsVs(baseline, [vsX, vsY], new Set(), 1)).toHaveLength(1);
