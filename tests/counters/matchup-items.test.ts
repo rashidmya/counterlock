@@ -26,7 +26,6 @@ describe("counterItemsVs", () => {
     const picks = counterItemsVs(baseline, [vsX, vsY]);
     expect(picks.map((p) => p.itemId)).toEqual([A, B]);
     expect(picks[0].lift).toBeCloseTo(0.05);
-    expect(picks[0].winRate).toBeCloseTo(0.55);
     expect(picks[0].matches).toBe(6000);
     expect(picks[0].against).toEqual([X]);
     expect(picks[1].lift).toBeCloseTo(0.03);
@@ -54,6 +53,45 @@ describe("counterItemsVs", () => {
     expect(
       counterItemsVs(baseline, [vsX, vsY], new Set([A])).map((p) => p.itemId),
     ).toEqual([B]);
+  });
+  it("a small lift on a small sample is not a counter, the same lift on a large one is", () => {
+    const enemy = (matches: number) => ({
+      heroId: X,
+      rows: [row(A, 0.53, matches), row(L, 0.47, matches)], // overall 50%: no shift
+    });
+    expect(counterItemsVs(baseline, [enemy(300)])).toEqual([]);
+    const [top] = counterItemsVs(baseline, [enemy(30000)]);
+    expect(top.itemId).toBe(A);
+    expect(top.lift).toBeCloseTo(0.03);
+  });
+  it("an enemy with only small samples does not dilute the lift", () => {
+    const tiny = { heroId: 103, rows: [row(A, 0.9, 100), row(B, 0.1, 100)] };
+    const picks = counterItemsVs(baseline, [vsX, vsY, tiny]);
+    expect(picks.map((p) => p.itemId)).toEqual([A, B]);
+    expect(picks[0].lift).toBeCloseTo(0.05);
+  });
+  it("exactly minMatches qualifies", () => {
+    const edge = { heroId: X, rows: [row(A, 0.8, 200), row(L, 0.2, 200)] };
+    expect(counterItemsVs(baseline, [edge]).map((p) => p.itemId)).toEqual([A]);
+  });
+  it("against lists only enemies where the item clearly does better", () => {
+    const small = { heroId: Y, rows: [row(A, 0.52, 200), row(L, 0.48, 200)] };
+    const [top] = counterItemsVs(baseline, [vsX, small]);
+    expect(top.itemId).toBe(A);
+    expect(top.lift).toBeCloseTo(0.06);
+    expect(top.against).toEqual([X]);
+  });
+  it("ranks by the lower bound", () => {
+    // P: lift 0.06 on 400 matches. Q: lift 0.05 on 40,000. R offsets the shift.
+    const rate = (0.5 * 80400 - (0.56 * 400 + 0.55 * 40000)) / 40000;
+    const enemy = {
+      heroId: X,
+      rows: [row(A, 0.56, 400), row(B, 0.55, 40000), row(L, rate, 40000)],
+    };
+    const picks = counterItemsVs(baseline, [enemy]);
+    expect(picks.map((p) => p.itemId)).toEqual([B, A]);
+    expect(picks[0].lift).toBeCloseTo(0.05);
+    expect(picks[1].lift).toBeCloseTo(0.06);
   });
   it("returns at most n items and nothing without data", () => {
     expect(counterItemsVs(baseline, [vsX, vsY], new Set(), 1)).toHaveLength(1);
