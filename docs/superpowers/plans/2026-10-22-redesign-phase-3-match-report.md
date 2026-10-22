@@ -6263,9 +6263,10 @@ After the "Hero page builds and counter items" section, add:
 
 Everything comes from `GET /v1/matches/{id}/metadata`: per-player stat snapshots (every 3 min until 15:00, then every 5 min, plus one at the end; lines connect them), deaths, purchases, permanent buff pickups, objectives and Mid Boss. Player names come from one batched `GET /v1/players/steam`. Teams are named Amber and Sapphire.
 
-- **Rank average:** `GET /v1/analytics/player-performance-curve?hero_ids=…&min_average_badge=…&max_average_badge=…&resolution=0` (absolute game time) for the selected player's hero and the whole tier of their rank at match start (from the metadata; the lobby's rank when theirs is unknown), last 30 days, normal matches only. When the tier has fewer than 100 games at 3:00 it widens one tier each way and says so; steps with fewer than 30 games are dropped. The graph shades ±1 standard deviation around the average.
+- **Rank average:** `GET /v1/analytics/player-performance-curve?hero_ids=…&min_average_badge=…&max_average_badge=…&resolution=0` (absolute game time) for the selected player's hero and the whole tier of their rank at match start (from the metadata; the lobby's rank when theirs is unknown), last 30 days, normal matches only. When the tier has fewer than 100 games at 3:00, or its games stop before the match ends, it widens one tier each way and says so; steps with fewer than 30 games are dropped. The graph shades ±1 standard deviation around the average.
 - **Verdicts** compare the match's end values with the average at the same match length. The graph and verdicts use **creep kills**, which the snapshots and the average both have; the banner and scoreboard show the game's **last hits**, which is a different count.
-- **Stretches** are rule-based: the moments furthest ahead of and behind the average souls, where the player crossed it, every death, and any 3+ deaths within 5 minutes.
+- **Stretches** are rule-based: the moments with the most and fewest souls against the average, where the player ended up against the normal range (the average ± 1 standard deviation) and since when, every death, and any 3+ deaths within 5 minutes. When the average stops before the match ends, they say so.
+- **Team lead** is Amber's advantage: Amber minus Sapphire, flipped for deaths so above the line always means Amber is ahead.
 - **Impact** is the player's share of their team's hero damage, objective damage and healing (bars fill at half the team's total; the line marks an even 1/6), plus kill participation.
 - **Permanent buffs** counts permanent pickups against the rank average.
 - **Copy link** copies `{VITE_SITE_URL}/matches/{id}?player={account}`; the desktop app uses Overwolf's clipboard (the manifest's "Clipboard" permission).
@@ -6288,7 +6289,7 @@ In `docs/superpowers/specs/2026-10-21-redesign-design.md`:
   - in the stat tabs list, change "Last hits" to "Last hits (built as **Creep kills**: the snapshots and the rank average have creep kills over time, not the game's last hits)";
   - in the "More stats…" list, change "Power-ups picked up" to "Power-ups picked up (built as **Permanent buffs**, counted from `power_up_buffs`, with a rank average)";
   - change "Team lead: Amber minus Sapphire, around a zero line." to "Team lead: Amber's advantage around a zero line (Amber minus Sapphire, flipped for deaths so above the line is always Amber ahead)."
-- Under "Match report", after the benchmark paragraph, add: "Built in phase 3: the rank band is the selected player's tier at match start, read from the metadata (`player_rank_data.initial_display_rank`), and widened one tier each way when it has fewer than 100 games."
+- Under "Match report", after the benchmark paragraph, add: "Built in phase 3: the rank band is the selected player's tier at match start, read from the metadata (`player_rank_data.initial_display_rank`), and widened one tier each way when it has fewer than 100 games or its games stop before the match ends."
 
 - [ ] **Step 3: Final check**
 
