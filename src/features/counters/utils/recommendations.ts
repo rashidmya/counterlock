@@ -146,7 +146,7 @@ export interface Recommendation {
   targets: string[];
 }
 export function recommend(
-  enemies: Player[],
+  enemies: Pick<Player, "heroId" | "heroName">[],
   items: Item[],
   budget: number,
   owned: number[],

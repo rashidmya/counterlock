@@ -53,4 +53,15 @@ describe("recommendation constraints", () => {
       recommend(unknown, catalog.items, 6400, [], ["healing"]).length,
     ).toBeGreaterThan(0);
   });
+  it("accepts hero references without full player rows", () => {
+    const hero = catalog.heroes.find((h) => heroThreats[h.id])!;
+    const list = recommend(
+      [{ heroId: hero.id, heroName: hero.name }],
+      catalog.items,
+      6400,
+      [],
+    );
+    expect(list.length).toBeGreaterThan(0);
+    expect(list[0].targets).toContain(hero.name);
+  });
 });

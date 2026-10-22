@@ -2,7 +2,6 @@ import type { Item } from "@/shared/catalog/types";
 import { TTL, deadlockApi, type DeadlockApi } from "@/shared/api/DeadlockApi";
 import { catalog, heroById } from "@/shared/catalog";
 import { recommend } from "@/features/counters/utils/recommendations";
-import type { Player } from "@/features/match/types";
 import {
   analyticsParams,
   summarizeHeroes,
@@ -74,18 +73,10 @@ export function fetchItemStats(
 }
 
 export function heuristicCounterItems(heroId: number): Item[] {
-  const enemy: Player = {
-    slot: "heuristic",
-    name: "",
-    heroId,
-    heroName: heroById.get(heroId)?.name ?? "",
-    team: 1,
-    local: false,
-    accountId: null,
-    kills: 0,
-    deaths: 0,
-    assists: 0,
-    items: [],
-  };
-  return recommend([enemy], catalog.items, 99999, []).map((r) => r.item);
+  return recommend(
+    [{ heroId, heroName: heroById.get(heroId)?.name ?? "" }],
+    catalog.items,
+    99999,
+    [],
+  ).map((r) => r.item);
 }
