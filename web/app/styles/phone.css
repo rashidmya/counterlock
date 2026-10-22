@@ -226,8 +226,7 @@
   .app.web .stat-card.rank-card {
     grid-column: 1 / -1;
   }
-  .app.web .stat-card small,
-  .app.web .chart-card small {
+  .app.web .stat-card small {
     font-size: 10px;
   }
   .app.web .top-heroes {

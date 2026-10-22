@@ -1,24 +1,146 @@
 import { useState } from "react";
 import type { AsyncState } from "@/shared/api/useAsync";
 import { useAsync } from "@/shared/api/useAsync";
-import { LineChart } from "@/shared/ui/LineChart";
+import { heroById } from "@/shared/catalog";
 import { SectionHeader } from "@/shared/ui/SectionHeader";
-import { fetchSummaryHeroStats } from "../services/profile-api";
-import type { HistoryMatch } from "../types";
 import {
-  combatAverages,
-  performanceSeries,
+  fetchGameAverages,
+  fetchMatchTotals,
+} from "../services/performance-api";
+import type { HistoryMatch } from "../types";
+import { timeAgo } from "../utils/format";
+import type { PlayerTotals } from "../utils/match-totals";
+import {
+  PERFORMANCE_METRICS,
+  RANGES,
+  gameTotals,
+  gamesInRange,
+  heroChoices,
+  summarizeMetric,
+  type GameAverage,
+  type GamePoint,
+  type MetricSummary,
+  type PerformanceMetric,
   type PerformanceRange,
-} from "../utils/performance";
+} from "../utils/performance-metrics";
+import { Sparkline } from "./Sparkline";
 
-const ranges: { value: PerformanceRange; label: string }[] = [
-  { value: 20, label: "Last 20" },
-  { value: 50, label: "Last 50" },
-  { value: "all", label: "All" },
-];
+const heroName = (heroId: number) =>
+  heroById.get(heroId)?.name ?? `Hero ${heroId}`;
 
-const NONE = "—";
-const whole = (value: number) => Math.round(value).toLocaleString("en-US");
+const count = (games: number) => `${games} ${games === 1 ? "game" : "games"}`;
+
+const format = (metric: PerformanceMetric, value: number) =>
+  metric.percent
+    ? `${Math.round(value * 100)}%`
+    : value >= 100
+      ? Math.round(value).toLocaleString("en-US")
+      : value.toFixed(1);
+
+const TRENDS = {
+  improving: "▲ Improving",
+  flat: "– Flat",
+  slipping: "▼ Slipping",
+};
+
+function PerformanceCard({
+  summary,
+  totals,
+  averages,
+}: {
+  summary: MetricSummary;
+  totals: AsyncState<unknown>;
+  averages: AsyncState<unknown>;
+}) {
+  const { metric, value, games, average, comparedValue, compared, trend } =
+    summary;
+  // What the card still waits for, or lacks because a request failed.
+  const waiting =
+    (metric.needsTotals && totals.loading) ||
+    (!!metric.average && averages.loading);
+  const failed =
+    (metric.needsTotals && !!totals.error) ||
+    (!!metric.average && !!averages.error);
+  const detail =
+    metric.needsTotals && totals.loading
+      ? "Loading match details…"
+      : !games
+        ? "No match details"
+        : count(games) +
+          (!metric.average
+            ? " · no rank average"
+            : averages.loading
+              ? " · loading rank average…"
+              : average === null
+                ? averages.error
+                  ? ""
+                  : " · no rank average for these games"
+                : compared < games
+                  ? // Like with like: the player over the same games.
+                    ` · ${compared} with a rank average: ${format(metric, comparedValue!)} vs ${format(metric, average)}`
+                  : ` · rank avg ${format(metric, average)}`);
+  const title = (p: GamePoint) =>
+    `${heroName(p.heroId)} · ${p.won ? "Win" : "Loss"} · ${timeAgo(p.startTime * 1000)}: ` +
+    format(metric, p.value!) +
+    (p.average === null ? "" : ` (rank avg ${format(metric, p.average)})`);
+  return (
+    <section className="perf-card" aria-label={metric.label}>
+      <div className="perf-card-head">
+        <h3>{metric.label}</h3>
+        {trend ? (
+          <span className={`perf-trend ${trend}`}>{TRENDS[trend]}</span>
+        ) : (
+          !waiting &&
+          !failed &&
+          games > 0 && <span className="perf-trend">Too few games</span>
+        )}
+      </div>
+      <div className="perf-card-numbers">
+        <b>{value === null ? "—" : format(metric, value)}</b>
+        <span>{detail}</span>
+      </div>
+      {games > 0 && (
+        <Sparkline
+          points={summary.points}
+          label={`${metric.label}, game by game`}
+          title={title}
+        />
+      )}
+    </section>
+  );
+}
+
+/** The one-line notes on how the numbers are made, as they apply. */
+function notes(
+  games: HistoryMatch[],
+  totals: Map<number, PlayerTotals[]> | undefined,
+  averages: Map<number, GameAverage> | undefined,
+) {
+  const lines = [
+    "Normal and ranked games, oldest on the left. The rank average is the average player on the same hero at the same rank and match length, over the last 30 days.",
+    "Improving or slipping compares the recent half of these games with the earlier half, each against its rank average where there is one. Changes smaller than game-to-game noise show as flat.",
+    "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and hero damage share have no rank average.",
+  ];
+  const sources = new Set([...(averages?.values() ?? [])].map((a) => a.source));
+  if (sources.has("current"))
+    lines.push("Games without a recorded rank use the player's current rank.");
+  if (sources.has("none"))
+    lines.push(
+      "Games without a recorded rank are compared with all ranks: the player's current rank is unknown.",
+    );
+  if ([...(averages?.values() ?? [])].some((a) => a.widenedFrom))
+    lines.push(
+      "Where a hero has too few games at one rank, its average covers the ranks either side.",
+    );
+  const missing = totals
+    ? games.filter((g) => !totals.has(g.matchId)).length
+    : 0;
+  if (missing)
+    lines.push(
+      `${missing} of ${games.length} games have no match details yet, so they're missing from damage, healing, creep kills and shares.`,
+    );
+  return lines;
+}
 
 export function PerformanceTab({
   accountId,
@@ -28,39 +150,63 @@ export function PerformanceTab({
   history: AsyncState<HistoryMatch[]>;
 }) {
   const [range, setRange] = useState<PerformanceRange>(20);
-  const stats = useAsync(() => fetchSummaryHeroStats(accountId), [accountId]);
-  const matches = history.data;
-  const series = performanceSeries(matches ?? [], range);
-  const combat = stats.data ? combatAverages(stats.data) : null;
-  const { averages } = series;
-  const cards = [
-    {
-      label: "ACCURACY",
-      value: combat ? `${(combat.accuracy * 100).toFixed(1)}%` : NONE,
-    },
-    {
-      label: "DMG/MIN",
-      value: combat ? whole(combat.damagePerMin) : NONE,
-    },
-    { label: "LAST HITS", value: averages.avgLastHits.toFixed(1) },
-    { label: "DEATHS", value: averages.avgDeaths.toFixed(1) },
-  ];
+  const [heroId, setHeroId] = useState<number | null>(null);
+  const matches = history.data ?? [];
+  const heroes = heroChoices(matches);
+  const games = gamesInRange(matches, range, heroId);
+  const key = games.map((g) => g.matchId).join(",");
+  const totals = useAsync(
+    games.length ? () => fetchMatchTotals(games.map((g) => g.matchId)) : null,
+    [key],
+  );
+  const averages = useAsync(
+    games.length ? () => fetchGameAverages(accountId, games) : null,
+    [accountId, key],
+  );
+  const summaries = PERFORMANCE_METRICS.map((metric) =>
+    summarizeMetric(
+      metric,
+      games,
+      (id) => gameTotals(totals.data?.get(id), accountId),
+      (id) => averages.data?.get(id),
+    ),
+  );
   return (
     <div className="performance">
       <SectionHeader title="Performance" />
       <div className="section-head">
         <div className="filter-buttons" role="group" aria-label="Range">
-          {ranges.map(({ value, label }) => (
+          {RANGES.map((value) => (
             <button
-              key={label}
+              key={value}
               className={range === value ? "active" : ""}
               aria-pressed={range === value}
               onClick={() => setRange(value)}
             >
-              {label}
+              Last {value}
             </button>
           ))}
         </div>
+        {heroes.length > 1 && (
+          <label className="select-field">
+            Hero
+            <select
+              value={heroId ?? ""}
+              onChange={(event) =>
+                setHeroId(
+                  event.target.value ? Number(event.target.value) : null,
+                )
+              }
+            >
+              <option value="">All heroes</option>
+              {heroes.map((hero) => (
+                <option key={hero.heroId} value={hero.heroId}>
+                  {heroName(hero.heroId)} · {count(hero.games)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
       {history.loading && <p className="muted">Loading match history…</p>}
       {history.error && (
@@ -71,51 +217,58 @@ export function PerformanceTab({
           </button>
         </p>
       )}
-      {matches && !averages.games && (
+      {history.data && !games.length && (
         <p className="muted">No recorded normal or ranked matches</p>
       )}
-      {!!averages.games && (
+      {!!games.length && (
         <>
-          <p className="data-note">Normal & ranked games</p>
-          <section className="chart-card">
-            <small>KDA PER MATCH</small>
-            <LineChart
-              values={series.kda}
-              average={averages.kda}
-              label="KDA per match"
-              color="var(--gold)"
-            />
-          </section>
-          <section className="chart-card">
-            <small>SOULS PER MINUTE</small>
-            <LineChart
-              values={series.soulsPerMin}
-              average={averages.soulsPerMin}
-              label="Souls per minute"
-              color="var(--good)"
-            />
-          </section>
-          <section className="chart-card">
-            <small>FORM · LAST {series.form.length}</small>
-            <div className="form">
-              {series.form.map((won, index) => (
-                <i key={index} className={won ? "win" : "loss"} />
-              ))}
-            </div>
-          </section>
-          <div className="stat-row">
-            {cards.map(({ label, value }) => (
-              <div key={label} className="stat-card">
-                <small>{label}</small>
-                <strong>{value}</strong>
-              </div>
+          <div className="performance-legend" aria-hidden="true">
+            <span>
+              <i className="value" />
+              Game by game
+            </span>
+            <span>
+              <i className="average" />
+              Average for that hero at that rank
+            </span>
+            <span>
+              <i className="win" />
+              Win
+            </span>
+            <span>
+              <i className="loss" />
+              Loss
+            </span>
+          </div>
+          <div className="perf-cards">
+            {summaries.map((summary) => (
+              <PerformanceCard
+                key={summary.metric.id}
+                {...{ summary, totals, averages }}
+              />
             ))}
           </div>
-          <p className="data-note">
-            Last hits and deaths are per-game averages for the selected range.
-            {range !== "all" &&
-              " Accuracy and damage cover all normal & ranked games in the period."}
-          </p>
+          {totals.error && (
+            <p className="notice warning" role="status">
+              Match details unavailable: {totals.error}
+              <button type="button" onClick={totals.retry}>
+                Retry
+              </button>
+            </p>
+          )}
+          {averages.error && (
+            <p className="notice warning" role="status">
+              Rank averages unavailable: {averages.error}
+              <button type="button" onClick={averages.retry}>
+                Retry
+              </button>
+            </p>
+          )}
+          {notes(games, totals.data, averages.data).map((line) => (
+            <p key={line} className="data-note">
+              {line}
+            </p>
+          ))}
         </>
       )}
     </div>

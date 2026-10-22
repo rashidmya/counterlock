@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
 import { matchMetadata, rankCurveRows } from "../fixtures/match-report";
+import { bulkMetadata } from "../fixtures/performance";
 
 export const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAHnOcQAAAAABJRU5ErkJggg==",
@@ -178,6 +179,8 @@ export async function mockApi(page: Page) {
         );
       case "/v1/matches/1001/metadata":
         return json(matchMetadata(FARGO));
+      case "/v1/matches/metadata":
+        return json(bulkMetadata(url, FARGO));
       case "/v1/analytics/player-performance-curve":
         return json(rankCurveRows());
       default:
