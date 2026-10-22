@@ -23,12 +23,12 @@ Each card shows one point per game (win or loss dot) with the dashed rank averag
 **Spec:** `docs/superpowers/specs/2026-10-21-redesign-design.md`: "Performance tab", "Profile" and phase 4 of "Delivery phases". Visual reference: `docs/superpowers/specs/2026-10-21-redesign-prototype.html` (open "Performance"; tick "Show as website" for web sizes). Where this plan and the prototype differ, this plan wins.
 
 **Every code block in this plan was built and run before the plan was written.** The full result:
-- `npm test` 362 passed;
+- `npm test` 365 passed;
 - `npm run test:browser` 130 passed;
 - `npm run test:web` 74 passed;
 - both type checks, `npm run build`, `npm run web:build` and `npm run validate:manifest` passed.
 
-Each task's end state was also checked on its own: type check and unit tests after every task (334, 339, 363, 372, 372, 372 and 362 tests), and both browser suites after Tasks 5 and 6. Copy the code as given. If something fails, fix the cause rather than the test.
+Each task's end state was also checked on its own: type check and unit tests after every task (334, 339, 363, 375, 375, 375 and 365 tests), and both browser suites after Tasks 5 and 6. Copy the code as given. If something fails, fix the cause rather than the test.
 
 ## Decisions made while planning (verified against the live API on 2026-10-22)
 
@@ -40,6 +40,7 @@ Checked on account 400239835 (Eternus 6, 5,699 games) and three Archon–Arcanis
   - **Size:** 50 games is 250 KB (59 KB gzipped) and about 5.5 s. Full metadata is about 1 MB per game, so 20 games would be 20 MB. `include_player_final_stats` is about 36 KB per game, mostly custom stats, and isn't needed.
   - **Limits and fields:** 30 requests per minute per IP, and CORS is open. Teams are `"Team0"` / `"Team1"` here, against `0` / `1` in single-match metadata. The endpoint's default `match_mode` is `ranked,unranked`, which is all the tab asks for.
   - **Batches and caching:** at most 50 games per request (`TOTALS_BATCH`). The service keeps totals per match (per client, so tests start empty), so Last 20 → Last 50 asks only for the 30 new games. A game the API hasn't stored yet is left out, asked for again next time, and counted in a note.
+  - **Retry delay (Task 4 review):** bulk responses are cached by the client for `TTL.history` (2 min), so a game the API stores after it was first asked for shows up within two minutes.
   - **Unreadable players (Task 2 review):** a match with any player that can't be read (no snapshots, no team) is left out whole, as if not stored yet. Dropping just that player would shrink the team totals, inflate kill participation and damage share, and cache the wrong numbers.
 - **Each game's rank.**
   - **Ranked games:** match history's `ranked_display_badge`, which phase 3 found equals `initial_display_rank` at match start. It is now kept as `HistoryMatch.badge`.
@@ -85,6 +86,7 @@ Checked on account 400239835 (Eternus 6, 5,699 games) and three Archon–Arcanis
   - **Clicking a game:** a point could open that game's match report.
   - **Unranked games:** the tab compares them with the player's current rank, while the match report uses the lobby's rank (all ranks for unranked). Pick one rule for both.
   - **Rate limit:** switching heroes quickly on Last 100 could pass bulk metadata's 30 requests per minute. The client's cooldown then pauses every request for 30 s.
+  - **All-or-nothing averages:** one failed or timed-out curve blanks every card's rank average until Retry (successful curves stay cached). On Last 100 a player with many heroes fires every uncached curve at once (about 7 s each against the client's 15 s timeout); catching per game, or limiting how many run together, would be more forgiving (Task 4 review).
   - **Point details:** they are SVG `<title>` tooltips, which only show on hover.
   - **Tab state:** the tab and its range reset when coming back from a match report (the existing profile follow-up).
 
@@ -135,7 +137,7 @@ Checked on account 400239835 (Eternus 6, 5,699 games) and three Archon–Arcanis
    - **Curves:** shared per hero and band.
    - **Current rank:** asked only when needed.
 
-   Tests: `only asks for games it doesn't have yet`, `shares one curve per hero and rank between games`, and the bulk-request count in the desktop test.
+   Tests: `only asks for games it doesn't have yet`, `shares one curve request per hero and rank between games`, and the bulk-request count in the desktop test.
 3. **Failure.** When totals or averages fail, the history-based values still show, each failure gets its own Retry, and no trend is claimed. Test: `performance tab keeps history values when details and averages fail`.
 4. **Widths.** Desktop at 850 px and 1260 px, and the website at 1600 px and 375 px: no horizontal page scroll; cards in four, two or one columns.
 
@@ -1341,18 +1343,19 @@ git commit -m "feat(profile): performance metrics, rank averages and trends"
 **`fetchMatchTotals(matchIds)`:**
 - **Cache:** a promise per match id, kept in a `WeakMap` per `DeadlockApi` client, so tests with their own fake client start empty.
 - **Requests:** only missing ids are asked for, in batches of `TOTALS_BATCH`.
-- **Retries:** a game missing from the response, or a failed request, drops out of the cache so the next call asks again.
+- **Retries:** a game missing from the response, or a failed request, drops out of the cache so the next call asks again. The client keeps each bulk response for `TTL.history` (2 minutes, the same as match history), so a game the API stores later appears within two minutes (Task 4 review: with `TTL.analytics` the client's path cache answered such a retry from a stale empty response for 10 minutes).
 
 **`fetchGameAverages(accountId, games)`:**
 - **Current rank:** asked for only when a game has no badge.
-- **Curves:** each game calls phase 3's `fetchRankCurve`. The client's path cache and in-flight sharing mean one request per hero and band.
+- **Curves:** each game calls phase 3's `fetchRankCurve`. The client's path cache and in-flight sharing mean one request per hero and band. A test with a real `DeadlockApi` checks this.
+- **Failures:** a failed current-rank lookup falls back to all ranks; a failed curve rejects the whole call, so the tab shows one "Rank averages unavailable" notice with Retry (successful curves stay cached).
 
 - [ ] **Step 1: Write the failing tests**
 
 `tests/profile/performance-api.test.ts`:
 
 ```ts
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { curvePath, rankBand } from "@/features/match-report/utils/rank-curve";
 import {
   fetchGameAverages,
@@ -1360,7 +1363,7 @@ import {
 } from "@/features/profile/services/performance-api";
 import type { HistoryMatch } from "@/features/profile/types";
 import { totalsPath } from "@/features/profile/utils/match-totals";
-import type { DeadlockApi } from "@/shared/api/DeadlockApi";
+import { DeadlockApi, TTL } from "@/shared/api/DeadlockApi";
 import { rankCurveRows } from "../fixtures/match-report";
 import { bulkMatch } from "../fixtures/performance";
 
@@ -1381,6 +1384,22 @@ function bulkApi(unstored: number[] = [], fail = false) {
     },
   } as unknown as DeadlockApi;
   return { api, calls };
+}
+
+/** A real client whose fetch answers bulk metadata for `stored` matches only. */
+function realBulkApi(stored: number[], now: () => number) {
+  const request = vi.fn<typeof fetch>().mockImplementation(async (url) => {
+    const ids = new URL(String(url)).searchParams
+      .get("match_ids")!
+      .split(",")
+      .map(Number);
+    return new Response(
+      JSON.stringify(
+        ids.filter((id) => stored.includes(id)).map((id) => bulkMatch(id, 77)),
+      ),
+    );
+  });
+  return { api: new DeadlockApi(request, now), request };
 }
 
 const range = (from: number, to: number) =>
@@ -1435,6 +1454,25 @@ describe("fetchMatchTotals", () => {
     await expect(fetchMatchTotals([1, 2], failing.api)).rejects.toThrow();
     expect(failing.calls).toHaveLength(2);
   });
+
+  it("sees a newly stored game once the client's answer is two minutes old", async () => {
+    let now = 0;
+    const stored = [1];
+    const { api, request } = realBulkApi(stored, () => now);
+    expect((await fetchMatchTotals([1, 2], api)).size).toBe(1);
+    expect((await fetchMatchTotals([1, 2], api)).size).toBe(1);
+    stored.push(2);
+    now += 60_000;
+    // The client still holds the empty answer for game 2.
+    expect((await fetchMatchTotals([1, 2], api)).size).toBe(1);
+    now += TTL.history;
+    expect((await fetchMatchTotals([1, 2], api)).size).toBe(2);
+    expect(
+      request.mock.calls.map(([url]) =>
+        new URL(String(url)).searchParams.get("match_ids"),
+      ),
+    ).toEqual(["1,2", "2", "2"]);
+  });
 });
 
 describe("fetchGameAverages", () => {
@@ -1458,13 +1496,17 @@ describe("fetchGameAverages", () => {
     ...overrides,
   });
 
-  /** Curves for any hero and band; the player's current rank is `badge`. */
-  function curveApi(badge: number | null) {
+  /**
+   * Curves for any hero and band (or a failure); the player's current rank
+   * is `badge`, none, or a failure.
+   */
+  function curveApi(badge: number | null | Error, failCurves = false) {
     const calls: string[] = [];
     const api = {
       get: async (path: string) => {
         calls.push(path);
-        if (path.startsWith("/v1/players/rank"))
+        if (path.startsWith("/v1/players/rank")) {
+          if (badge instanceof Error) throw badge;
           return badge === null
             ? []
             : [
@@ -1475,14 +1517,20 @@ describe("fetchGameAverages", () => {
                   subrank: badge % 10,
                 },
               ];
+        }
+        if (failCurves) throw new Error("Deadlock API unavailable (500).");
         return rankCurveRows();
       },
     } as unknown as DeadlockApi;
     return { api, calls };
   }
 
-  it("shares one curve per hero and rank between games", async () => {
-    const { api, calls } = curveApi(116);
+  it("shares one curve request per hero and rank between games", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(
+        async () => new Response(JSON.stringify(rankCurveRows())),
+      );
     const averages = await fetchGameAverages(
       77,
       [
@@ -1490,11 +1538,12 @@ describe("fetchGameAverages", () => {
         game({ matchId: 2, durationS: 1500 }),
         game({ matchId: 3, heroId: 7 }),
       ],
-      api,
+      new DeadlockApi(request),
     );
-    expect(new Set(calls)).toEqual(
-      new Set([curvePath(6, rankBand(73)), curvePath(7, rankBand(73))]),
-    );
+    expect(request.mock.calls.map(([url]) => String(url))).toEqual([
+      `https://api.deadlock-api.com${curvePath(6, rankBand(73))}`,
+      `https://api.deadlock-api.com${curvePath(7, rankBand(73))}`,
+    ]);
     expect(averages.get(1)!.values.souls).toBe(30000);
     expect(averages.get(2)!.values.souls).toBe(25000);
     expect(averages.get(3)!.source).toBe("game");
@@ -1521,6 +1570,24 @@ describe("fetchGameAverages", () => {
     );
     expect(calls).toContain(curvePath(6, rankBand(0)));
     expect(averages.get(1)!.source).toBe("none");
+  });
+
+  it("falls back to all ranks when the current rank fails to load", async () => {
+    const { api, calls } = curveApi(new Error("Deadlock API timed out."));
+    const averages = await fetchGameAverages(
+      77,
+      [game({ matchId: 1, badge: 0 })],
+      api,
+    );
+    expect(calls).toContain(curvePath(6, rankBand(0)));
+    expect(averages.get(1)!.source).toBe("none");
+  });
+
+  it("fails as a whole when a curve fails, so the tab can offer Retry", async () => {
+    const { api } = curveApi(116, true);
+    await expect(
+      fetchGameAverages(77, [game({ matchId: 1 })], api),
+    ).rejects.toThrow("Deadlock API unavailable (500).");
   });
 
   it("doesn't ask for the current rank when every game has one", async () => {
@@ -1557,46 +1624,45 @@ import { fetchRank } from "./profile-api";
 
 // Kept per match and per client (tests bring their own), so a wider range
 // only asks for the games it adds.
-const stored = new WeakMap<
-  DeadlockApi,
-  Map<number, Promise<PlayerTotals[] | undefined>>
->();
+type Entries = Map<number, Promise<PlayerTotals[] | undefined>>;
+const totalsCache = new WeakMap<DeadlockApi, Entries>();
 
 /**
  * Every player's final totals for each match, by match id, from bulk match
  * metadata in batches of TOTALS_BATCH. A match the API hasn't stored yet is
- * missing from the result and asked for again next time.
+ * missing from the result and asked for again next time; the client keeps
+ * each response for TTL.history (two minutes, as match history), so a game
+ * just played appears soon after the API stores it.
  */
 export async function fetchMatchTotals(
   matchIds: number[],
   api: DeadlockApi = deadlockApi,
 ): Promise<Map<number, PlayerTotals[]>> {
-  let cache = stored.get(api);
-  if (!cache) stored.set(api, (cache = new Map()));
-  const known = cache;
+  const known: Entries = totalsCache.get(api) ?? new Map();
+  totalsCache.set(api, known);
   const missing = [...new Set(matchIds)].filter((id) => !known.has(id));
   for (let start = 0; start < missing.length; start += TOTALS_BATCH) {
     const batch = missing.slice(start, start + TOTALS_BATCH);
     const request = api
-      .get<unknown>(totalsPath(batch), TTL.analytics)
+      .get<unknown>(totalsPath(batch), TTL.history)
       .then(parseMatchTotals);
     for (const id of batch) {
-      const totals = request.then((found) => found.get(id));
-      known.set(id, totals);
+      const entry = request.then((matches) => matches.get(id));
+      known.set(id, entry);
       // Not stored yet, or the request failed: ask again next time.
-      totals.then(
-        (found) => {
-          if (!found) known.delete(id);
-        },
-        () => known.delete(id),
-      );
+      const forget = () => {
+        if (known.get(id) === entry) known.delete(id);
+      };
+      entry.then((players) => {
+        if (!players) forget();
+      }, forget);
     }
   }
-  const found = await Promise.all(
+  const entries = await Promise.all(
     matchIds.map(async (id) => [id, await known.get(id)] as const),
   );
   return new Map(
-    found.filter((entry): entry is [number, PlayerTotals[]] => !!entry[1]),
+    entries.filter((entry): entry is [number, PlayerTotals[]] => !!entry[1]),
   );
 }
 
@@ -1636,7 +1702,7 @@ export async function fetchGameAverages(
 - [ ] **Step 4: Run the tests and confirm they pass**
 
 Run: `npx vitest run tests/profile/performance-api.test.ts`
-Expected: PASS (9 tests). `npm test`: 372 tests.
+Expected: PASS (12 tests). `npm test`: 375 tests.
 
 - [ ] **Step 5: Check and commit**
 
@@ -1793,7 +1859,7 @@ export function Sparkline({
 - [ ] **Step 4: Check that nothing broke**
 
 Run: `npx tsc --noEmit && npm test && npx playwright test tests/browser/match-report.spec.ts`
-Expected: PASS. 372 unit tests, and every match report browser test (the Graph still sizes and redraws).
+Expected: PASS. 375 unit tests, and every match report browser test (the Graph still sizes and redraws).
 
 - [ ] **Step 5: Check and commit**
 
@@ -2509,7 +2575,7 @@ Run: `npx playwright test tests/browser/home.spec.ts -g "performance"`
 Expected: PASS (5 tests).
 
 Then run `npm test`, `npm run test:browser` and `npm run test:web`.
-Expected: PASS (372, 130 and 74).
+Expected: PASS (375, 130 and 74).
 
 - [ ] **Step 7: Look at it**
 
@@ -2586,7 +2652,7 @@ In `tests/profile/match-history.test.ts`, remove `form` from the import and dele
 - [ ] **Step 4: Run everything**
 
 Run: `npx tsc --noEmit && npm run web:typecheck && npm test`
-Expected: PASS (362 tests).
+Expected: PASS (365 tests).
 
 Run: `grep -rn "LineChart\|fetchSummaryHeroStats\|SUMMARY_HERO_STATS\|performanceSeries\|combatAverages\|chart-card" src web/app tests`
 Expected: no output.
@@ -2649,7 +2715,7 @@ Built in phase 4: eight metrics (souls / min, K/D/A ratio, hero damage, objectiv
 - [ ] **Step 3: Final check**
 
 Run all of these; every one must pass:
-- `npm test` (362)
+- `npm test` (365)
 - `npx tsc --noEmit`
 - `npm run web:typecheck`
 - `npm run test:browser` (130)
