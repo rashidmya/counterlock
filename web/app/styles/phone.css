@@ -237,24 +237,10 @@
     padding: 8px 4px;
     text-align: center;
   }
-  .app.web .match-row {
-    flex-wrap: wrap;
-    gap: 0;
-  }
   .app.web .hero-link {
     flex: 1 1 100%;
     padding: 10px 0 0;
     font-size: 14px;
-  }
-  .app.web .match-open {
-    flex: 1 1 100%;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px 6px;
-    padding: 8px 0 12px;
-    font-size: 12px;
-  }
-  .app.web :is(.match-date, .match-report-link) {
-    text-align: left;
   }
   .app.web .show-more {
     min-height: 40px;
@@ -325,5 +311,29 @@
   .app.web .report-player-link {
     display: inline-block;
     padding: 6px 0;
+  }
+}
+
+/* Match rows stack a little wider than the rest of the phone layout: their
+   seven columns don't fit the content column below about 760px. */
+@media (max-width: 760px) {
+  .app.web .match-row {
+    flex-wrap: wrap;
+    gap: 0;
+  }
+  .app.web .match-row .hero-link {
+    flex: 1 1 100%;
+    padding: 10px 0 0;
+    font-size: 14px;
+  }
+  .app.web .match-open {
+    flex: 1 1 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px 6px;
+    padding: 8px 0 12px;
+    font-size: 12px;
+  }
+  .app.web :is(.match-date, .match-report-link) {
+    text-align: left;
   }
 }

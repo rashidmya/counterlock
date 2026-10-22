@@ -301,3 +301,20 @@ test("at desktop width the hero art sits to the right of the identity column", a
   expect(portrait!.x).toBeGreaterThanOrEqual(body!.x + body!.width);
   expect((await overflow(page)).scroll).toBeLessThanOrEqual(1260);
 });
+
+test("match rows fit the content column between phone and desktop widths", async ({
+  page,
+}) => {
+  await mockApi(page);
+  for (const width of [667, 760]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`/players/${FARGO}`);
+    await page.getByRole("tab", { name: "Matches" }).click();
+    const entry = page.locator(".match-entry").first();
+    const entryBox = (await entry.boundingBox())!;
+    const openBox = (await entry.locator(".match-open").boundingBox())!;
+    expect(openBox.x + openBox.width).toBeLessThanOrEqual(
+      entryBox.x + entryBox.width + 1,
+    );
+  }
+});
