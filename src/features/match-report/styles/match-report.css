@@ -107,29 +107,41 @@
   padding: 24px 30px;
   overflow: hidden;
   border-block: 1px solid var(--line);
+}
+/* The win or loss tint sits above the hero art and below the text. */
+.report-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   background: linear-gradient(
     90deg,
     rgb(from var(--good) r g b / 0.1),
     transparent 60%
   );
+  pointer-events: none;
 }
-.report-banner.lost {
+.report-banner.lost::before {
   background: linear-gradient(
     90deg,
     rgb(from var(--bad) r g b / 0.12),
     transparent 60%
   );
 }
-.report-banner.whole {
+.report-banner.whole::before {
   background: linear-gradient(
     90deg,
     rgb(from var(--ally) r g b / 0.14),
     rgb(from var(--enemy) r g b / 0.14)
   );
 }
-/* The hero page's dark wash would hide the win or loss tint. */
+/* A lighter wash than the hero page's keeps text readable over the art. */
 .report-banner .hero-art::after {
-  display: none;
+  background: linear-gradient(
+    90deg,
+    rgb(from var(--ink) r g b / 0.75),
+    transparent 70%
+  );
 }
 .report-banner .hero-art-bg {
   top: -80px;

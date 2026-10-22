@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RouteLink } from "@/app/links";
 import { useAsync } from "@/shared/api/useAsync";
 import { SectionHeader } from "@/shared/ui/SectionHeader";
@@ -51,12 +51,20 @@ function Report({
   );
   const top = useRef<HTMLDivElement>(null);
   const viewing = useRef<HTMLSelectElement>(null);
+  const refocus = useRef(false);
+  // Focus once the selector names the new player, so it is read out.
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    viewing.current?.focus({ preventScroll: true });
+  }, [slot]);
   const select = (next: number | null) => setPicked({ slot: next });
   // "View as" sits far down the page: bring the new point of view into
   // sight and move focus to the selector, which now names that player.
   const viewAs = (next: number) => {
     select(next);
-    viewing.current?.focus({ preventScroll: true });
+    if (next === slot) viewing.current?.focus({ preventScroll: true });
+    else refocus.current = true;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     top.current?.scrollIntoView({
       block: "start",
