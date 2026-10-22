@@ -45,9 +45,12 @@ describe("series", () => {
       [0, 0],
       [100, 10],
     ];
-    expect([valueAt(points, 50), valueAt(points, 500), valueAt([], 5)]).toEqual(
-      [5, 10, 0],
-    );
+    expect([
+      valueAt(points, 50),
+      valueAt(points, 500),
+      valueAt([], 5),
+      valueAt([[180, 5]], 0),
+    ]).toEqual([5, 10, 0, 5]);
   });
 
   it("sums teams, averages rate stats, and leads Amber minus Sapphire", () => {
@@ -65,12 +68,55 @@ describe("series", () => {
     ]);
   });
 
+  it("leads by Amber's advantage: fewer deaths count as ahead", () => {
+    // Amber died 9 times (4 + 5 × 1), Sapphire 6 times.
+    expect(leadSeries(report.players, deaths, "total").at(-1)).toEqual([
+      1800, -3,
+    ]);
+    expect(
+      leadSeries(report.players, accuracy, "total").at(-1)?.[1],
+    ).toBeCloseTo(0);
+  });
+
+  it("divides a team's total by minutes, even when someone's snapshots stop early", () => {
+    const keep = 3;
+    const early = {
+      ...lead,
+      times: lead.times.slice(0, keep),
+      values: Object.fromEntries(
+        Object.entries(lead.values).map(([id, v]) => [id, v.slice(0, keep)]),
+      ) as typeof lead.values,
+    };
+    const players = [early, ...report.players.slice(1)];
+    const total = teamSeries(players, 0, souls, "total").at(-1)!;
+    const rate = teamSeries(players, 0, souls, "perMinute").at(-1)!;
+    expect(rate[0]).toBe(1800);
+    expect(rate[1]).toBeCloseTo(total[1] / 30);
+  });
+
+  it("leaves out players without snapshots", () => {
+    const empty = {
+      ...lead,
+      times: [],
+      values: Object.fromEntries(
+        Object.keys(lead.values).map((id) => [id, []]),
+      ) as unknown as typeof lead.values,
+    };
+    const players = [empty, ...report.players.slice(1)];
+    expect(ranking(players, deaths, "total", 1800)).toHaveLength(11);
+    expect(
+      teamSeries(players, 0, metricById.get("level")!, "total").at(-1)?.[1],
+    ).toBe(30);
+  });
+
   it("gives the rank average up to match end, per minute too", () => {
     const avg = averageSeries(curve, souls, "total", 1800)!;
     expect(avg[0]).toEqual([0, 0, 0]);
     expect(avg.at(-1)).toEqual([1800, 30000, 3000]);
     const rate = averageSeries(curve, souls, "perMinute", 1800)!;
     expect(rate[0]).toEqual([180, 1000, 100]);
+    const short = { ...curve, points: curve.points.filter((p) => p.t <= 900) };
+    expect(averageSeries(short, souls, "total", 1800)!.at(-1)?.[0]).toBe(900);
     expect(averageSeries(null, souls, "total", 1800)).toBeNull();
     expect(averageSeries(curve, accuracy, "total", 1800)).toBeNull();
   });
@@ -84,6 +130,8 @@ describe("ranges and ranking", () => {
     expect(rangeOf("late", 1800)).toEqual([1200, 1800]);
     expect(rangeAvailable("late", 1100)).toBe(false);
     expect(rangeAvailable("mid", 1100)).toBe(true);
+    expect(rangeAvailable("mid", 630)).toBe(false);
+    expect(rangeAvailable("mid", 660)).toBe(true);
   });
 
   it("ranks everyone at a time, fewest first for deaths", () => {
@@ -93,6 +141,10 @@ describe("ranges and ranking", () => {
     expect(most.findIndex((r) => r.player.slot === 1)).toBe(6);
     const fewest = ranking(report.players, deaths, "total", 1800);
     expect(fewest[0].value).toBe(1);
+    // Eleven players died once; ties go by slot.
+    expect(fewest.slice(0, 11).map((r) => r.player.slot)).toEqual([
+      2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+    ]);
     expect(fewest.at(-1)?.player.slot).toBe(1);
   });
 
@@ -109,5 +161,11 @@ describe("ranges and ranking", () => {
   it("formats axis values", () => {
     expect(formatValue(32400, souls)).toBe("32.4K");
     expect(formatValue(62.6666, accuracy)).toBe("62.7");
+    expect(formatValue(-2.66, accuracy)).toBe("−2.7");
+    expect(formatValue(-0.04, accuracy)).toBe("0");
+    expect(formatValue(0.067, deaths)).toBe("0.07");
+    expect(formatValue(-0.25, deaths)).toBe("−0.25");
+    expect(formatValue(0.004, deaths)).toBe("0");
+    expect(formatValue(-29160, souls)).toBe("−29.2K");
   });
 });
