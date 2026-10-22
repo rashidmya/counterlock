@@ -409,7 +409,7 @@ button.enemy-slot.filled:is(:hover, :focus-visible)::after {
     flex-basis: 100%;
   }
   .enemy-choices {
-    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
   }
   .enemy-choice-name {
     font-size: 10px;
