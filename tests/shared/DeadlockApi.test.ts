@@ -121,6 +121,26 @@ describe("DeadlockApi", () => {
     await expect(api.get("/v1/x", 1000)).resolves.toBe(1);
   });
 
+  it("reports a timed-out request in plain words", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockRejectedValue(new DOMException("signal timed out", "TimeoutError"));
+    const api = new DeadlockApi(request, () => 0);
+    await expect(api.get("/v1/x", 1000)).rejects.toThrow(
+      new Error("Deadlock API timed out."),
+    );
+  });
+
+  it("reports a network failure in plain words", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockRejectedValue(new TypeError("Failed to fetch"));
+    const api = new DeadlockApi(request, () => 0);
+    await expect(api.get("/v1/x", 1000)).rejects.toThrow(
+      new Error("Deadlock API unreachable."),
+    );
+  });
+
   it("exposes ttl presets", () => {
     expect(TTL).toEqual({
       analytics: 600_000,

@@ -33,7 +33,7 @@ export function BuildPanel({
   const owned = local && local.heroId === id ? local.items : [];
   const rank = rankLabel(query.minBadge);
   return (
-    <section className="build-panel panel" aria-label="Recommended hero build">
+    <section className="build-panel panel" aria-label="Your build">
       <div className="build-heading">
         <div className="build-title">
           {hero ? (
@@ -75,11 +75,7 @@ export function BuildPanel({
             </select>
           </label>
           <button
-            aria-label={
-              expanded
-                ? "Collapse recommended build"
-                : "Expand recommended build"
-            }
+            aria-label={expanded ? "Collapse build" : "Expand build"}
             aria-expanded={expanded}
             onClick={() => setExpanded(!expanded)}
           >

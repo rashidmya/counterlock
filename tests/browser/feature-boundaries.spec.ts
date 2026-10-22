@@ -132,6 +132,49 @@ test("desktop retains counter state across tabs and exposes game-only settings",
   await expect(page.locator(".build-panel")).toBeVisible();
 });
 
+test("Live build follows the rank chosen on a hero page", async ({ page }) => {
+  await nativeWindow(page, "desktop");
+  await page.route("https://api.deadlock-api.com/**", (route) =>
+    route.fulfill({
+      json: [],
+      headers: { "access-control-allow-origin": "*" },
+    }),
+  );
+  await mainBuildResponses(page, { 7: [buyRow(item.id)] });
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(request.url()));
+  await page.goto("/desktop/desktop.html");
+  const panel = page.locator(".build-panel");
+  await expect(panel.locator(".eyebrow")).toContainText("All ranks");
+  await page.getByRole("button", { name: "Heroes", exact: true }).click();
+  // Haze, not the local hero, so the hero page's own build requests are
+  // never mistaken for the Live panel's.
+  await page
+    .locator(".page:not([hidden]) .hero-card")
+    .filter({ hasText: "Haze" })
+    .click();
+  await page
+    .locator(".page:not([hidden])")
+    .getByLabel("Rank", { exact: true })
+    .selectOption({ label: "Mystic+" });
+  await page.getByRole("button", { name: "Live" }).click();
+  await expect(panel.locator(".eyebrow")).toContainText("Mystic+");
+  await expect(panel.locator(".build-source")).toContainText("Mystic+");
+  await expect
+    .poll(() =>
+      requests.some((url) => {
+        const params = new URL(url).searchParams;
+        return (
+          url.includes("/v1/analytics/item-stats?") &&
+          params.get("hero_id") === "7" &&
+          params.has("min_bought_at_s") &&
+          params.get("min_average_badge") === "51"
+        );
+      }),
+    )
+    .toBe(true);
+});
+
 for (const name of ["desktop", "in_game"]) {
   test(`${name} retains its Street Brawl build message without making build requests`, async ({
     page,

@@ -174,18 +174,11 @@
   font: 700 10px var(--font-label);
 }
 .build-source {
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
   color: var(--dim);
   font-size: 12px;
   padding: 6px 14px 10px;
   line-height: 1.5;
   border-top: 1px solid var(--line-soft);
-}
-.build-source a {
-  color: var(--gold);
-  white-space: nowrap;
 }
 .build-empty {
   padding: 18px 16px;
@@ -235,9 +228,6 @@
     display: inline;
     margin-left: 8px;
   }
-  .build-source {
-    flex-wrap: wrap;
-  }
 }
 
 /* Main build: one row of most-bought items per phase. It stacks by its own
@@ -246,6 +236,10 @@
   container-type: inline-size;
   border: 1px solid var(--line);
   background: var(--surface);
+}
+/* The Live panel already draws the frame. */
+.build-panel .main-build {
+  border: 0;
 }
 .build-phase {
   display: grid;

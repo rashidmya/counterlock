@@ -34,9 +34,18 @@ export class DeadlockApi {
   }
 
   private async fetchJson<T>(path: string): Promise<T> {
-    const response = await this.request(`${BASE}${path}`, {
-      signal: AbortSignal.timeout(15_000),
-    });
+    let response: Response;
+    try {
+      response = await this.request(`${BASE}${path}`, {
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "TimeoutError")
+        throw new Error("Deadlock API timed out.");
+      if (error instanceof TypeError)
+        throw new Error("Deadlock API unreachable.");
+      throw error;
+    }
     if (response.status === 429 || response.status === 503) {
       const header = response.headers.get("Retry-After");
       const seconds = header ? Number(header) : NaN;
