@@ -839,7 +839,7 @@ test("counter items: pick enemies and see what does well against them", async ({
   await openHaze(page, { heroItems: counterBase, vsEnemy: counterVs });
   const counter = section(page, "Counter items");
   await expect(counter.locator(".data-note").first()).toHaveText(
-    "Items not already in the main build that gain the most win rate for Haze against these heroes, compared with all Haze games and allowing for the matchup itself. Only clear gains are shown · All ranks · last 30 days.",
+    "Items not already in the main build that gain the most win rate for Haze against these heroes overall, then items that clearly beat one of them. Each is compared with all Haze games, allowing for the matchup itself, and only clear gains are shown · All ranks · last 30 days.",
   );
   await expect(counter.locator(".picker-label")).toHaveText("Enemy team");
   await expect(counter).toContainText(
@@ -907,6 +907,34 @@ test("counter items: pick enemies and see what does well against them", async ({
   await expect(counter.locator(".enemy-slot.filled")).toHaveCount(0);
   await expect(counter).toContainText("Pick up to 6 enemy heroes");
   await expect(add).toBeFocused();
+});
+
+test("an item that clearly beats one enemy is listed against that enemy", async ({
+  page,
+}) => {
+  // bestB gains 4.5 points against strongB alone: clear against strongB,
+  // too little averaged over three enemies.
+  await openHaze(page, {
+    heroItems: counterBase,
+    vsEnemy: {
+      [strongA.id]: vsRows(0.6, 0.5, 0.4),
+      [strongB.id]: vsRows(0.5, 0.545, 0.455),
+      [weakA.id]: vsRows(0.5, 0.5, 0.5),
+    },
+  });
+  const counter = section(page, "Counter items");
+  await counter.getByRole("button", { name: "Add enemy hero" }).click();
+  for (const enemy of [strongA, strongB, weakA])
+    await choice(page, enemy.name).click();
+  const cards = counter.locator(".item-card");
+  await expect(cards.locator("h3")).toHaveText([bestA.name, bestB.name]);
+  await expect(cards.locator("p")).toHaveText([
+    "+3.3% vs these heroes · 3,000+ games",
+    `+4.5% vs ${strongB.name} · 3,000 games`,
+  ]);
+  await expect(cards.nth(1).locator(".targets span")).toHaveText([
+    strongB.name,
+  ]);
 });
 
 test("enemy chooser closes on Escape and returns focus", async ({ page }) => {

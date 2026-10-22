@@ -25,11 +25,41 @@ describe("counterItemsVs", () => {
   it("ranks by average lift and names the enemies each item beats", () => {
     const picks = counterItemsVs(baseline, [vsX, vsY]);
     expect(picks.map((p) => p.itemId)).toEqual([A, B]);
+    expect(picks.map((p) => p.scope)).toEqual(["team", "team"]);
     expect(picks[0].lift).toBeCloseTo(0.05);
     expect(picks[0].matches).toBe(3000);
     expect(picks[0].against).toEqual([X]);
     expect(picks[1].lift).toBeCloseTo(0.03);
     expect(picks[1].against).toEqual([Y]);
+  });
+  it("lists an item that clearly beats one enemy after the team-wide ones", () => {
+    // B gains 4.5 points against X alone: clear against X, too little
+    // averaged over three enemies.
+    const Z = 103;
+    const x = { heroId: X, rows: [row(A, 0.6), row(B, 0.545), row(L, 0.355)] };
+    const y = { heroId: Y, rows: [row(A, 0.6), row(B, 0.5), row(L, 0.4)] };
+    const z = { heroId: Z, rows: [row(A, 0.6), row(B, 0.5), row(L, 0.4)] };
+    const picks = counterItemsVs(baseline, [x, y, z]);
+    expect(picks.map((p) => [p.itemId, p.scope])).toEqual([
+      [A, "team"],
+      [B, "hero"],
+    ]);
+    expect(picks[1].lift).toBeCloseTo(0.045);
+    expect(picks[1].matches).toBe(3000);
+    expect(picks[1].against).toEqual([X]);
+    expect(
+      counterItemsVs(baseline, [x, y, z], new Set(), 1).map((p) => p.itemId),
+    ).toEqual([A]);
+  });
+  it("an item that does worse against the team overall is not listed for beating one enemy", () => {
+    const x = { heroId: X, rows: [row(A, 0.6), row(B, 0.545), row(L, 0.355)] };
+    const worse = (heroId: number) => ({
+      heroId,
+      rows: [row(A, 0.6), row(B, 0.44), row(L, 0.46)],
+    });
+    expect(
+      counterItemsVs(baseline, [x, worse(Y), worse(103)]).map((p) => p.itemId),
+    ).toEqual([A]);
   });
   it("corrects for an enemy that is easy to beat overall", () => {
     const easy = { heroId: X, rows: [row(A, 0.7), row(B, 0.6), row(L, 0.5)] };

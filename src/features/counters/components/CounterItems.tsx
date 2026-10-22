@@ -122,6 +122,7 @@ export function CounterItems({
       <div className="counter-cards">
         {picksVs.flatMap((pick, index) => {
           const item = itemById.get(pick.itemId);
+          const team = pick.scope === "team";
           return item
             ? [
                 <CounterCard
@@ -130,8 +131,10 @@ export function CounterItems({
                   label={cardLabel(index, item.category)}
                   targets={pick.against.map(heroName)}
                 >
-                  +{(pick.lift * 100).toFixed(1)}% vs these heroes ·{" "}
-                  {pick.matches.toLocaleString()}+ games
+                  +{(pick.lift * 100).toFixed(1)}% vs{" "}
+                  {team ? "these heroes" : heroName(pick.against[0])} ·{" "}
+                  {pick.matches.toLocaleString()}
+                  {team ? "+" : ""} games
                 </CounterCard>,
               ]
             : [];
@@ -191,8 +194,9 @@ export function CounterItems({
     <div className="counter-items">
       <p className="data-note">
         Items not already in the main build that gain the most win rate for{" "}
-        {hero.name} against these heroes, compared with all {hero.name} games
-        and allowing for the matchup itself. Only clear gains are shown ·{" "}
+        {hero.name} against these heroes overall, then items that clearly beat
+        one of them. Each is compared with all {hero.name} games, allowing for
+        the matchup itself, and only clear gains are shown ·{" "}
         {rankLabel(query.minBadge)} · last 30 days.
       </p>
       <div className="enemy-picker">

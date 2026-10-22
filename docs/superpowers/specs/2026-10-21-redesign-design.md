@@ -403,10 +403,14 @@ count badge and has its own row of build tabs inside it, one per build.
      matchup minus its win rate in all of the hero's games, minus the
      matchup's own shift. Items are ranked by a lower confidence bound on
      the average lift (3 standard errors), so a big lift on a small sample
-     doesn't beat a solid one, and only clear gains are shown.
+     doesn't beat a solid one, and only clear gains are shown. After them
+     come items that clear the same bound against one picked enemy but not
+     on average (their average lift must still be above zero), so a full
+     team doesn't leave the list nearly empty.
    - Show them as cards (reuse the "Consider first" card style). Each card
      shows the lift and the largest single-enemy sample, and says which
-     picked enemies it clearly does better against.
+     picked enemies it clearly does better against; a card for one enemy
+     shows the lift and sample against that enemy.
    - Label it in one line saying exactly this.
    - Where data is thin, fall back to the existing rules-based reasons in
      `src/features/counters/`, labelled as such.
