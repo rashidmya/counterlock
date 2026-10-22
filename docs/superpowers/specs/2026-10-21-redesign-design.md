@@ -396,12 +396,18 @@ count badge and has its own row of build tabs inside it, one per build.
    `GET /v1/analytics/item-stats?hero_id=<this hero>&enemy_hero_ids=<picked>`
    with the rank filter (the API describes this as "what items beat
    hero(es) X").
-   - Rank items by win rate, with a minimum-matches threshold, and leave
-     out items already in the main build.
+   - Rank items by win-rate *lift*, not raw win rate, and leave out items
+     already in the main build. (Built in phase 2: raw win rate only ever
+     surfaced 6,400-soul items, because players who are ahead can afford
+     them.) Lift against each enemy is the item's win rate in that
+     matchup minus its win rate in all of the hero's games, minus the
+     matchup's own shift. Items are ranked by a lower confidence bound on
+     the average lift (3 standard errors), so a big lift on a small sample
+     doesn't beat a solid one, and only clear gains are shown.
    - Show them as cards (reuse the "Consider first" card style). Each card
-     says which picked enemies it does well against.
-   - Label it in one line, e.g. "Highest win rate for Haze players when
-     these heroes are on the enemy team".
+     shows the lift and the largest single-enemy sample, and says which
+     picked enemies it clearly does better against.
+   - Label it in one line saying exactly this.
    - Where data is thin, fall back to the existing rules-based reasons in
      `src/features/counters/`, labelled as such.
    - Desktop app in a match: the enemy heroes come from the GEP roster.
