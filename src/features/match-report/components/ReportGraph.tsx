@@ -1,7 +1,8 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { AsyncState } from "@/shared/api/useAsync";
 import { heroById, itemById } from "@/shared/catalog";
 import { Picture } from "@/shared/ui/Picture";
+import { useElementWidth } from "@/shared/ui/useElementWidth";
 import { clock } from "../utils/format";
 import {
   ITEM_MARKER_COST,
@@ -112,16 +113,7 @@ export function ReportGraph({
   });
   const [hidden, setHidden] = useState<ReadonlySet<number>>(new Set());
   const chartRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
-  useLayoutEffect(() => {
-    const node = chartRef.current;
-    if (!node) return;
-    const measure = () => setWidth(Math.round(node.clientWidth));
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
+  const width = useElementWidth(chartRef);
 
   const metric = metricById.get(metricId)!;
   // Matches before 2026-09-29 have no buff pickup times, so no buffs line.
