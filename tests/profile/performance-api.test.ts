@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { curvePath, rankBand } from "@/features/match-report/utils/rank-curve";
 import {
   fetchGameAverages,
@@ -6,7 +6,7 @@ import {
 } from "@/features/profile/services/performance-api";
 import type { HistoryMatch } from "@/features/profile/types";
 import { totalsPath } from "@/features/profile/utils/match-totals";
-import type { DeadlockApi } from "@/shared/api/DeadlockApi";
+import { DeadlockApi, TTL } from "@/shared/api/DeadlockApi";
 import { rankCurveRows } from "../fixtures/match-report";
 import { bulkMatch } from "../fixtures/performance";
 
@@ -27,6 +27,22 @@ function bulkApi(unstored: number[] = [], fail = false) {
     },
   } as unknown as DeadlockApi;
   return { api, calls };
+}
+
+/** A real client whose fetch answers bulk metadata for `stored` matches only. */
+function realBulkApi(stored: number[], now: () => number) {
+  const request = vi.fn<typeof fetch>().mockImplementation(async (url) => {
+    const ids = new URL(String(url)).searchParams
+      .get("match_ids")!
+      .split(",")
+      .map(Number);
+    return new Response(
+      JSON.stringify(
+        ids.filter((id) => stored.includes(id)).map((id) => bulkMatch(id, 77)),
+      ),
+    );
+  });
+  return { api: new DeadlockApi(request, now), request };
 }
 
 const range = (from: number, to: number) =>
@@ -81,6 +97,25 @@ describe("fetchMatchTotals", () => {
     await expect(fetchMatchTotals([1, 2], failing.api)).rejects.toThrow();
     expect(failing.calls).toHaveLength(2);
   });
+
+  it("sees a newly stored game once the client's answer is two minutes old", async () => {
+    let now = 0;
+    const stored = [1];
+    const { api, request } = realBulkApi(stored, () => now);
+    expect((await fetchMatchTotals([1, 2], api)).size).toBe(1);
+    expect((await fetchMatchTotals([1, 2], api)).size).toBe(1);
+    stored.push(2);
+    now += 60_000;
+    // The client still holds the empty answer for game 2.
+    expect((await fetchMatchTotals([1, 2], api)).size).toBe(1);
+    now += TTL.history;
+    expect((await fetchMatchTotals([1, 2], api)).size).toBe(2);
+    expect(
+      request.mock.calls.map(([url]) =>
+        new URL(String(url)).searchParams.get("match_ids"),
+      ),
+    ).toEqual(["1,2", "2", "2"]);
+  });
 });
 
 describe("fetchGameAverages", () => {
@@ -104,13 +139,17 @@ describe("fetchGameAverages", () => {
     ...overrides,
   });
 
-  /** Curves for any hero and band; the player's current rank is `badge`. */
-  function curveApi(badge: number | null) {
+  /**
+   * Curves for any hero and band (or a failure); the player's current rank
+   * is `badge`, none, or a failure.
+   */
+  function curveApi(badge: number | null | Error, failCurves = false) {
     const calls: string[] = [];
     const api = {
       get: async (path: string) => {
         calls.push(path);
-        if (path.startsWith("/v1/players/rank"))
+        if (path.startsWith("/v1/players/rank")) {
+          if (badge instanceof Error) throw badge;
           return badge === null
             ? []
             : [
@@ -121,14 +160,20 @@ describe("fetchGameAverages", () => {
                   subrank: badge % 10,
                 },
               ];
+        }
+        if (failCurves) throw new Error("Deadlock API unavailable (500).");
         return rankCurveRows();
       },
     } as unknown as DeadlockApi;
     return { api, calls };
   }
 
-  it("shares one curve per hero and rank between games", async () => {
-    const { api, calls } = curveApi(116);
+  it("shares one curve request per hero and rank between games", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(
+        async () => new Response(JSON.stringify(rankCurveRows())),
+      );
     const averages = await fetchGameAverages(
       77,
       [
@@ -136,11 +181,12 @@ describe("fetchGameAverages", () => {
         game({ matchId: 2, durationS: 1500 }),
         game({ matchId: 3, heroId: 7 }),
       ],
-      api,
+      new DeadlockApi(request),
     );
-    expect(new Set(calls)).toEqual(
-      new Set([curvePath(6, rankBand(73)), curvePath(7, rankBand(73))]),
-    );
+    expect(request.mock.calls.map(([url]) => String(url))).toEqual([
+      `https://api.deadlock-api.com${curvePath(6, rankBand(73))}`,
+      `https://api.deadlock-api.com${curvePath(7, rankBand(73))}`,
+    ]);
     expect(averages.get(1)!.values.souls).toBe(30000);
     expect(averages.get(2)!.values.souls).toBe(25000);
     expect(averages.get(3)!.source).toBe("game");
@@ -167,6 +213,24 @@ describe("fetchGameAverages", () => {
     );
     expect(calls).toContain(curvePath(6, rankBand(0)));
     expect(averages.get(1)!.source).toBe("none");
+  });
+
+  it("falls back to all ranks when the current rank fails to load", async () => {
+    const { api, calls } = curveApi(new Error("Deadlock API timed out."));
+    const averages = await fetchGameAverages(
+      77,
+      [game({ matchId: 1, badge: 0 })],
+      api,
+    );
+    expect(calls).toContain(curvePath(6, rankBand(0)));
+    expect(averages.get(1)!.source).toBe("none");
+  });
+
+  it("fails as a whole when a curve fails, so the tab can offer Retry", async () => {
+    const { api } = curveApi(116, true);
+    await expect(
+      fetchGameAverages(77, [game({ matchId: 1 })], api),
+    ).rejects.toThrow("Deadlock API unavailable (500).");
   });
 
   it("doesn't ask for the current rank when every game has one", async () => {

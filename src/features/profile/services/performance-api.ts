@@ -12,46 +12,45 @@ import { fetchRank } from "./profile-api";
 
 // Kept per match and per client (tests bring their own), so a wider range
 // only asks for the games it adds.
-const stored = new WeakMap<
-  DeadlockApi,
-  Map<number, Promise<PlayerTotals[] | undefined>>
->();
+type Entries = Map<number, Promise<PlayerTotals[] | undefined>>;
+const totalsCache = new WeakMap<DeadlockApi, Entries>();
 
 /**
  * Every player's final totals for each match, by match id, from bulk match
  * metadata in batches of TOTALS_BATCH. A match the API hasn't stored yet is
- * missing from the result and asked for again next time.
+ * missing from the result and asked for again next time; the client keeps
+ * each response for TTL.history (two minutes, as match history), so a game
+ * just played appears soon after the API stores it.
  */
 export async function fetchMatchTotals(
   matchIds: number[],
   api: DeadlockApi = deadlockApi,
 ): Promise<Map<number, PlayerTotals[]>> {
-  let cache = stored.get(api);
-  if (!cache) stored.set(api, (cache = new Map()));
-  const known = cache;
+  const known: Entries = totalsCache.get(api) ?? new Map();
+  totalsCache.set(api, known);
   const missing = [...new Set(matchIds)].filter((id) => !known.has(id));
   for (let start = 0; start < missing.length; start += TOTALS_BATCH) {
     const batch = missing.slice(start, start + TOTALS_BATCH);
     const request = api
-      .get<unknown>(totalsPath(batch), TTL.analytics)
+      .get<unknown>(totalsPath(batch), TTL.history)
       .then(parseMatchTotals);
     for (const id of batch) {
-      const totals = request.then((found) => found.get(id));
-      known.set(id, totals);
+      const entry = request.then((matches) => matches.get(id));
+      known.set(id, entry);
       // Not stored yet, or the request failed: ask again next time.
-      totals.then(
-        (found) => {
-          if (!found) known.delete(id);
-        },
-        () => known.delete(id),
-      );
+      const forget = () => {
+        if (known.get(id) === entry) known.delete(id);
+      };
+      entry.then((players) => {
+        if (!players) forget();
+      }, forget);
     }
   }
-  const found = await Promise.all(
+  const entries = await Promise.all(
     matchIds.map(async (id) => [id, await known.get(id)] as const),
   );
   return new Map(
-    found.filter((entry): entry is [number, PlayerTotals[]] => !!entry[1]),
+    entries.filter((entry): entry is [number, PlayerTotals[]] => !!entry[1]),
   );
 }
 
