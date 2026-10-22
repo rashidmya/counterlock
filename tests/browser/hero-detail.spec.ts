@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
+import { heroThreats } from "../../src/features/counters/utils/recommendations";
+import { nativeWindow } from "./helpers";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAHnOcQAAAAABJRU5ErkJggg==",
@@ -783,4 +785,250 @@ test("a hero without a tagline omits that line", async ({ page }) => {
   await expect(page.locator(".hero-tags")).toHaveText(
     mina.tags.map((tag) => tag.toUpperCase()).join(" · "),
   );
+});
+
+// Counter items: baseline 50% for every item; against strongA, bestA gains
+// 10 points; against strongB, bestB gains 6. Both matchups average 50%, so
+// there is no matchup shift.
+const counterBase = [
+  itemRow(bestA.id, 0.5),
+  itemRow(bestB.id, 0.5),
+  itemRow(losing.id, 0.5),
+];
+const vsRows = (a: number, b: number, l: number) => [
+  itemRow(bestA.id, a, 3000),
+  itemRow(bestB.id, b, 3000),
+  itemRow(losing.id, l, 3000),
+];
+const counterVs = {
+  [strongA.id]: vsRows(0.6, 0.5, 0.4),
+  [strongB.id]: vsRows(0.5, 0.56, 0.44),
+};
+const choice = (page: Page, name: string) =>
+  page.locator(".enemy-choices").getByRole("button", { name, exact: true });
+
+test("counter items: pick enemies and see what does well against them", async ({
+  page,
+}) => {
+  await openHaze(page, { heroItems: counterBase, vsEnemy: counterVs });
+  const counter = section(page, "Counter items");
+  await expect(counter.locator(".data-note").first()).toHaveText(
+    "Items that gain the most win rate for Haze against these heroes, compared with all Haze games and allowing for the matchup itself. Only clear gains are shown · All ranks · last 30 days.",
+  );
+  await expect(counter.locator(".picker-label")).toHaveText("Enemy team");
+  await expect(counter).toContainText(
+    "Pick up to 6 enemy heroes to see items that do well against them.",
+  );
+  const add = counter.getByRole("button", { name: "Add enemy hero" });
+  await expect(add).toHaveAttribute("aria-expanded", "false");
+  await add.click();
+  await expect(add).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    counter.getByRole("group", { name: "Choose enemy heroes" }),
+  ).toBeVisible();
+  await expect(page.locator(".enemy-choice")).toHaveCount(
+    catalog.heroes.length - 1,
+  );
+  await expect(
+    page.locator(".enemy-choices").getByRole("button", {
+      name: "Haze",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+
+  await choice(page, strongA.name).click();
+  await expect(choice(page, strongA.name)).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  const cards = counter.locator(".item-card");
+  await expect(cards.locator("h3")).toHaveText([bestA.name]);
+  await expect(cards.first().locator("p")).toHaveText(
+    "+10.0% vs these heroes · 3,000+ games",
+  );
+  await expect(cards.first().locator(".targets span")).toHaveText([
+    strongA.name,
+  ]);
+  await expect(cards.first().locator(".item-label")).toHaveText(
+    "CONSIDER FIRST",
+  );
+
+  await choice(page, strongB.name).click();
+  await expect(cards.locator("h3")).toHaveText([bestA.name, bestB.name]);
+  await expect(cards.first().locator("p")).toHaveText(
+    "+5.0% vs these heroes · 3,000+ games",
+  );
+  await expect(cards.nth(1).locator(".targets span")).toHaveText([
+    strongB.name,
+  ]);
+  await expect(cards.nth(1).locator(".item-label")).toHaveText(
+    bestB.category.toUpperCase(),
+  );
+  await expect(counter.locator(".enemy-slot.filled")).toHaveCount(2);
+
+  await counter.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(page.locator(".enemy-choices")).toBeHidden();
+  await expect(add).toBeFocused();
+  await counter
+    .getByRole("button", { name: `Remove ${strongB.name}`, exact: true })
+    .click();
+  await expect(cards.locator("h3")).toHaveText([bestA.name]);
+  await counter.getByRole("button", { name: "Clear", exact: true }).click();
+  await expect(counter.locator(".enemy-slot.filled")).toHaveCount(0);
+  await expect(counter).toContainText("Pick up to 6 enemy heroes");
+});
+
+test("enemy chooser closes on Escape and returns focus", async ({ page }) => {
+  await openHaze(page);
+  const counter = section(page, "Counter items");
+  const add = counter.getByRole("button", { name: "Add enemy hero" });
+  await add.click();
+  await choice(page, strongA.name).focus();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".enemy-choices")).toBeHidden();
+  await expect(add).toBeFocused();
+  await expect(add).toHaveAttribute("aria-expanded", "false");
+});
+
+test("enemy picks carry over to the next hero, leaving that hero out", async ({
+  page,
+}) => {
+  await openHaze(page, { heroItems: counterBase, vsEnemy: counterVs });
+  const counter = section(page, "Counter items");
+  await counter.getByRole("button", { name: "Add enemy hero" }).click();
+  await choice(page, strongA.name).click();
+  await choice(page, strongB.name).click();
+  await counter.getByRole("button", { name: "Done", exact: true }).click();
+  await section(page, "Strong against").locator(".matchup").first().click();
+  await expect(page.locator(".hero-header h1")).toHaveText(strongA.name);
+  await expect(counter.locator(".enemy-slot.filled")).toHaveCount(1);
+  await expect(
+    counter.getByRole("button", { name: `Remove ${strongB.name}` }),
+  ).toHaveCount(1);
+  await expect(counter.locator(".data-note").first()).toContainText(
+    `for ${strongA.name} against these heroes`,
+  );
+  await counter.getByRole("button", { name: "Add enemy hero" }).click();
+  await expect(choice(page, strongA.name)).toHaveCount(0);
+  await expect(choice(page, haze.name)).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+});
+
+test("re-picking an enemy reuses its cached request", async ({ page }) => {
+  const itemStats: URLSearchParams[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/v1/analytics/item-stats")
+      itemStats.push(url.searchParams);
+  });
+  await openHaze(page, { heroItems: counterBase, vsEnemy: counterVs });
+  const counter = section(page, "Counter items");
+  const cards = counter.locator(".item-card h3");
+  await counter.getByRole("button", { name: "Add enemy hero" }).click();
+  await choice(page, strongA.name).click();
+  await expect(cards).toHaveText([bestA.name]);
+  await choice(page, strongB.name).click();
+  await expect(cards).toHaveText([bestA.name, bestB.name]);
+  await counter
+    .getByRole("button", { name: `Remove ${strongB.name}`, exact: true })
+    .click();
+  await expect(cards).toHaveText([bestA.name]);
+  await choice(page, strongB.name).click();
+  await expect(cards).toHaveText([bestA.name, bestB.name]);
+
+  const versus = itemStats.filter(
+    (params) => params.has("hero_id") && params.has("enemy_hero_ids"),
+  );
+  expect(versus.map((params) => params.get("enemy_hero_ids")).sort()).toEqual(
+    [String(strongA.id), String(strongB.id)].sort(),
+  );
+  expect(
+    itemStats.filter(
+      (params) =>
+        params.has("hero_id") &&
+        !params.has("enemy_hero_ids") &&
+        !params.has("min_bought_at_s"),
+    ),
+  ).toHaveLength(1);
+});
+
+test("counter items fall back to hero traits without match data", async ({
+  page,
+}) => {
+  const profiled = others.find((hero) => heroThreats[hero.id])!;
+  await openHaze(page, { vsEnemy: {} });
+  const counter = section(page, "Counter items");
+  await counter.getByRole("button", { name: "Add enemy hero" }).click();
+  await choice(page, profiled.name).click();
+  await expect(counter).toContainText(
+    "Based on hero traits — not enough match data for these heroes yet.",
+  );
+  await expect(counter.locator(".item-card").first()).toBeVisible();
+  await expect(counter.locator(".item-card .targets").first()).toContainText(
+    profiled.name,
+  );
+  await expect(counter).not.toContainText("Not enough data");
+});
+
+test("counter items say when match data fails", async ({ page }) => {
+  const profiled = others.find((hero) => heroThreats[hero.id])!;
+  await openHaze(page);
+  await page.route(
+    (url) =>
+      url.pathname === "/v1/analytics/item-stats" &&
+      url.searchParams.has("enemy_hero_ids") &&
+      url.searchParams.has("hero_id"),
+    (route) => route.fulfill({ status: 500, headers: cors, body: "" }),
+  );
+  const counter = section(page, "Counter items");
+  await counter.getByRole("button", { name: "Add enemy hero" }).click();
+  await choice(page, profiled.name).click();
+  await expect(counter.locator(".data-note").nth(1)).toContainText(
+    "Match data unavailable: Deadlock API unavailable (500). Based on hero traits instead.",
+  );
+  await expect(counter.getByRole("button", { name: "Retry" })).toBeVisible();
+  await expect(counter.locator(".item-card").first()).toBeVisible();
+});
+
+test("six picks disable the rest of the chooser", async ({ page }) => {
+  await openHaze(page);
+  const counter = section(page, "Counter items");
+  await counter.getByRole("button", { name: "Add enemy hero" }).click();
+  const [first, ...rest] = others.slice(0, 7);
+  for (const hero of [first, ...rest.slice(0, 5)])
+    await choice(page, hero.name).click();
+  await expect(
+    counter.getByRole("button", { name: "Add enemy hero" }),
+  ).toHaveCount(0);
+  await expect(counter.locator(".enemy-slot.filled")).toHaveCount(6);
+  await expect(choice(page, rest[5].name)).toBeDisabled();
+  await expect(choice(page, first.name)).toBeEnabled();
+  await choice(page, first.name).click();
+  await expect(counter.locator(".enemy-slot.filled")).toHaveCount(5);
+  await expect(choice(page, rest[5].name)).toBeEnabled();
+});
+
+test("in a live match the enemy team fills counter items", async ({ page }) => {
+  await nativeWindow(page, "desktop");
+  await openHaze(
+    page,
+    {
+      heroItems: counterBase,
+      vsEnemy: { [haze.id]: vsRows(0.6, 0.5, 0.4) },
+      url: "/desktop/desktop.html",
+    },
+    strongA,
+  );
+  const counter = section(page, "Counter items");
+  await expect(counter).toContainText("Enemy team from your live match.");
+  await expect(counter.locator(".enemy-slot.filled")).toHaveCount(1);
+  await expect(
+    counter.getByRole("button", { name: "Add enemy hero" }),
+  ).toHaveCount(0);
+  await expect(counter.locator(".enemy-choices")).toHaveCount(0);
+  await expect(
+    counter.locator(".item-card").first().locator(".targets"),
+  ).toContainText("Haze");
 });

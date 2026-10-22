@@ -219,7 +219,14 @@ export function DesktopApp({
         )}
         {visited.includes("heroes") && (
           <div className="page" hidden={route.page !== "heroes"}>
-            <HeroesPage {...{ route, navigate, query, setQuery }} />
+            <HeroesPage
+              {...{ route, navigate, query, setQuery }}
+              liveEnemies={
+                status === "in-match"
+                  ? counters.teams.enemies.map((p) => p.heroId)
+                  : []
+              }
+            />
           </div>
         )}
         {visited.includes("items") && (

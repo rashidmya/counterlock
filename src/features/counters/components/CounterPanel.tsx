@@ -1,10 +1,10 @@
 import { heroById } from "@/shared/catalog";
 import { Icon } from "@/shared/ui/Icon";
 import { Picture } from "@/shared/ui/Picture";
-import { ItemIcon } from "@/shared/ui/ItemIcon";
 import { threatLabels } from "../utils/recommendations";
 import type { Threat } from "../types";
 import type { useCounters } from "../hooks/useCounters";
+import { CounterCard } from "./CounterCard";
 
 export function CounterPanel({
   model,
@@ -104,29 +104,16 @@ export function CounterPanel({
       <div className="recommendations">
         {recommendations.length ? (
           recommendations.map((entry, i) => (
-            <article className="item-card" key={entry.item.id}>
-              <div className="item-top">
-                <ItemIcon item={entry.item} />
-                <div>
-                  <span className="item-label">
-                    {i === 0
-                      ? "CONSIDER FIRST"
-                      : entry.item.category.toUpperCase()}
-                  </span>
-                  <h3>{entry.item.name}</h3>
-                </div>
-                <span className="price">
-                  {entry.item.cost.toLocaleString()}
-                  <small>SOULS</small>
-                </span>
-              </div>
-              <p>{entry.reasons.join(" ")}</p>
-              <div className="targets">
-                {entry.targets.map((target) => (
-                  <span key={target}>{target}</span>
-                ))}
-              </div>
-            </article>
+            <CounterCard
+              key={entry.item.id}
+              item={entry.item}
+              label={
+                i === 0 ? "CONSIDER FIRST" : entry.item.category.toUpperCase()
+              }
+              targets={entry.targets}
+            >
+              {entry.reasons.join(" ")}
+            </CounterCard>
           ))
         ) : (
           <div className="empty">

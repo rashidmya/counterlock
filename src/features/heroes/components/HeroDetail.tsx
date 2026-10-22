@@ -13,6 +13,7 @@ import { MainBuild } from "@/features/builds/components/MainBuild";
 import { PopularBuilds } from "@/features/builds/components/PopularBuilds";
 import { fetchMainBuild } from "@/features/builds/services/main-build";
 import { fetchPopularBuilds } from "@/features/builds/services/popular-builds";
+import { CounterItems } from "@/features/counters/components/CounterItems";
 import {
   fetchAbilityOrder,
   fetchHeroSummaries,
@@ -111,10 +112,16 @@ export function HeroDetail({
   heroId,
   query,
   setQuery,
+  liveEnemies,
+  enemyPicks,
+  setEnemyPicks,
 }: {
   heroId: number;
   query: AnalyticsQuery;
   setQuery(query: AnalyticsQuery): void;
+  liveEnemies: number[];
+  enemyPicks: number[];
+  setEnemyPicks(picks: number[]): void;
 }) {
   const hero = heroById.get(heroId);
   const deps = [heroId, query.minBadge];
@@ -134,6 +141,14 @@ export function HeroDetail({
   const heuristic = useMemo(() => heuristicCounterItems(heroId), [heroId]);
   const build = useAsync(() => fetchMainBuild(heroId, query), deps);
   const popular = useAsync(() => fetchPopularBuilds(heroId), [heroId]);
+  // Counter items leave out what the main build already lists.
+  const exclude = useMemo(
+    () =>
+      new Set(
+        build.data?.flatMap((phase) => phase.items.map((item) => item.itemId)),
+      ),
+    [build.data],
+  );
   const tabsId = useId();
   const [tab, setTab] = useState<TabKey>("build");
   const tabId = (key: TabKey) => `${tabsId}-${key}-tab`;
@@ -261,6 +276,16 @@ export function HeroDetail({
         >
           <PopularBuilds state={popular} />
         </div>
+        <Section title="Counter items">
+          <CounterItems
+            hero={hero}
+            query={query}
+            picks={enemyPicks}
+            setPicks={setEnemyPicks}
+            liveEnemies={liveEnemies}
+            exclude={exclude}
+          />
+        </Section>
         <Section
           title="Skill order"
           meta={

@@ -72,20 +72,27 @@ function HeroRoster({
   );
 }
 
+const NO_ENEMIES: number[] = [];
+
 export function HeroesPage({
   route,
   navigate,
   query,
   setQuery,
+  liveEnemies = NO_ENEMIES,
 }: {
   route: Route;
   navigate: Navigate;
   query: AnalyticsQuery;
   setQuery(query: AnalyticsQuery): void;
   catalogWhileLoading?: boolean;
+  // Enemy heroes in the desktop app's live match; the website has none.
+  liveEnemies?: number[];
 }) {
   const [role, setRole] = useState<RoleFilter>("all");
   const [search, setSearch] = useState("");
+  // Kept here so the same enemy team carries over from hero to hero.
+  const [enemyPicks, setEnemyPicks] = useState<number[]>([]);
   return (
     <LinkScope navigate={navigate}>
       {route.heroId === undefined ? (
@@ -96,6 +103,9 @@ export function HeroesPage({
           heroId={route.heroId}
           query={query}
           setQuery={setQuery}
+          liveEnemies={liveEnemies}
+          enemyPicks={enemyPicks}
+          setEnemyPicks={setEnemyPicks}
         />
       )}
     </LinkScope>
