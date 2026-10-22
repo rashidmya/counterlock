@@ -23,14 +23,15 @@ interface Point {
 }
 
 const level = (r: number) => Math.round(Math.abs(r) * 100) === 0;
-const toneOf = (r: number): Stretch["tone"] =>
-  level(r) ? undefined : r > 0 ? "good" : "bad";
 const versus = (r: number, average: string) =>
   level(r)
     ? `level with ${average}`
     : `${percent(r)} ${r > 0 ? "more" : "fewer"} souls than ${average}`;
 
-/** Where the player ended up against the normal range, and since when. */
+/**
+ * Where the player ended up against the normal range, and since when.
+ * `until` is set when the average stops before the match ends.
+ */
 function turningPoint(points: Point[], until: string) {
   const last = points.at(-1)!.side;
   let start = points.length - 1;
@@ -40,12 +41,21 @@ function turningPoint(points: Point[], until: string) {
     return `${where} the normal range ${until || "all game"}.`;
   }
   const at = clock(points[start].t);
+  const moved =
+    last === 1
+      ? "Pulled ahead of the normal range"
+      : last === -1
+        ? "Fell behind the normal range"
+        : "Back within the normal range";
+  // A change at the last snapshot has no time after it to "stay" in.
+  if (start === points.length - 1)
+    return until
+      ? `${moved} at ${at}, where the average stops.`
+      : `${moved} by the end (${at}).`;
   const tail = until ? ` ${until}` : "";
-  if (last === 1)
-    return `Pulled ahead of the normal range at ${at} and stayed there${tail}.`;
-  if (last === -1)
-    return `Fell behind the normal range at ${at} and stayed there${tail}.`;
-  return `Back within the normal range from ${at}${tail}.`;
+  return last === 0
+    ? `${moved} from ${at}${tail}.`
+    : `${moved} at ${at} and stayed there${tail}.`;
 }
 
 function roughPatch(deaths: number[]): Stretch | null {
@@ -89,7 +99,10 @@ export function stretches(
   const result: Stretch[] = [];
   if (curve && points.length >= 2) {
     const end = points.at(-1)!.t;
-    const until = end < player.times.at(-1)! ? `until ${clock(end)}` : "";
+    const until =
+      end < player.times.at(-1)!
+        ? `through ${clock(end)}, where the average stops`
+        : "";
     const average =
       curve.band.min > 0
         ? `the ${curve.band.label} average`
@@ -100,12 +113,13 @@ export function stretches(
       {
         label: "Strongest",
         text: `Around ${clock(best.t)}: ${versus(best.r, average)}.`,
-        tone: toneOf(best.r),
+        // Coloured only outside the normal range, like the turning point.
+        tone: best.side === 1 ? "good" : undefined,
       },
       {
         label: "Weakest",
         text: `Around ${clock(worst.t)}: ${versus(worst.r, "the average")}.`,
-        tone: toneOf(worst.r),
+        tone: worst.side === -1 ? "bad" : undefined,
       },
       { label: "Turning point", text: turningPoint(points, until) },
     );

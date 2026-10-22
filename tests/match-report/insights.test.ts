@@ -112,10 +112,12 @@ describe("stretches", () => {
         text: "Around 15:00: 20% more souls than the Emissary average.",
         tone: "good",
       },
+      // The curve's normal range is ±10%. At 3:00 and 20:00 the lead sits
+      // exactly on its edge, which counts as within: no tone at 3:00, and
+      // back within from 20:00.
       {
         label: "Weakest",
         text: "Around 3:00: 10% fewer souls than the average.",
-        tone: "bad",
       },
       {
         label: "Turning point",
@@ -163,13 +165,32 @@ describe("stretches", () => {
     );
   });
 
-  it("says until when when the average stops before the match ends", () => {
+  it("a change at the last snapshot happened by the end", () => {
+    expect(turn([1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 0.8])).toBe(
+      "Fell behind the normal range by the end (30:00).",
+    );
+  });
+
+  it("colours strongest and weakest only outside the normal range", () => {
+    const [strongest, weakest] = stretches(
+      withShares([0.95, 0.97, 1, 1, 1, 1, 1, 1]),
+      curve,
+    );
+    expect(strongest.tone).toBeUndefined();
+    expect(weakest.tone).toBeUndefined();
+    expect(weakest.text).toBe("Around 3:00: 5% fewer souls than the average.");
+  });
+
+  it("says through when when the average stops before the match ends", () => {
     const short = { ...curve, points: curve.points.filter((p) => p.t <= 900) };
     expect(turn([1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2], short)).toBe(
-      "Ahead of the normal range until 15:00.",
+      "Ahead of the normal range through 15:00, where the average stops.",
     );
     expect(turn([0.8, 0.8, 1.2, 1.2, 1.2, 0.5, 0.5, 0.5], short)).toBe(
-      "Pulled ahead of the normal range at 9:00 and stayed there until 15:00.",
+      "Pulled ahead of the normal range at 9:00 and stayed there through 15:00, where the average stops.",
+    );
+    expect(turn([1.2, 1.2, 1.2, 1.2, 0.8, 0.5, 0.5, 0.5], short)).toBe(
+      "Fell behind the normal range at 15:00, where the average stops.",
     );
   });
 
