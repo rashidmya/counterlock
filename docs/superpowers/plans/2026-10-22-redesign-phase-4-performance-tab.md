@@ -23,12 +23,12 @@ Each card shows one point per game (win or loss dot) with the dashed rank averag
 **Spec:** `docs/superpowers/specs/2026-10-21-redesign-design.md`: "Performance tab", "Profile" and phase 4 of "Delivery phases". Visual reference: `docs/superpowers/specs/2026-10-21-redesign-prototype.html` (open "Performance"; tick "Show as website" for web sizes). Where this plan and the prototype differ, this plan wins.
 
 **Every code block in this plan was built and run before the plan was written.** The full result:
-- `npm test` 359 passed;
-- `npm run test:browser` 129 passed;
+- `npm test` 362 passed;
+- `npm run test:browser` 130 passed;
 - `npm run test:web` 74 passed;
 - both type checks, `npm run build`, `npm run web:build` and `npm run validate:manifest` passed.
 
-Each task's end state was also checked on its own: type check and unit tests after every task (334, 339, 360, 369, 369, 369 and 359 tests), and both browser suites after Tasks 5 and 6. Copy the code as given. If something fails, fix the cause rather than the test.
+Each task's end state was also checked on its own: type check and unit tests after every task (334, 339, 363, 372, 372, 372 and 362 tests), and both browser suites after Tasks 5 and 6. Copy the code as given. If something fails, fix the cause rather than the test.
 
 ## Decisions made while planning (verified against the live API on 2026-10-22)
 
@@ -54,17 +54,17 @@ Checked on account 400239835 (Eternus 6, 5,699 games) and three Archon–Arcanis
   - **Cost:** one request per hero and band (31 KB, about 7 s uncached, cached for an hour server-side), shared between games by the client.
 - **K/D/A without inflating anyone.**
   - **The problem:** a mean of per-game K/D/A ratios runs far above a ratio of averages. Haze at Eternus has a mean per-game K/D/A of 5.8, a median of 3.6 and a ratio of average kills, deaths and assists of 3.5. Comparing the first with the curve's ratio would put nearly every player above average.
-  - **Range value:** (Σkills + Σassists) ÷ Σmax(1, deaths).
-  - **Rank average:** (k̄ + ā) ÷ max(1, d̄) from the curve. A single game's ratio is compared with it directly, since the median game sits near it.
-- **Every range value adds up fractions.** Each metric gives each game a numerator and a denominator (souls and minutes, damage and team damage…). The range value is Σnumerators ÷ Σdenominators: a time-weighted rate, so longer games count for more. The rank average adds up the same way, over the games that have both a value and an average. When those are fewer, the card says so: "rank avg 1,085 (18 games)".
+  - **Range value:** (Σkills + Σassists) ÷ max(1, Σdeaths), as the Overview's K/D/A does. Deaths are added up before the floor at one (`minDenominator`), so deathless games aren't counted as a death each (Task 3 review).
+  - **Rank average:** (k̄ + ā) ÷ max(1, d̄) per game from the curve, and over the range (Σk̄ + Σā) ÷ max(1, Σd̄). A single game's ratio is compared with it directly, since the median game sits near it.
+- **Every range value adds up fractions.** Each metric gives each game a numerator and a denominator (souls and minutes, damage and team damage…). The range value is Σnumerators ÷ Σdenominators: a time-weighted rate, so longer games count for more. The rank average adds up the same way, over the games that have both a value and an average. When those are fewer (games longer than the curve), the card compares like with like: "20 games · 18 with a rank average: 1,060 vs 1,000", where 1,060 is the player over those 18 games (`comparedValue`, Task 3 review). The left-out games are the longest, where rates run highest, so comparing all games with the subset's average would flatter the player.
 - **"Last hits" becomes "Creep kills / min" (deviation, as in phase 3).** The curve has creep kills, not last hits, and the two counts differ. The note says so.
 - **Kill participation and hero damage share have no rank average.**
   - **Source:** bulk K/D/A and hero damage of the player's team.
   - **No average:** the curve has no team totals. The prototype's "rank avg 55%" and "17%" weren't real numbers, so these cards say "no rank average".
 - **Improving / Flat / Slipping.**
   - **Method:** the recent half of the games against the earlier half; with an odd count, the middle game goes to the earlier half. Each game counts as its value ÷ its own rank average, so changing hero or rank doesn't read as a change in form. The two shares use their values.
-  - **Threshold:** improving or slipping only when the halves differ by at least `TREND_T = 2` standard errors (Welch), and with at least `MIN_TREND_GAMES = 6` games.
-  - **Why 2:** on the four live accounts, a threshold of 1 flagged about four of eight metrics per account, mostly noise. A threshold of 2 flagged zero to two, and those were consistent (one account slipping in both K/D/A and kill participation).
+  - **Threshold:** improving or slipping only when Welch's t-test finds the halves differ at the 95% level (Welch–Satterthwaite degrees of freedom, `criticalT(df)` from a t-table), with at least `MIN_TREND_GAMES = 6` games.
+  - **Why:** on the four live accounts, a threshold of 1 standard error flagged about four of eight metrics per account, mostly noise. The Task 3 review then simulated a fixed 2 on data with no change: 12% of cards flagged at 6 games and 6% at 20, because a 3-vs-3 split has only about 4 degrees of freedom (critical t 2.78). The t-table keeps the false-alarm rate near 5% at any range.
   - **States:** no badge while the needed data loads or failed, and "Too few games" otherwise.
 - **Ranges and hero.**
   - **Ranges:** Last 20 (default), Last 50 and Last 100. "All" is dropped, because thousands of games of metadata is too much (the test account has 5,699).
@@ -92,7 +92,7 @@ Checked on account 400239835 (Eternus 6, 5,699 games) and three Archon–Arcanis
 
 - Every colour comes from `src/app/styles/tokens.css` (`var(--token)` or `rgb(from var(--token) r g b / a)`). `tests/app/theme.test.ts` fails on any hex literal in `src/**/*.css`, `web/app/**/*.css` or `src/**/*.tsx`.
 - Fonts and components are as in phases 1–3: Rajdhani uppercase for labels, buttons and numbers, DM Sans for body text, `SectionHeader` for the section title, `.filter-buttons` for the ranges and `.select-field` for the hero select.
-- **Constants (exported; tests import them):** `RANGES = [20, 50, 100]`, `MIN_TREND_GAMES = 6`, `TREND_T = 2`, `TOTALS_BATCH = 50`.
+- **Constants (exported; tests import them):** `RANGES = [20, 50, 100]`, `MIN_TREND_GAMES = 6`, `TOTALS_BATCH = 50`; `criticalT(df)` gives the two-sided 95% t.
 - **Copy strings fixed by this plan (tests assert them):**
   - **Controls:** buttons "Last 20", "Last 50" and "Last 100"; the select "Hero" with "All heroes" and options like "Haze · 181 games" ("1 game" for one).
   - **Legend:** "Game by game", "Average for that hero at that rank", "Win" and "Loss".
@@ -100,7 +100,7 @@ Checked on account 400239835 (Eternus 6, 5,699 games) and three Archon–Arcanis
   - **Trends:** "▲ Improving", "– Flat", "▼ Slipping" and "Too few games".
   - **Card numbers:**
     - the value (`1,238`, `3.7` below 100, `54%` for shares, "—" without one);
-    - then "{n} games · rank avg {x}", with " ({n} games)" when fewer games have an average;
+    - then "{n} games · rank avg {x}", or, when fewer games have an average, "{n} games · {m} with a rank average: {player over those m} vs {x}";
     - otherwise " · no rank average", " · loading rank average…" or " · no rank average for these games";
     - or "Loading match details…" or "No match details" instead.
   - **Point tooltip:** "{Hero} · Win · 3d ago: 1,254 (rank avg 1,213)".
@@ -125,11 +125,11 @@ Checked on account 400239835 (Eternus 6, 5,699 games) and three Archon–Arcanis
 
 1. **Honest numbers.**
    - **Range values** add up fractions; they never average per-game ratios.
-   - **The rank average** covers only games that have both a value and an average, and the card says when they are fewer.
+   - **The rank average** covers only games that have both a value and an average; when they are fewer, the card compares the player over the same games.
    - **Trends** follow each game against its own average; the two shares are the only metrics that use raw values.
    - **Notes** cover the current-rank fallback, widening and missing details.
 
-   Tests: `weights games by length, not each game equally`, `follows each game against its own rank average`, `performance tab compares each metric with the rank average`.
+   Tests: `weights games by length, not each game equally`, `compares like with like when some games have no rank average`, `adds up deaths before counting them as at least one`, `follows each game against its own rank average`, `is flat unless Welch's t-test finds the halves differ at 95%`, `performance tab compares each metric with the rank average`, `performance tab compares like with like when a game outlasts the rank average`.
 2. **Requests.**
    - **Bulk metadata:** asked once per new game, in batches of 50, with in-flight requests shared.
    - **Curves:** shared per hero and band.
@@ -514,7 +514,7 @@ The new module sits next to the old `utils/performance.ts`. The old tab still us
 **How the pieces fit:**
 - **Metrics:** each `PerformanceMetric` turns a game into a fraction, from its history row and, for six metrics, its `GameTotals`. Metrics the curve covers also turn the game's `GameAverage` into a fraction.
 - **`summarizeMetric()`:** builds the per-game points, the range value and the rank average by adding up the fractions, and the trend.
-- **`trend()`:** a Welch comparison of the earlier and recent halves.
+- **`trend()`:** Welch's t-test at 95% on the earlier and recent halves, with `criticalT(df)` from a t-table.
 
 **Test data:**
 - `gameAverage()` reads the phase 3 fixture curve (`rankCurveRows()`: 1,000 souls and 500 hero damage per minute).
@@ -537,7 +537,7 @@ import { parseMatchTotals } from "@/features/profile/utils/match-totals";
 import {
   MIN_TREND_GAMES,
   PERFORMANCE_METRICS,
-  TREND_T,
+  criticalT,
   gameAverage,
   gameTotals,
   gamesInRange,
@@ -626,6 +626,16 @@ describe("gameAverage", () => {
     expect(average.values.deaths).toBe(
       averageAt(curve, metricById.get("deaths")!, 1800)!.avg,
     );
+    expect(Object.keys(average.values).sort()).toEqual([
+      "assists",
+      "creepKills",
+      "deaths",
+      "healing",
+      "heroDamage",
+      "kills",
+      "objectiveDamage",
+      "souls",
+    ]);
   });
 
   it("has no values past the curve's end", () => {
@@ -686,15 +696,19 @@ describe("metrics", () => {
     expect(average("soulsPerMin")).toBe(1000);
     expect(value("kda")).toBe((4 + 2) / 2);
     expect(average("kda")).toBe((6 + 9) / 5);
+    // Deaths count as at least one when dividing, not in the fraction.
     expect(metric("kda").value(match({ deaths: 0 }), undefined)).toEqual({
       num: 6,
-      den: 1,
+      den: 0,
     });
+    expect(metric("kda").minDenominator).toBe(1);
   });
 
   it("the rest need the match's totals", () => {
     expect(value("heroDamagePerMin")).toBe(1000);
     expect(average("heroDamagePerMin")).toBe(500);
+    expect(value("objectiveDamagePerMin")).toBe(200);
+    expect(value("healingPerMin")).toBe(4000 / 30);
     expect(value("creepKillsPerMin")).toBe(3);
     expect(average("creepKillsPerMin")).toBeNull();
     expect(value("killParticipation")).toBe(17 / 30);
@@ -718,24 +732,39 @@ describe("trend", () => {
     expect(trend([1, 2, 3, 4, 5])).toBeNull();
   });
 
-  it("is flat when the halves differ by less than TREND_T standard errors", () => {
-    expect(TREND_T).toBe(2);
-    // Means 1.0 and 1.1; standard error about 0.082, so t ≈ 1.22.
+  it("reads 95% critical values of t, the stricter row between rows", () => {
+    expect(criticalT(4)).toBe(2.78);
+    expect(criticalT(4.9)).toBe(2.78);
+    expect(criticalT(18)).toBe(2.13);
+    expect(criticalT(1000)).toBe(1.98);
+    expect(criticalT(0.5)).toBe(12.71);
+  });
+
+  it("is flat unless Welch's t-test finds the halves differ at 95%", () => {
+    // Means 1.0 and 1.1: t ≈ 1.22.
     expect(trend([0.9, 1.1, 1.0, 1.0, 1.2, 1.1])).toBe("flat");
+    // Means 1.0 and 1.2: t ≈ 2.45, short of 2.78 on 4 degrees of freedom.
+    expect(trend([0.9, 1.0, 1.1, 1.1, 1.2, 1.3])).toBe("flat");
     expect(trend([1, 1, 1, 1, 1, 1])).toBe("flat");
   });
 
   it("improves or slips beyond that", () => {
     expect(trend([0.9, 1.0, 1.1, 1.4, 1.5, 1.6])).toBe("improving");
     expect(trend([1.6, 1.5, 1.4, 1.1, 1.0, 0.9])).toBe("slipping");
+    // The same 0.2 step over 20 games: t ≈ 5.5 on 18 degrees of freedom.
+    const earlier = [0.9, 1.0, 1.1, 0.9, 1.0, 1.1, 0.9, 1.0, 1.1, 1.0];
+    expect(trend([...earlier, ...earlier.map((v) => v + 0.2)])).toBe(
+      "improving",
+    );
     // No spread at all: any change counts.
     expect(trend([1, 1, 1, 2, 2, 2])).toBe("improving");
   });
 
   it("puts the middle game in the earlier half", () => {
-    // Earlier [0, 0, 0, 3] and recent [1, 1, 1]: t ≈ 0.33. With the 3 in
-    // the recent half it would be t = 3, improving.
-    expect(trend([0, 0, 0, 3, 1, 1, 1])).toBe("flat");
+    // Earlier [1, 1, 1, 2] and recent [2, 2, 2]: t = 3, short of 3.18 on 3
+    // degrees of freedom. With the middle game in the recent half both
+    // halves would be constant, a sure change.
+    expect(trend([1, 1, 1, 2, 2, 2, 2])).toBe("flat");
   });
 });
 
@@ -797,6 +826,34 @@ describe("summarizeMetric", () => {
     expect(summary.value).toBe(1100);
     expect(summary.average).toBeNull();
     expect(summary.compared).toBe(0);
+  });
+
+  it("compares like with like when some games have no rank average", () => {
+    const summary = summarizeMetric(
+      metric("soulsPerMin"),
+      games,
+      () => undefined,
+      (id) => (id <= 4 ? average : undefined),
+    );
+    expect(summary.value).toBe(1150);
+    expect(summary.games).toBe(6);
+    expect(summary.average).toBe(1000);
+    expect(summary.compared).toBe(4);
+    expect(summary.comparedValue).toBe((900 + 950 + 1000 + 1300) / 4);
+    // Four games to compare are too few for a trend.
+    expect(summary.trend).toBeNull();
+  });
+
+  it("adds up deaths before counting them as at least one", () => {
+    const summary = summarizeMetric(
+      metric("kda"),
+      [0, 0, 4].map((deaths, i) => match({ matchId: i + 1, deaths })),
+      () => undefined,
+      () => undefined,
+    );
+    expect(summary.points.map((p) => p.value)).toEqual([6, 6, 1.5]);
+    // 18 kills and assists over 4 deaths, not over 1 + 1 + 4.
+    expect(summary.value).toBe(4.5);
   });
 
   it("has no trend for a rank-averaged metric until the averages load", () => {
@@ -896,11 +953,9 @@ import type { PlayerTotals } from "./match-totals";
 
 export const RANGES = [20, 50, 100] as const;
 export type PerformanceRange = (typeof RANGES)[number];
-// Fewer games than this with a value and there is no trend.
+// Fewer games than this to compare (with a rank average, where the metric
+// has one) and there is no trend. Six keeps each half at three games or more.
 export const MIN_TREND_GAMES = 6;
-// The recent half must differ from the earlier half by this many standard
-// errors to count as improving or slipping; anything less is flat.
-export const TREND_T = 2;
 
 /** The newest `range` normal and ranked games, of one hero or all, oldest first. */
 export function gamesInRange(
@@ -988,7 +1043,7 @@ export function gameTotals(
 // A game's value as a fraction. Over a range the numerators and the
 // denominators are added up (a time-weighted rate) rather than averaging
 // each game's value.
-interface Fraction {
+export interface Fraction {
   num: number;
   den: number;
 }
@@ -1007,8 +1062,11 @@ export interface PerformanceMetric {
   id: PerformanceMetricId;
   label: string;
   // Needs the match's totals, not just the match-history row.
-  totals: boolean;
+  needsTotals: boolean;
   percent: boolean;
+  // Never divide by less than this, in a game or over the range: deaths
+  // count as at least one.
+  minDenominator?: number;
   value(game: HistoryMatch, totals: GameTotals | undefined): Fraction | null;
   // The rank average for the game; absent for metrics the curve can't give.
   average?(game: HistoryMatch, values: GameAverage["values"]): Fraction | null;
@@ -1025,7 +1083,7 @@ const perMinute = (
 ): PerformanceMetric => ({
   id,
   label,
-  totals: true,
+  needsTotals: true,
   percent: false,
   value: (game, totals) =>
     totals && game.durationS > 0
@@ -1045,7 +1103,7 @@ const share = (
 ): PerformanceMetric => ({
   id,
   label,
-  totals: true,
+  needsTotals: true,
   percent: true,
   value: (_, totals) => {
     if (!totals) return null;
@@ -1058,7 +1116,7 @@ export const PERFORMANCE_METRICS: PerformanceMetric[] = [
   {
     id: "soulsPerMin",
     label: "Souls / min",
-    totals: false,
+    needsTotals: false,
     percent: false,
     value: (game) =>
       game.durationS > 0 ? { num: game.netWorth, den: minutes(game) } : null,
@@ -1070,16 +1128,14 @@ export const PERFORMANCE_METRICS: PerformanceMetric[] = [
   {
     id: "kda",
     label: "K/D/A ratio",
-    totals: false,
+    needsTotals: false,
     percent: false,
-    value: (game) => ({
-      num: game.kills + game.assists,
-      den: Math.max(1, game.deaths),
-    }),
+    minDenominator: 1,
+    value: (game) => ({ num: game.kills + game.assists, den: game.deaths }),
     average: (_, { kills, deaths, assists }) =>
       kills === undefined || deaths === undefined || assists === undefined
         ? null
-        : { num: kills + assists, den: Math.max(1, deaths) },
+        : { num: kills + assists, den: deaths },
   },
   perMinute(
     "heroDamagePerMin",
@@ -1129,15 +1185,21 @@ export interface MetricSummary {
   // Over the games with a value.
   value: number | null;
   games: number;
-  // Over the games with both a value and a rank average.
+  // The rank average, and the player's value, over the games that have
+  // both; the same games as `value` unless some have no rank average.
   average: number | null;
+  comparedValue: number | null;
   compared: number;
   // Null with fewer than MIN_TREND_GAMES games to compare.
   trend: Trend | null;
 }
 
-const ratio = (parts: Fraction[]) => {
-  const den = parts.reduce((sum, part) => sum + part.den, 0);
+const ratio = (parts: Fraction[], minDenominator = 0) => {
+  if (!parts.length) return null;
+  const den = Math.max(
+    minDenominator,
+    parts.reduce((sum, part) => sum + part.den, 0),
+  );
   return den > 0 ? parts.reduce((sum, part) => sum + part.num, 0) / den : null;
 };
 
@@ -1151,10 +1213,34 @@ const variance = (values: number[]) => {
   );
 };
 
+// Two-sided 95% critical values of Student's t by degrees of freedom,
+// most first; between rows, the row below (the stricter value).
+const T_95: [number, number][] = [
+  [120, 1.98],
+  [60, 2.0],
+  [40, 2.02],
+  [30, 2.04],
+  [20, 2.09],
+  [15, 2.13],
+  [12, 2.18],
+  [10, 2.23],
+  [9, 2.26],
+  [8, 2.31],
+  [7, 2.36],
+  [6, 2.45],
+  [5, 2.57],
+  [4, 2.78],
+  [3, 3.18],
+  [2, 4.3],
+  [1, 12.71],
+];
+export const criticalT = (df: number) =>
+  T_95.find(([rows]) => rows <= df)?.[1] ?? T_95.at(-1)![1];
+
 /**
  * Compares the recent half of the games with the earlier half (the middle
- * game goes to the earlier half). Improving or slipping only when the
- * difference is at least TREND_T standard errors (Welch).
+ * game goes to the earlier half) with Welch's t-test: improving or slipping
+ * only when the halves differ at the 95% level, otherwise flat.
  */
 export function trend(values: number[]): Trend | null {
   if (values.length < MIN_TREND_GAMES) return null;
@@ -1162,11 +1248,16 @@ export function trend(values: number[]): Trend | null {
   const earlier = values.slice(0, split);
   const recent = values.slice(split);
   const diff = mean(recent) - mean(earlier);
-  const error = Math.sqrt(
-    variance(earlier) / earlier.length + variance(recent) / recent.length,
-  );
-  if (error === 0 ? diff === 0 : Math.abs(diff) < TREND_T * error)
-    return "flat";
+  const a = variance(earlier) / earlier.length;
+  const b = variance(recent) / recent.length;
+  // Without any spread, every change is a sure one.
+  const t = a + b > 0 ? Math.abs(diff) / Math.sqrt(a + b) : diff ? Infinity : 0;
+  const df =
+    a + b > 0
+      ? (a + b) ** 2 /
+        (a ** 2 / (earlier.length - 1) + b ** 2 / (recent.length - 1))
+      : Infinity;
+  if (t < criticalT(df)) return "flat";
   return diff > 0 ? "improving" : "slipping";
 }
 
@@ -1181,6 +1272,8 @@ export function summarizeMetric(
   totals: (matchId: number) => GameTotals | undefined,
   averages: (matchId: number) => GameAverage | undefined,
 ): MetricSummary {
+  const floor = metric.minDenominator ?? 0;
+  const divide = (part: Fraction) => part.num / Math.max(floor, part.den);
   const rows = games.map((game) => {
     const value = metric.value(game, totals(game.matchId));
     const values = averages(game.matchId)?.values;
@@ -1191,10 +1284,10 @@ export function summarizeMetric(
   const compared = valued.filter((row) => row.average);
   const samples = metric.average
     ? compared.flatMap(({ value, average }) => {
-        const avg = average!.num / average!.den;
-        return avg > 0 ? [value!.num / value!.den / avg] : [];
+        const avg = divide(average!);
+        return avg > 0 ? [divide(value!) / avg] : [];
       })
-    : valued.map(({ value }) => value!.num / value!.den);
+    : valued.map(({ value }) => divide(value!));
   return {
     metric,
     points: rows.map(({ game, value, average }) => ({
@@ -1202,12 +1295,22 @@ export function summarizeMetric(
       heroId: game.heroId,
       startTime: game.startTime,
       won: isWin(game),
-      value: value ? value.num / value.den : null,
-      average: average ? average.num / average.den : null,
+      value: value ? divide(value) : null,
+      average: average ? divide(average) : null,
     })),
-    value: ratio(valued.map((row) => row.value!)),
+    value: ratio(
+      valued.map((row) => row.value!),
+      floor,
+    ),
     games: valued.length,
-    average: ratio(compared.map((row) => row.average!)),
+    average: ratio(
+      compared.map((row) => row.average!),
+      floor,
+    ),
+    comparedValue: ratio(
+      compared.map((row) => row.value!),
+      floor,
+    ),
     compared: compared.length,
     trend: trend(samples),
   };
@@ -1217,7 +1320,7 @@ export function summarizeMetric(
 - [ ] **Step 4: Run the tests and confirm they pass**
 
 Run: `npx vitest run tests/profile/performance-metrics.test.ts`
-Expected: PASS (21 tests). `npm test`: 360 tests.
+Expected: PASS (24 tests). `npm test`: 363 tests.
 
 - [ ] **Step 5: Check and commit**
 
@@ -1533,7 +1636,7 @@ export async function fetchGameAverages(
 - [ ] **Step 4: Run the tests and confirm they pass**
 
 Run: `npx vitest run tests/profile/performance-api.test.ts`
-Expected: PASS (9 tests). `npm test`: 369 tests.
+Expected: PASS (9 tests). `npm test`: 372 tests.
 
 - [ ] **Step 5: Check and commit**
 
@@ -1690,7 +1793,7 @@ export function Sparkline({
 - [ ] **Step 4: Check that nothing broke**
 
 Run: `npx tsc --noEmit && npm test && npx playwright test tests/browser/match-report.spec.ts`
-Expected: PASS. 369 unit tests, and every match report browser test (the Graph still sizes and redraws).
+Expected: PASS. 372 unit tests, and every match report browser test (the Graph still sizes and redraws).
 
 - [ ] **Step 5: Check and commit**
 
@@ -1754,10 +1857,7 @@ import { bulkMetadata } from "../fixtures/performance";
       return fixtures.failCurve ? json({}, 500) : json(rankCurveRows());
 ```
 
-- Replace a whole block: it starts at the comment `// 60 summary games, newest first; every third one is lost.` and ends with the test `"performance tab degrades without match history"`. That covers `performanceHistory`, `pointCount` and the three old performance tests. The new block:
-
-```ts
-// 60 summary games, newest first; every third one is lost. The newest ten
+- Replace a whole block: it starts at the comment `// 60 summary games, newest first; every third one is lost. The newest ten
 // earn 1,200 souls a minute, the rest 1,000. Street Brawl, bot and
 // private-lobby games sit between them and must stay out of the cards.
 const performanceHistory = [
@@ -1881,6 +1981,28 @@ test("performance tab says so with too few games", async ({ page }) => {
   );
 });
 
+test("performance tab compares like with like when a game outlasts the rank average", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, {
+    history: [
+      historyRow(1, heroes[0], 1, 4, true, now - 7200),
+      {
+        ...historyRow(2, heroes[0], 1, 4, false, now - 3600),
+        match_duration_s: 3000,
+      },
+    ],
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  // The fixture's average stops at 40:00, so only the 30-minute game has
+  // one: 60,000 souls over 80 minutes overall, 1,000 a minute in that game.
+  await expect(
+    card(page, "Souls / min").locator(".perf-card-numbers"),
+  ).toHaveText("7502 games · 1 with a rank average: 1,000 vs 1,000");
+});
+
 test("performance tab keeps history values when details and averages fail", async ({
   page,
 }) => {
@@ -1987,14 +2109,17 @@ function PerformanceCard({
   totals: AsyncState<unknown>;
   averages: AsyncState<unknown>;
 }) {
-  const { metric, value, games, average, compared, trend } = summary;
+  const { metric, value, games, average, comparedValue, compared, trend } =
+    summary;
   // What the card still waits for, or lacks because a request failed.
   const waiting =
-    (metric.totals && totals.loading) || (!!metric.average && averages.loading);
+    (metric.needsTotals && totals.loading) ||
+    (!!metric.average && averages.loading);
   const failed =
-    (metric.totals && !!totals.error) || (!!metric.average && !!averages.error);
+    (metric.needsTotals && !!totals.error) ||
+    (!!metric.average && !!averages.error);
   const detail =
-    metric.totals && totals.loading
+    metric.needsTotals && totals.loading
       ? "Loading match details…"
       : !games
         ? "No match details"
@@ -2007,8 +2132,10 @@ function PerformanceCard({
                 ? averages.error
                   ? ""
                   : " · no rank average for these games"
-                : ` · rank avg ${format(metric, average)}` +
-                  (compared < games ? ` (${count(compared)})` : ""));
+                : compared < games
+                  ? // Like with like: the player over the same games.
+                    ` · ${compared} with a rank average: ${format(metric, comparedValue!)} vs ${format(metric, average)}`
+                  : ` · rank avg ${format(metric, average)}`);
   const title = (p: GamePoint) =>
     `${heroName(p.heroId)} · ${p.won ? "Win" : "Loss"} · ${timeAgo(p.startTime * 1000)}: ` +
     format(metric, p.value!) +
@@ -2379,10 +2506,10 @@ with:
 - [ ] **Step 6: Run the tests and confirm they pass**
 
 Run: `npx playwright test tests/browser/home.spec.ts -g "performance"`
-Expected: PASS (4 tests).
+Expected: PASS (5 tests).
 
 Then run `npm test`, `npm run test:browser` and `npm run test:web`.
-Expected: PASS (369, 129 and 74).
+Expected: PASS (372, 130 and 74).
 
 - [ ] **Step 7: Look at it**
 
@@ -2459,7 +2586,7 @@ In `tests/profile/match-history.test.ts`, remove `form` from the import and dele
 - [ ] **Step 4: Run everything**
 
 Run: `npx tsc --noEmit && npm run web:typecheck && npm test`
-Expected: PASS (359 tests).
+Expected: PASS (362 tests).
 
 Run: `grep -rn "LineChart\|fetchSummaryHeroStats\|SUMMARY_HERO_STATS\|performanceSeries\|combatAverages\|chart-card" src web/app tests`
 Expected: no output.
@@ -2494,10 +2621,10 @@ git commit -m "refactor(profile): remove what the old Performance tab used"
 
 Eight cards, each with one point per game (oldest on the left, dotted by win or loss), the dashed rank average and the value over the range. A range adds up the games rather than averaging each game's value, so longer games count for more.
 
-- **From match history:** souls / min and the K/D/A ratio, (kills + assists) ÷ deaths (at least one).
+- **From match history:** souls / min and the K/D/A ratio, (kills + assists) ÷ deaths, with deaths counted as at least one after adding up the games.
 - **From each game's totals:** hero damage, objective damage, healing and creep kills per minute, kill participation and hero damage share. They come from `GET /v1/matches/metadata?match_ids=…&include_player_kda=true&extra_player_columns=stats.player_damage,stats.boss_damage,stats.player_healing,stats.creep_kills` (bulk metadata, every player's stat snapshots; the last one is the final total), at most 50 games per request and kept per match, so a wider range only asks for the games it adds. Bulk metadata allows 30 requests per minute per IP. Games the API hasn't stored yet are left out and the note says how many.
 - **Rank average:** the match report's curve, one request per hero and rank (shared between games), read at each game's length: the tier of the game's rank (match history's `ranked_display_badge`), the player's current rank for games without one, such as unranked games, or all ranks when neither is known. It widens as in the match report. As there, **creep kills** stand in for last hits. Kill participation and hero damage share have no rank average.
-- **Improving / Flat / Slipping** compares the recent half of the games with the earlier half (at least 6 games), each game as its value ÷ its rank average, so changing hero or rank doesn't read as a change in form; the two shares use their values. It says improving or slipping only when the halves differ by at least two standard errors (Welch), and flat otherwise.
+- **Improving / Flat / Slipping** compares the recent half of the games with the earlier half (at least 6 games), each game as its value ÷ its rank average, so changing hero or rank doesn't read as a change in form; the two shares use their values. It says improving or slipping only when Welch's t-test finds the halves differ at the 95% level, and flat otherwise. When some games run past the end of the rank average, the card compares the player and the average over the games that have one.
 ```
 
 **"Project map":** in the `src/features/profile/` row, change "heroes, charts" to "heroes, trends". Pad the cell with spaces so the table's columns stay aligned and prettier leaves the table alone.
@@ -2516,16 +2643,16 @@ In `docs/superpowers/specs/2026-10-21-redesign-design.md`:
 - At the end of "### Performance tab", add:
 
 ```markdown
-Built in phase 4: eight metrics (souls / min, K/D/A ratio, hero damage, objective damage, healing and creep kills per minute, kill participation and hero damage share) over the last 20, 50 or 100 normal and ranked games, for all heroes or one. Damage, healing, creep kills and shares come from bulk metadata (`GET /v1/matches/metadata`, 50 games per request) rather than one metadata request per game. The rank average is the match report's curve at each game's length, using the game's rank, or the player's current rank for unranked games. As in the match report, creep kills stand in for last hits. The two shares have no rank average. Improving or slipping needs the recent half of the games to differ from the earlier half by two standard errors, each game against its own rank average.
+Built in phase 4: eight metrics (souls / min, K/D/A ratio, hero damage, objective damage, healing and creep kills per minute, kill participation and hero damage share) over the last 20, 50 or 100 normal and ranked games, for all heroes or one. Damage, healing, creep kills and shares come from bulk metadata (`GET /v1/matches/metadata`, 50 games per request) rather than one metadata request per game. The rank average is the match report's curve at each game's length, using the game's rank, or the player's current rank for unranked games. As in the match report, creep kills stand in for last hits. The two shares have no rank average. Improving or slipping needs Welch's t-test to find the recent half of the games different from the earlier half at the 95% level, each game against its own rank average.
 ```
 
 - [ ] **Step 3: Final check**
 
 Run all of these; every one must pass:
-- `npm test` (359)
+- `npm test` (362)
 - `npx tsc --noEmit`
 - `npm run web:typecheck`
-- `npm run test:browser` (129)
+- `npm run test:browser` (130)
 - `npm run test:web` (74)
 - `npm run build`
 - `npm run web:build`
