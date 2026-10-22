@@ -106,8 +106,9 @@ All checked on real ranked match 118590607 (`GET /v1/matches/118590607/metadata`
   - **Section titles:** "Graph", "Best & worst stretches", "Impact", "Permanent buffs" and "Scoreboard".
   - **Stretches:**
     - labels Strongest, Weakest, Turning point, Deaths and Rough patch;
-    - texts like "Around 15:00: 20% ahead of the Emissary average.", "Around 3:00: 10% behind the average.", "Pulled ahead of the average at 9:00 and stayed there.", "4 deaths: 6:40, 21:40, 23:20, 25:00." and "3 deaths between 21:40 and 25:00.";
-    - the no-average note "No rank average for this match, so only deaths are listed."
+    - texts like "Around 15:00: 20% more souls than the Emissary average.", "Around 3:00: 10% fewer souls than the average." (or "level with …"), "Back within the normal range from 20:00." (other turning points: "Ahead of / Behind / Within the normal range all game.", "Pulled ahead of / Fell behind the normal range at {m:ss} and stayed there.", each with " through {m:ss}, where the average stops" when it stops early; a change at the last snapshot reads "… by the end ({m:ss})."), "4 deaths: 6:40, 21:40, 23:20, 25:00." and "3 deaths between 21:40 and 25:00.";
+    - the note under the stretches title, "Souls against the average {Hero} at {Band} at each snapshot · normal range = ±1 standard deviation", or "No rank average for this match, so only deaths are listed.";
+    - verdicts that round to 0% read "Level with avg {Hero} at {Band}"
   - **Impact:** note "{Your|name's} share of the team's total · bars fill at half · the line marks an even 1/6 share"; kill participation "Kill participation 50% 14 of 28 team kills".
   - **Buffs:** "Picked up" and "Avg {Hero} at {Band}".
   - **Whole-match line:** "Pick a player in “Viewing as” to see their verdicts, best and worst stretches and impact."
@@ -1260,7 +1261,10 @@ describe("format", () => {
       compact(906),
       compact(12.5),
       compact(-1500),
-    ]).toEqual(["59.9K", "906", "12.5", "−1.5K"]);
+      compact(999.6),
+      compact(99.96),
+      compact(-0.04),
+    ]).toEqual(["59.9K", "906", "12.5", "−1.5K", "1.0K", "100", "0"]);
     expect([percent(0.124), percent(-0.25)]).toEqual(["12%", "25%"]);
   });
 });
@@ -1312,21 +1316,34 @@ describe("impact", () => {
 });
 
 describe("stretches", () => {
+  const withShares = (shares: number[]) => ({
+    ...lead,
+    values: {
+      ...lead.values,
+      souls: lead.times.map((t, i) => ((1000 * t) / 60) * shares[i]),
+    },
+  });
+  const turn = (shares: number[], c = curve) =>
+    stretches(withShares(shares), c).find((s) => s.label === "Turning point")
+      ?.text;
+
   it("names the strongest and weakest moments, the turning point and deaths", () => {
     expect(stretches(lead, curve)).toEqual([
       {
         label: "Strongest",
-        text: "Around 15:00: 20% ahead of the Emissary average.",
+        text: "Around 15:00: 20% more souls than the Emissary average.",
         tone: "good",
       },
+      // The curve's normal range is ±10%. At 3:00 and 20:00 the lead sits
+      // exactly on its edge, which counts as within: no tone at 3:00, and
+      // back within from 20:00.
       {
         label: "Weakest",
-        text: "Around 3:00: 10% behind the average.",
-        tone: "bad",
+        text: "Around 3:00: 10% fewer souls than the average.",
       },
       {
         label: "Turning point",
-        text: "Pulled ahead of the average at 9:00 and stayed there.",
+        text: "Back within the normal range from 20:00.",
       },
       { label: "Deaths", text: "4 deaths: 6:40, 21:40, 23:20, 25:00." },
       {
@@ -1337,33 +1354,89 @@ describe("stretches", () => {
     ]);
   });
 
-  it("describes each kind of turning point", () => {
-    const withShares = (shares: number[]) => ({
-      ...lead,
-      values: {
-        ...lead.values,
-        souls: lead.times.map((t, i) => ((1000 * t) / 60) * shares[i]),
-      },
+  it("describes where the player ended up against the normal range", () => {
+    expect(turn([1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2])).toBe(
+      "Ahead of the normal range all game.",
+    );
+    expect(turn([0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8])).toBe(
+      "Behind the normal range all game.",
+    );
+    expect(turn([1, 1.05, 0.95, 1, 1, 1, 1, 1])).toBe(
+      "Within the normal range all game.",
+    );
+    expect(turn([0.8, 0.8, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2])).toBe(
+      "Pulled ahead of the normal range at 9:00 and stayed there.",
+    );
+    expect(turn([1.2, 1.2, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8])).toBe(
+      "Fell behind the normal range at 9:00 and stayed there.",
+    );
+    expect(turn([1.2, 0.8, 1.2, 0.8, 1.2, 0.8, 1, 1])).toBe(
+      "Back within the normal range from 25:00.",
+    );
+  });
+
+  it("goes by how the match ended, not the first crossing, and ignores wobbles inside the range", () => {
+    expect(turn([0.8, 1.2, 0.8, 1.2, 0.8, 1.2, 1.2, 1.2])).toBe(
+      "Pulled ahead of the normal range at 20:00 and stayed there.",
+    );
+    expect(turn([1.2, 0.8, 1.2, 0.8, 1.2, 0.8, 0.8, 0.8])).toBe(
+      "Fell behind the normal range at 20:00 and stayed there.",
+    );
+    expect(turn([1.2, 1.2, 1.2, 0.98, 1.2, 1.2, 1.2, 1.2])).toBe(
+      "Pulled ahead of the normal range at 15:00 and stayed there.",
+    );
+  });
+
+  it("a change at the last snapshot happened by the end", () => {
+    expect(turn([1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 0.8])).toBe(
+      "Fell behind the normal range by the end (30:00).",
+    );
+  });
+
+  it("colours strongest and weakest only outside the normal range", () => {
+    const [strongest, weakest] = stretches(
+      withShares([0.95, 0.97, 1, 1, 1, 1, 1, 1]),
+      curve,
+    );
+    expect(strongest.tone).toBeUndefined();
+    expect(weakest.tone).toBeUndefined();
+    expect(weakest.text).toBe("Around 3:00: 5% fewer souls than the average.");
+  });
+
+  it("says through when when the average stops before the match ends", () => {
+    const short = { ...curve, points: curve.points.filter((p) => p.t <= 900) };
+    expect(turn([1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2], short)).toBe(
+      "Ahead of the normal range through 15:00, where the average stops.",
+    );
+    expect(turn([0.8, 0.8, 1.2, 1.2, 1.2, 0.5, 0.5, 0.5], short)).toBe(
+      "Pulled ahead of the normal range at 9:00 and stayed there through 15:00, where the average stops.",
+    );
+    expect(turn([1.2, 1.2, 1.2, 1.2, 0.8, 0.5, 0.5, 0.5], short)).toBe(
+      "Fell behind the normal range at 15:00, where the average stops.",
+    );
+  });
+
+  it("reads level within half a percent, and names the all-ranks average", () => {
+    const [strongest, weakest] = stretches(
+      withShares([1.002, 1.001, 1, 1, 1, 1, 1, 1]),
+      { ...curve, band: rankBand(0) },
+    );
+    expect(strongest).toEqual({
+      label: "Strongest",
+      text: "Around 3:00: level with the all-ranks average.",
     });
-    const turn = (shares: number[]) =>
-      stretches(withShares(shares), curve).find(
-        (s) => s.label === "Turning point",
-      )?.text;
-    expect(turn([1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1])).toBe(
-      "Ahead of the average all game.",
-    );
-    expect(turn([0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9])).toBe(
-      "Never caught the average.",
-    );
-    expect(turn([0.9, 1.1, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9])).toBe(
-      "Pulled ahead of the average at 6:00 and fell back later.",
-    );
-    expect(turn([1.1, 1.1, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9])).toBe(
-      "Fell behind the average at 9:00 and stayed behind.",
-    );
-    expect(turn([1.1, 0.9, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1])).toBe(
-      "Fell behind the average at 6:00, then caught up again.",
-    );
+    expect(weakest).toEqual({
+      label: "Weakest",
+      text: "Around 9:00: level with the average.",
+    });
+  });
+
+  it("needs two snapshots with an average to compare; otherwise only deaths", () => {
+    const first = { ...curve, points: curve.points.slice(0, 1) };
+    expect(stretches(lead, first).map((s) => s.label)).toEqual([
+      "Deaths",
+      "Rough patch",
+    ]);
   });
 
   it("without an average lists only deaths; one death reads singular", () => {
@@ -1393,10 +1466,14 @@ describe("perspective", () => {
     expect(displayName(lead, names, ACCOUNT)).toBe("You");
     expect(displayName(lead, names, null)).toBe("Fargo");
     expect(displayName(report.players[5], names, null)).toBe(heroes[5].name);
-    expect([possessive("You"), possessive("somdr")]).toEqual([
-      "Your",
-      "somdr's",
-    ]);
+    expect(displayName(lead, new Map([[ACCOUNT, ""]]), null)).toBe(
+      heroes[0].name,
+    );
+    expect([
+      possessive("You", true),
+      possessive("You", false),
+      possessive("somdr", false),
+    ]).toEqual(["Your", "You's", "somdr's"]);
   });
 
   it("labels options by team, hero and name, and notes whose match it is", () => {
@@ -1436,14 +1513,15 @@ export function clock(seconds: number) {
 /** 59.9K, 906, 12.5 (fractions only below 100). */
 export function compact(value: number) {
   const size = Math.abs(value);
+  if (size < 0.05) return "0";
   const sign = value < 0 ? "−" : "";
-  if (size >= 1000) return `${sign}${(size / 1000).toFixed(1)}K`;
-  if (size >= 100 || Number.isInteger(size))
+  if (size >= 999.5) return `${sign}${(size / 1000).toFixed(1)}K`;
+  if (size >= 99.95 || Number.isInteger(size))
     return `${sign}${Math.round(size)}`;
   return `${sign}${size.toFixed(1)}`;
 }
 
-/** "12%", rounding to a whole percent of a 0–1 share or change. */
+/** "12%": a 0–1 share or change as a whole percent, without its sign. */
 export const percent = (share: number) =>
   `${Math.round(Math.abs(share) * 100)}%`;
 ```
@@ -1487,12 +1565,12 @@ export function displayName(
   meId: number | null,
 ) {
   if (isMe(player, meId)) return "You";
-  return names.get(player.accountId) ?? heroName(player.heroId);
+  return names.get(player.accountId) || heroName(player.heroId);
 }
 
-/** "Your" / "somdr's". */
-export const possessive = (name: string) =>
-  name === "You" ? "Your" : `${name}'s`;
+/** "Your" for the remembered account, otherwise "somdr's". */
+export const possessive = (name: string, me: boolean) =>
+  me ? "Your" : `${name}'s`;
 
 /** "Amber · Haze · moealali777 (you)". */
 export function optionLabel(
@@ -1640,22 +1718,49 @@ export interface Stretch {
   tone?: "good" | "bad";
 }
 
-const relative = (r: number) => (r >= 0 ? "ahead of" : "behind");
+// Souls against the rank average at one snapshot: r = souls ÷ average − 1.
+// `side` is 1 above the normal range (average ± 1 standard deviation), −1
+// below it and 0 inside it, so small wobbles around the average don't count.
+interface Point {
+  t: number;
+  r: number;
+  side: -1 | 0 | 1;
+}
 
-function turningPoint(points: { t: number; r: number }[]) {
-  const ahead = points.map((p) => p.r >= 0);
-  if (ahead.every(Boolean)) return "Ahead of the average all game.";
-  if (!ahead.some(Boolean)) return "Never caught the average.";
-  const flip = ahead.findIndex((value) => value !== ahead[0]);
-  const at = clock(points[flip].t);
-  const holds = ahead.slice(flip).every((value) => value === ahead[flip]);
-  return ahead[0]
-    ? holds
-      ? `Fell behind the average at ${at} and stayed behind.`
-      : `Fell behind the average at ${at}, then caught up again.`
-    : holds
-      ? `Pulled ahead of the average at ${at} and stayed there.`
-      : `Pulled ahead of the average at ${at} and fell back later.`;
+const level = (r: number) => Math.round(Math.abs(r) * 100) === 0;
+const versus = (r: number, average: string) =>
+  level(r)
+    ? `level with ${average}`
+    : `${percent(r)} ${r > 0 ? "more" : "fewer"} souls than ${average}`;
+
+/**
+ * Where the player ended up against the normal range, and since when.
+ * `until` is set when the average stops before the match ends.
+ */
+function turningPoint(points: Point[], until: string) {
+  const last = points.at(-1)!.side;
+  let start = points.length - 1;
+  while (start > 0 && points[start - 1].side === last) start--;
+  if (start === 0) {
+    const where = last === 1 ? "Ahead of" : last === -1 ? "Behind" : "Within";
+    return `${where} the normal range ${until || "all game"}.`;
+  }
+  const at = clock(points[start].t);
+  const moved =
+    last === 1
+      ? "Pulled ahead of the normal range"
+      : last === -1
+        ? "Fell behind the normal range"
+        : "Back within the normal range";
+  // A change at the last snapshot has no time after it to "stay" in.
+  if (start === points.length - 1)
+    return until
+      ? `${moved} at ${at}, where the average stops.`
+      : `${moved} by the end (${at}).`;
+  const tail = until ? ` ${until}` : "";
+  return last === 0
+    ? `${moved} from ${at}${tail}.`
+    : `${moved} at ${at} and stayed there${tail}.`;
 }
 
 function roughPatch(deaths: number[]): Stretch | null {
@@ -1677,37 +1782,51 @@ function roughPatch(deaths: number[]): Stretch | null {
 
 /**
  * Rule-based sentences from the souls curve against the rank average at
- * each snapshot, plus the death times. Without an average, only deaths.
+ * each snapshot, plus the death times. With fewer than two snapshots to
+ * compare, only deaths. When the average stops before the match does, the
+ * sentences say until when.
  */
 export function stretches(
   player: ReportPlayer,
   curve: RankCurve | null,
 ): Stretch[] {
   const souls = metricById.get("souls")!;
-  const points = curve
+  const points: Point[] = curve
     ? player.times.flatMap((t, index) => {
-        const avg = averageAt(curve, souls, t)?.avg;
-        return avg && avg > 0
-          ? [{ t, r: player.values.souls[index] / avg - 1 }]
-          : [];
+        const at = averageAt(curve, souls, t);
+        if (!at || at.avg <= 0) return [];
+        const value = player.values.souls[index];
+        const side =
+          value > at.avg + at.std ? 1 : value < at.avg - at.std ? -1 : 0;
+        return [{ t, r: value / at.avg - 1, side }];
       })
     : [];
   const result: Stretch[] = [];
-  if (points.length) {
+  if (curve && points.length >= 2) {
+    const end = points.at(-1)!.t;
+    const until =
+      end < player.times.at(-1)!
+        ? `through ${clock(end)}, where the average stops`
+        : "";
+    const average =
+      curve.band.min > 0
+        ? `the ${curve.band.label} average`
+        : "the all-ranks average";
     const best = points.reduce((a, b) => (b.r > a.r ? b : a));
     const worst = points.reduce((a, b) => (b.r < a.r ? b : a));
     result.push(
       {
         label: "Strongest",
-        text: `Around ${clock(best.t)}: ${percent(best.r)} ${relative(best.r)} the ${curve!.band.label} average.`,
-        tone: "good",
+        text: `Around ${clock(best.t)}: ${versus(best.r, average)}.`,
+        // Coloured only outside the normal range, like the turning point.
+        tone: best.side === 1 ? "good" : undefined,
       },
       {
         label: "Weakest",
-        text: `Around ${clock(worst.t)}: ${percent(worst.r)} ${relative(worst.r)} the average.`,
-        tone: "bad",
+        text: `Around ${clock(worst.t)}: ${versus(worst.r, "the average")}.`,
+        tone: worst.side === -1 ? "bad" : undefined,
       },
-      { label: "Turning point", text: turningPoint(points) },
+      { label: "Turning point", text: turningPoint(points, until) },
     );
   }
   const deaths = player.deathTimes;
@@ -2303,9 +2422,9 @@ test("stretches, impact and buffs describe the selected player", async ({
   await openReport(page);
   const r = report(page);
   await expect(r.locator(".stretch")).toHaveText([
-    "StrongestAround 15:00: 20% ahead of the Emissary average.",
-    "WeakestAround 3:00: 10% behind the average.",
-    "Turning pointPulled ahead of the average at 9:00 and stayed there.",
+    "StrongestAround 15:00: 20% more souls than the Emissary average.",
+    "WeakestAround 3:00: 10% fewer souls than the average.",
+    "Turning pointBack within the normal range from 20:00.",
     "Deaths4 deaths: 6:40, 21:40, 23:20, 25:00.",
     "Rough patch3 deaths between 21:40 and 25:00.",
   ]);
@@ -2704,9 +2823,13 @@ export function Verdicts({
             <b>{v.value.toLocaleString("en-US")}</b>
             {v.change === null ? (
               <span className="muted">No rank average</span>
+            ) : percent(v.change) === "0%" ? (
+              <span className="muted">
+                Level with avg {hero} at {band}
+              </span>
             ) : (
-              <span className={v.change >= 0 ? "good" : "bad"}>
-                {v.change >= 0 ? "▲" : "▼"} {percent(v.change)} vs avg {hero} at{" "}
+              <span className={v.change > 0 ? "good" : "bad"}>
+                {v.change > 0 ? "▲" : "▼"} {percent(v.change)} vs avg {hero} at{" "}
                 {band}
               </span>
             )}
@@ -2735,7 +2858,12 @@ export function Verdicts({
 import { SectionHeader } from "@/shared/ui/SectionHeader";
 import { compact, percent } from "../utils/format";
 import { buffs, impact } from "../utils/insights";
-import { displayName, heroName, possessive } from "../utils/perspective";
+import {
+  displayName,
+  heroName,
+  isMe,
+  possessive,
+} from "../utils/perspective";
 import type { RankCurve } from "../utils/rank-curve";
 import type { MatchReport, ReportPlayer } from "../utils/report";
 import { stretches } from "../utils/stretches";
@@ -2769,13 +2897,13 @@ export function PlayerInsights({
     <div className="report-cols">
       <div>
         <SectionHeader title="Best & worst stretches" />
-        {!curve && (
-          <p className="data-note">
-            {curveLoading
+        <p className="data-note">
+          {curve
+            ? `Souls against the average ${hero} at ${curve.band.label} at each snapshot · normal range = ±1 standard deviation`
+            : curveLoading
               ? "Loading the rank average…"
               : "No rank average for this match, so only deaths are listed."}
-          </p>
-        )}
+        </p>
         <ul className="stretches">
           {stretches(player, curve).map((s) => (
             <li key={s.label} className="stretch">
@@ -2788,7 +2916,7 @@ export function PlayerInsights({
       <div>
         <SectionHeader title="Impact" />
         <p className="data-note">
-          {possessive(name)} share of the team's total · bars fill at half · the
+          {possessive(name, isMe(player, meId))} share of the team's total · bars fill at half · the
           line marks an even 1/6 share
         </p>
         <div className="impact">
@@ -2851,7 +2979,7 @@ import { RouteLink } from "@/app/links";
 import { heroById } from "@/shared/catalog";
 import { Picture } from "@/shared/ui/Picture";
 import { compact } from "../utils/format";
-import { displayName, heroName, optionLabel } from "../utils/perspective";
+import { heroName, isMe, optionLabel } from "../utils/perspective";
 import {
   TEAM_NAMES,
   finalValue,
@@ -2901,7 +3029,6 @@ export function Scoreboard({
               .sort((a, b) => b.netWorth - a.netWorth || a.slot - b.slot)
               .map((p) => {
                 const hero = heroById.get(p.heroId);
-                const name = displayName(p, names, meId);
                 const current = p.slot === selected;
                 return (
                   <tr
@@ -2926,7 +3053,9 @@ export function Scoreboard({
                                 accountId: p.accountId,
                               }}
                             >
-                              {name === heroName(p.heroId) ? "Profile" : name}
+                              {isMe(p, meId)
+                                ? "You"
+                                : names.get(p.accountId) || "Profile"}
                             </RouteLink>
                           )}
                         </span>
@@ -4478,7 +4607,7 @@ export function ReportGraph({
   const notes: Record<ShowMode, string> = {
     player: selected
       ? average
-        ? `${who === "You" ? "You" : `${who} (${heroName(selected.heroId)})`} vs the average ${heroName(selected.heroId)} at ${curve!.band.label} · shaded band = normal range (±1 standard deviation)`
+        ? `${isMe(selected, meId) ? "You" : `${who} (${heroName(selected.heroId)})`} vs the average ${heroName(selected.heroId)} at ${curve!.band.label} · shaded band = normal range (±1 standard deviation)`
         : `${who} · no rank average for this stat`
       : "",
     teams: metric.rate ? "Each team's average" : "Each team's combined total",
