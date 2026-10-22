@@ -16,6 +16,7 @@
 /* Notes read as one paragraph, with Retry inline after the text. */
 .match-report .data-note {
   display: block;
+  overflow-wrap: anywhere;
 }
 .match-report .retry {
   margin-left: 4px;
