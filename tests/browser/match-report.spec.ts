@@ -420,6 +420,20 @@ test("a player without a recorded rank is compared at the lobby's rank, and the 
   );
 });
 
+test("with no ranks recorded, the average covers all ranks without a lobby note", async ({
+  page,
+}) => {
+  const unranked = matchMetadata(ACCOUNT);
+  for (const player of unranked.match_info.players)
+    delete (player as Record<string, unknown>).player_rank_data;
+  await openWith(page, unranked);
+  await expect(
+    report(page).locator(".report-verdicts + .data-note"),
+  ).toHaveText(
+    `Compared with the average ${lead.name} at all ranks at the same match length, over the last 30 days.`,
+  );
+});
+
 test("Street Brawl reports say rank averages cover normal matches only", async ({
   page,
 }) => {

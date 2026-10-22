@@ -119,7 +119,7 @@ function Report({
           durationS={report.durationS}
           curve={curve}
           normal={normal}
-          fromLobby={!selected.badge}
+          fromLobby={!selected.badge && lobbyBadge(report.players) > 0}
         />
       )}
       <SectionHeader title="Graph" />
