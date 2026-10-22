@@ -41,7 +41,7 @@
   - picker empty line "Pick up to 6 enemy heroes to see items that do well against them.";
   - live line "Enemy team from your live match.";
   - card body "+5.0% vs these heroes · 3,000+ games"; first card label "CONSIDER FIRST", others the category in upper case;
-  - fallback note "Based on hero traits — not enough match data for these heroes yet." and the error form "Match data unavailable: {error}. Based on hero traits instead.";
+  - fallback note "Based on hero traits — match data shows no clear counter items against these heroes yet." and the error form "Match data unavailable: {error}. Based on hero traits instead.";
   - fallback empty line "No suggestions for these heroes yet.";
   - renamed section "Items that beat {Hero}";
   - Live panel h2 "Your build".
@@ -1081,6 +1081,8 @@ case "/v1/players/steam":
 
 ### Task 5: Hero page — Counter items with enemy picker and live roster
 
+> Revised after code review: live mode is decided after filtering (no displayable live enemy → manual picker); `exclude` is `null` until the main build settles and the section shows Loading meanwhile; chooser names wrap to two lines and the chooser uses ~5 columns with a sticky Done row on phones. The committed code is the reference.
+
 **Files:**
 - Create: `src/features/counters/components/CounterCard.tsx`
 - Modify: `src/features/counters/components/CounterPanel.tsx` (render cards through `CounterCard`; no visual change)
@@ -1119,7 +1121,7 @@ case "/v1/players/steam":
    - No enemies: `p.muted` "Pick up to 6 enemy heroes to see items that do well against them."
    - Loading: `p.muted` "Loading…".
    - Data (`picksVs.length`): `div.counter-cards` of `CounterCard`. Label "CONSIDER FIRST" for the first, the category upper-cased for the rest. Body `+{(lift*100).toFixed(1)}% vs these heroes · {matches.toLocaleString()}+ games`. Targets are the `against` hero names (may be empty).
-   - Fallback: `p.data-note` with "Based on hero traits — not enough match data for these heroes yet.", or "Match data unavailable: {error}. Based on hero traits instead." followed by a Retry `button.retry`. Then `div.counter-cards` of `CounterCard` with `reasons.join(" ")` and `targets`. If the fallback is empty too: `p.muted` "No suggestions for these heroes yet."
+   - Fallback: `p.data-note` with "Based on hero traits — match data shows no clear counter items against these heroes yet.", or "Match data unavailable: {error}. Based on hero traits instead." followed by a Retry `button.retry`. Then `div.counter-cards` of `CounterCard` with `reasons.join(" ")` and `targets`. If the fallback is empty too: `p.muted` "No suggestions for these heroes yet."
 
 **CSS** (`counters.css`, tokens only; look from the prototype's `.picker`, `.slot`, `.ccards`):
 - `.enemy-picker`: flex, 8px gap, wrapping.
