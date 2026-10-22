@@ -17,6 +17,7 @@ import { NORMAL_MODE, type MatchReport } from "../utils/report";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { PlayerInsights } from "./PlayerInsights";
 import { ReportBanner } from "./ReportBanner";
+import { ReportGraph } from "./ReportGraph";
 import { Scoreboard } from "./Scoreboard";
 import { Verdicts } from "./Verdicts";
 
@@ -120,6 +121,12 @@ function Report({
           normal={normal}
         />
       )}
+      <SectionHeader title="Graph" />
+      <ReportGraph
+        {...{ report, names, meId, selected }}
+        curve={curve.data ?? null}
+        onSelect={viewAs}
+      />
       {selected ? (
         <PlayerInsights
           player={selected}
