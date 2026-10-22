@@ -1990,7 +1990,10 @@ import { bulkMetadata } from "../fixtures/performance";
       return fixtures.failCurve ? json({}, 500) : json(rankCurveRows());
 ```
 
-- Replace a whole block: it starts at the comment `// 60 summary games, newest first; every third one is lost. The newest ten
+- Replace a whole block: it starts at the comment `// 60 summary games, newest first; every third one is lost.` and ends with the test `"performance tab degrades without match history"`. That covers `performanceHistory`, `pointCount` and the three old performance tests. The new block:
+
+```ts
+// 60 summary games, newest first; every third one is lost. The newest ten
 // earn 1,200 souls a minute, the rest 1,000. Street Brawl, bot and
 // private-lobby games sit between them and must stay out of the cards.
 const performanceHistory = [
