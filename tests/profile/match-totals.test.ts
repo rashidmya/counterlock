@@ -32,15 +32,21 @@ describe("parseMatchTotals", () => {
     expect(parseMatchTotals([{ ...match, players }]).get(5)![0].team).toBe(1);
   });
 
-  it("drops players without snapshots or a team, and matches without players", () => {
-    const match = bulkMatch(5, 77);
-    match.players[0].stats_player_damage = [];
-    match.players[1].team = "Spectator";
-    const empty = { ...bulkMatch(6, 77), players: [] };
-    const totals = parseMatchTotals([match, empty, null, { match_id: "7" }]);
-    expect([...totals.keys()]).toEqual([5]);
-    expect(totals.get(5)!.map((p) => p.accountId)).not.toContain(77);
-    expect(totals.get(5)).toHaveLength(10);
+  it("leaves out a match with a player it can't read, and matches without players", () => {
+    const noSnapshots = bulkMatch(5, 77);
+    noSnapshots.players[3].stats_player_damage = [];
+    const noTeam = bulkMatch(6, 77);
+    noTeam.players[1].team = "Spectator";
+    const empty = { ...bulkMatch(7, 77), players: [] };
+    const totals = parseMatchTotals([
+      noSnapshots,
+      noTeam,
+      empty,
+      bulkMatch(8, 77),
+      null,
+      { match_id: "9" },
+    ]);
+    expect([...totals.keys()]).toEqual([8]);
   });
 
   it("is empty for anything but an array", () => {

@@ -40,7 +40,7 @@ const rows = (value: unknown): Row[] =>
     : [];
 
 // Bulk metadata names the teams "Team0" and "Team1".
-const teamOf = (value: unknown) =>
+const parseTeam = (value: unknown) =>
   value === "Team0" || value === 0
     ? 0
     : value === "Team1" || value === 1
@@ -54,7 +54,7 @@ const final = (player: Row, field: string) => {
 };
 
 function parsePlayer(player: Row): PlayerTotals | null {
-  const team = teamOf(player.team);
+  const team = parseTeam(player.team);
   if (!isNumber(player.account_id) || team === null) return null;
   const heroDamage = final(player, STATS.heroDamage);
   const objectiveDamage = final(player, STATS.objectiveDamage);
@@ -80,13 +80,17 @@ function parsePlayer(player: Row): PlayerTotals | null {
   };
 }
 
-/** Players' totals by match id; matches without usable players are left out. */
+/**
+ * Players' totals by match id. A match with a player that can't be read is
+ * left out, as if not stored yet: its team totals would be wrong.
+ */
 export function parseMatchTotals(data: unknown): Map<number, PlayerTotals[]> {
   const matches = new Map<number, PlayerTotals[]>();
   for (const match of rows(data)) {
     if (!isNumber(match.match_id)) continue;
-    const players = rows(match.players).flatMap((p) => parsePlayer(p) ?? []);
-    if (players.length) matches.set(match.match_id, players);
+    const players = rows(match.players).map(parsePlayer);
+    if (players.length && players.every((p): p is PlayerTotals => !!p))
+      matches.set(match.match_id, players);
   }
   return matches;
 }
