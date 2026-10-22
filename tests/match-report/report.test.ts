@@ -64,6 +64,8 @@ describe("parseMatchReport", () => {
     expect(finalValue(lead, "headshots")).toBe(60);
     expect(lead.values.permanentBuffs).toEqual([0, 1, 1, 2, 2, 2, 3, 3]);
     expect(lead.buffTimes).toEqual([200, 700, 1300]);
+    expect(lead.buffCount).toBe(3);
+    expect(report.buffsTimed).toBe(true);
   });
 
   it("keeps shop purchases only, deaths and destroyed objectives in time order", () => {
@@ -87,6 +89,43 @@ describe("parseMatchReport", () => {
     const parsed = parseMatchReport(data, 1001).players[0];
     expect(parsed.badge).toBe(0);
     expect(parsed.times).toEqual(TIMES.slice(1));
+  });
+
+  it("counts permanent buffs from their values when the game recorded no pickup times", () => {
+    const data = matchMetadata(ACCOUNT);
+    for (const p of data.match_info.players)
+      (p as Record<string, unknown>).power_up_buffs = [
+        { is_permanent: true, value: 3, pickup_times_s: [] },
+      ];
+    const old = parseMatchReport(data, 1001);
+    const first = old.players[0];
+    expect(first.buffCount).toBe(3);
+    expect(first.buffTimes).toEqual([]);
+    expect(first.values.permanentBuffs.every((v) => v === 0)).toBe(true);
+    expect(old.buffsTimed).toBe(false);
+  });
+
+  it("sorts snapshots and drops duplicate times", () => {
+    const data = matchMetadata(ACCOUNT);
+    const player = data.match_info.players[0];
+    player.stats.reverse();
+    player.stats.push({ ...player.stats[0] });
+    expect(parseMatchReport(data, 1001).players[0].times).toEqual(TIMES);
+  });
+
+  it("has no headshots when the match has no headshot stat", () => {
+    const data = matchMetadata(ACCOUNT);
+    delete (data.match_info as Record<string, unknown>).custom_user_stats;
+    const parsed = parseMatchReport(data, 1001).players[0];
+    expect(finalValue(parsed, "headshots")).toBe(0);
+  });
+
+  it("drops a death without a time", () => {
+    const data = matchMetadata(ACCOUNT);
+    (data.match_info.players[0].death_details as object[]).push({});
+    expect(parseMatchReport(data, 1001).players[0].deathTimes).toEqual([
+      400, 1300, 1400, 1500,
+    ]);
   });
 
   it("throws when the metadata has no match or no players", () => {

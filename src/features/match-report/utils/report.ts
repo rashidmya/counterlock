@@ -29,7 +29,10 @@ export interface ReportPlayer {
   values: Record<MetricId, number[]>;
   deathTimes: number[];
   purchases: { timeS: number; itemId: number }[];
+  // Permanent buff pickup times; empty before the game recorded them (2026-09-29).
   buffTimes: number[];
+  // Permanent buffs picked up (each entry's `value`).
+  buffCount: number;
 }
 
 export interface MatchReport {
@@ -44,6 +47,9 @@ export interface MatchReport {
   objectives: { timeS: number; team: Team }[];
   // `team` claimed the Mid Boss.
   midBoss: { timeS: number; team: Team }[];
+  // Whether the game recorded buff pickup times; without them the graph has
+  // no Permanent buffs line.
+  buffsTimed: boolean;
 }
 
 type Row = Record<string, unknown>;
@@ -61,20 +67,25 @@ function parsePlayer(
   index: number,
   headshotsId: number | undefined,
 ): ReportPlayer {
-  const buffTimes = rows(p.power_up_buffs)
-    .filter((buff) => buff.is_permanent === true)
-    .flatMap((buff) =>
-      Array.isArray(buff.pickup_times_s)
-        ? buff.pickup_times_s.filter(isNumber)
-        : [],
-    )
-    .sort((a, b) => a - b);
+  const permanent = rows(p.power_up_buffs).filter(
+    (buff) => buff.is_permanent === true,
+  );
+  const pickupTimes = (buff: Row) =>
+    Array.isArray(buff.pickup_times_s)
+      ? buff.pickup_times_s.filter(isNumber)
+      : [];
+  const buffTimes = permanent.flatMap(pickupTimes).sort((a, b) => a - b);
+  const buffCount = permanent.reduce(
+    (sum, buff) =>
+      sum + (isNumber(buff.value) ? buff.value : pickupTimes(buff).length),
+    0,
+  );
   const stats = rows(p.stats)
     .filter((stat) => isNumber(stat.time_stamp_s) && stat.time_stamp_s > 0)
     .sort((a, b) => num(a.time_stamp_s) - num(b.time_stamp_s))
     .filter(
-      (stat, index, all) =>
-        index === 0 || stat.time_stamp_s !== all[index - 1].time_stamp_s,
+      (stat, i, all) =>
+        i === 0 || stat.time_stamp_s !== all[i - 1].time_stamp_s,
     );
   const values = Object.fromEntries(
     METRICS.map((m) => [
@@ -98,16 +109,23 @@ function parsePlayer(
     times: stats.map((stat) => num(stat.time_stamp_s)),
     values,
     deathTimes: rows(p.death_details)
-      .map((death) => num(death.game_time_s))
+      .map((death) => death.game_time_s)
+      .filter(isNumber)
       .sort((a, b) => a - b),
     purchases: rows(p.items)
-      .filter((item) => isNumber(item.item_id) && itemById.has(item.item_id))
+      .filter(
+        (item) =>
+          isNumber(item.item_id) &&
+          isNumber(item.game_time_s) &&
+          itemById.has(item.item_id),
+      )
       .map((item) => ({
         timeS: num(item.game_time_s),
         itemId: num(item.item_id),
       }))
       .sort((a, b) => a.timeS - b.timeS),
     buffTimes,
+    buffCount,
   };
 }
 
@@ -133,6 +151,7 @@ export function parseMatchReport(data: unknown, matchId: number): MatchReport {
     gameMode: num(info.game_mode),
     winningTeam: info.winning_team,
     players,
+    buffsTimed: players.some((p) => p.buffTimes.length > 0),
     objectives: rows(info.objectives)
       .filter(
         (o) =>
@@ -143,7 +162,12 @@ export function parseMatchReport(data: unknown, matchId: number): MatchReport {
       .map((o) => ({ timeS: num(o.destroyed_time_s), team: o.team as Team }))
       .sort((a, b) => a.timeS - b.timeS),
     midBoss: rows(info.mid_boss)
-      .filter((b) => isTeam(b.team_claimed) && isNumber(b.destroyed_time_s))
+      .filter(
+        (b) =>
+          isTeam(b.team_claimed) &&
+          isNumber(b.destroyed_time_s) &&
+          b.destroyed_time_s > 0,
+      )
       .map((b) => ({
         timeS: num(b.destroyed_time_s),
         team: b.team_claimed as Team,

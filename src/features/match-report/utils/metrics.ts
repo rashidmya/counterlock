@@ -134,11 +134,15 @@ export function snapshotValue(
     return shots > 0 ? (hit / shots) * 100 : 0;
   }
   if (id === "headshots") {
+    if (headshotsId === undefined) return 0;
     const custom = Array.isArray(stat.custom_user_stats)
       ? (stat.custom_user_stats as Record<string, unknown>[])
       : [];
     return num(custom.find((c) => c?.id === headshotsId)?.value);
   }
-  const t = num(stat.time_stamp_s);
-  return buffTimes.filter((time) => time <= t).length;
+  if (id === "permanentBuffs") {
+    const t = num(stat.time_stamp_s);
+    return buffTimes.filter((time) => time <= t).length;
+  }
+  return 0;
 }

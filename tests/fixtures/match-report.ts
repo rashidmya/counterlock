@@ -87,11 +87,13 @@ export function matchPlayer(index: number, accountId: number) {
       {
         type: "hp_permanent_pickup",
         is_permanent: true,
+        value: index === 0 ? 3 : 1,
         pickup_times_s: index === 0 ? [200, 700, 1300] : [500],
       },
       {
         type: "gun_powerup_pickup",
         is_permanent: false,
+        value: 1,
         pickup_times_s: [300],
       },
     ],
