@@ -7,6 +7,27 @@ const PAD_X = 6;
 const PAD_Y = 8;
 
 /**
+ * A path through the values, broken at games without one. A value with no
+ * neighbour on either side gets a short tick, so it still shows.
+ */
+export function linePath(
+  values: (number | null)[],
+  x: (index: number) => number,
+  y: (value: number) => number,
+) {
+  return values
+    .map((value, index) => {
+      if (value === null) return "";
+      const before = values[index - 1] ?? null;
+      const after = values[index + 1] ?? null;
+      if (before === null && after === null)
+        return `M${(x(index) - 4).toFixed(1)},${y(value).toFixed(1)}h8`;
+      return `${before === null ? "M" : "L"}${x(index).toFixed(1)},${y(value).toFixed(1)}`;
+    })
+    .join("");
+}
+
+/**
  * One point per game, oldest on the left: the player's line with a win or
  * loss dot per game, and the dashed rank average. Drawn at its real width.
  */
@@ -34,22 +55,30 @@ export function Sparkline({
     max === min
       ? HEIGHT / 2
       : PAD_Y + ((max - value) * (HEIGHT - 2 * PAD_Y)) / (max - min);
-  // Breaks the line at games without a value.
-  const path = (pick: (p: GamePoint) => number | null) =>
-    points
-      .map((p, index) => {
-        const value = pick(p);
-        if (value === null) return "";
-        const previous = index > 0 ? pick(points[index - 1]) : null;
-        return `${previous === null ? "M" : "L"}${x(index).toFixed(1)},${y(value).toFixed(1)}`;
-      })
-      .join("");
+  // Dots shrink as games crowd together, so the line stays visible.
+  const step =
+    points.length > 1 ? (width - 2 * PAD_X) / (points.length - 1) : width;
+  const radius = Math.min(3, Math.max(1.25, step * 0.4));
   return (
     <div className="sparkline" ref={box}>
       {width > 0 && values.length > 0 && (
         <svg width={width} height={HEIGHT} role="img" aria-label={label}>
-          <path className="spark-average" d={path((p) => p.average)} />
-          <path className="spark-value" d={path((p) => p.value)} />
+          <path
+            className="spark-average"
+            d={linePath(
+              points.map((p) => p.average),
+              x,
+              y,
+            )}
+          />
+          <path
+            className="spark-value"
+            d={linePath(
+              points.map((p) => p.value),
+              x,
+              y,
+            )}
+          />
           {points.map((p, index) =>
             p.value === null ? null : (
               <circle
@@ -57,7 +86,7 @@ export function Sparkline({
                 className={p.won ? "win" : "loss"}
                 cx={x(index)}
                 cy={y(p.value)}
-                r={3}
+                r={radius}
               >
                 <title>{title(p)}</title>
               </circle>
