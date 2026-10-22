@@ -4113,6 +4113,19 @@ git commit -m "feat(match-report): report page with Viewing as, verdicts, stretc
 - Modify: `src/features/match-report/styles/match-report.css`
 - Test: `tests/browser/match-report.spec.ts`
 
+> **Revision (code review of Task 6):**
+> - **Code and tests:** the code and tests below are the reviewed versions.
+> - **Honest footnote:** `ReportGraph` takes the curve's `AsyncState` and `normal`, and the footnote says why there is no average line. `MatchReportPage` passes `curve={curve}` and `normal={normal}`.
+> - **Axes:** the y-scale includes the values at the plot edges. Two new pure helpers in `utils/graph.ts`, with unit tests, set the ticks:
+>   - `yAxis`: round ticks, with the team lead centred on 0;
+>   - `minuteStep`: x ticks at least 60 px apart.
+> - **Ranking:** row names include the value, and the selected row has `aria-current`.
+> - **Touch:** taps are supported, and the tooltip is clamped inside the chart.
+> - **Other:**
+>   - copy fixes ("an Amber objective", the colour key);
+>   - markers hide with the selected player's line, and the Deaths/Items checkboxes are disabled where they don't apply;
+>   - `ReportBanner`'s portrait key is now `portrait-{heroId}`, which fixes a duplicate-key warning.
+
 How the Graph behaves:
 - **Measuring:** `ReportGraph` measures its chart column with a `ResizeObserver` and draws `GraphChart` at that pixel width.
 - **Hidden desktop pages:** a desktop page mounted while hidden measures 0 and draws once it is shown.
@@ -4208,10 +4221,13 @@ test.describe("the graph", () => {
     await g.getByRole("button", { name: "Team totals" }).click();
     await expect(g.locator(".graph-line")).toHaveCount(2);
     await expect(g.locator(".graph-foot")).toContainText(
-      "Each team's combined total.",
+      "Each team's combined total · Amber in blue, Sapphire in red.",
     );
     await g.getByRole("button", { name: "Team lead" }).click();
     await expect(g.locator(".graph-line")).toHaveCount(1);
+    await expect(
+      g.locator(".graph-axis").getByText("0", { exact: true }),
+    ).toHaveCount(1);
     await expect(g.locator(".graph-lead-label")).toHaveText([
       "AMBER AHEAD",
       "SAPPHIRE AHEAD",
@@ -4311,6 +4327,73 @@ test.describe("the graph", () => {
     ).toHaveText("2");
   });
 
+  test("follows Viewing as: line, average, markers and footnote", async ({
+    page,
+  }) => {
+    await openReport(page);
+    const g = graph(page);
+    await viewingAs(page).selectOption("2");
+    await expect(g.locator(".graph-foot")).toHaveText(
+      `somdr (${second.name}) vs the average ${second.name} at Emissary · shaded band = normal range (±1 standard deviation). Snapshots every 3 min until 15:00, then every 5 min; lines connect them.`,
+    );
+    await expect(g.locator(".mark-death")).toHaveCount(1);
+    await viewingAs(page).selectOption("all");
+    await expect(g.getByRole("button", { name: "Everyone" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await viewingAs(page).selectOption("1");
+    await expect(
+      g.getByRole("button", { name: "Player vs avg" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("says why there is no average line while it fails", async ({ page }) => {
+    await storeAccount(page);
+    await routeApi(page);
+    await page.route(
+      "https://api.deadlock-api.com/v1/analytics/player-performance-curve**",
+      (route) => route.fulfill({ status: 500, headers: cors, body: "" }),
+    );
+    await page.goto("/");
+    await view(page)
+      .getByRole("button", { name: "Open match report →" })
+      .click();
+    await expect(graph(page).locator(".graph-foot")).toHaveText(
+      "You · rank average unavailable. Snapshots every 3 min until 15:00, then every 5 min; lines connect them.",
+    );
+  });
+
+  test("keeps lines and the band inside the plot when zoomed", async ({
+    page,
+  }) => {
+    await openReport(page);
+    const g = graph(page);
+    await g.getByRole("button", { name: "0–10" }).click();
+    const ys = await g.locator(".graph-line, .graph-avg").evaluateAll((nodes) =>
+      nodes.flatMap((node) =>
+        (node.getAttribute("points") ?? "")
+          .trim()
+          .split(" ")
+          .map((pair) => Number(pair.split(",")[1])),
+      ),
+    );
+    expect(ys.length).toBeGreaterThan(0);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
+  });
+
+  test("ranking rows read out their values", async ({ page }) => {
+    await openReport(page);
+    await expect(
+      graph(page).getByRole("button", {
+        name: `View as Sapphire · ${heroes[11].name}: 37.6K`,
+      }),
+    ).toBeVisible();
+    await expect(
+      graph(page).locator('.graph-ranking [aria-current="true"]'),
+    ).toContainText(lead.name);
+  });
+
   test("clicking a ranking row switches Viewing as", async ({ page }) => {
     await openReport(page);
     await graph(page)
@@ -4320,6 +4403,24 @@ test.describe("the graph", () => {
       .click();
     await expect(viewingAs(page)).toHaveValue("12");
     await expect(title(page)).toHaveText("Most souls");
+  });
+});
+
+test.describe("the graph on a touch screen", () => {
+  test.use({ hasTouch: true });
+
+  test("a tap shows the tooltip and a tap outside the chart hides it", async ({
+    page,
+  }) => {
+    await openReport(page);
+    const chart = report(page).locator(".report-graph");
+    const hit = (await chart.locator(".graph-hit").boundingBox())!;
+    await page.touchscreen.tap(hit.x + hit.width / 2, hit.y + hit.height / 2);
+    const tip = chart.locator(".graph-tip");
+    await expect(tip).toBeVisible();
+    const title = (await report(page).locator(".report-result").boundingBox())!;
+    await page.touchscreen.tap(title.x + 5, title.y + 5);
+    await expect(tip).toBeHidden();
   });
 });
 ```
@@ -4334,9 +4435,15 @@ Expected: FAIL (no `.report-graph`).
 `src/features/match-report/components/GraphChart.tsx`:
 
 ```tsx
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
 import { clock } from "../utils/format";
-import { formatValue, valueAt, type Point } from "../utils/graph";
+import {
+  formatValue,
+  minuteStep,
+  valueAt,
+  yAxis,
+  type Point,
+} from "../utils/graph";
 import type { Metric } from "../utils/metrics";
 import type { Team } from "../utils/report";
 
@@ -4354,11 +4461,13 @@ export interface Markers {
 }
 
 // Plot margins and the marker lanes below it, in pixels.
-const LEFT = 80;
+const LEFT = 84;
 const RIGHT = 24;
 const TOP = 12;
 const BOTTOM = 24;
 export const LANES = 66;
+// Matches the tooltip's CSS width.
+const TIP_WIDTH = 220;
 
 /** About 24% of the width, kept between 190 and 260px. */
 export const plotHeight = (width: number) =>
@@ -4404,7 +4513,18 @@ export function GraphChart({
   perMinute: boolean;
 }) {
   const clip = useId();
+  const svg = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null);
+  const hovering = hover !== null;
+  // A tapped tooltip stays put; tapping anywhere outside the chart clears it.
+  useEffect(() => {
+    if (!hovering) return;
+    const clear = (event: Event) => {
+      if (!svg.current?.contains(event.target as Node)) setHover(null);
+    };
+    document.addEventListener("pointerdown", clear);
+    return () => document.removeEventListener("pointerdown", clear);
+  }, [hovering]);
   const height = plotHeight(width);
   const x = (t: number) =>
     LEFT + ((t - t0) / Math.max(1, t1 - t0)) * (width - LEFT - RIGHT);
@@ -4414,28 +4534,25 @@ export function GraphChart({
   }));
   const band = average ? visible(average, t0, t1) : [];
   const inside = (t: number) => t >= t0 && t <= t1;
+  // Lines run to the plot's edges between snapshots, so the values there
+  // count towards the scale too.
+  const bandTop = band.map(([t, v, s]): Point => [t, v + s]);
   const values = [
-    ...shown.flatMap((line) =>
-      line.points.filter(([t]) => inside(t)).map(([, v]) => v),
-    ),
-    ...band.filter(([t]) => inside(t)).map(([, v, s]) => v + s),
+    ...shown.flatMap((line) => [
+      ...line.points.filter(([t]) => inside(t)).map(([, v]) => v),
+      ...(line.points.length
+        ? [valueAt(line.points, t0), valueAt(line.points, t1)]
+        : []),
+    ]),
+    ...bandTop.filter(([t]) => inside(t)).map(([, v]) => v),
+    ...(band.length ? [valueAt(bandTop, t0), valueAt(bandTop, t1)] : []),
   ];
-  let low = Math.min(0, ...values);
-  let high = Math.max(...values, 0) * 1.06 || 1;
-  if (lead) {
-    const most = Math.max(...values.map(Math.abs), 1) * 1.1;
-    low = -most;
-    high = most;
-  }
+  const { low, high, ticks } = yAxis(values, lead);
   const y = (v: number) =>
     TOP + (1 - (v - low) / (high - low)) * (height - TOP - BOTTOM);
   const path = (points: [number, number][]) =>
     points.map(([t, v]) => `${x(t).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-  const ticks = Array.from(
-    { length: 6 },
-    (_, i) => low + ((high - low) * i) / 5,
-  );
-  const step = width < 520 ? 600 : 300;
+  const step = minuteStep(t1 - t0, width - LEFT - RIGHT);
   const minutes: number[] = [];
   for (let t = Math.ceil(t0 / step) * step; t <= t1; t += step) minutes.push(t);
   const lanes = {
@@ -4472,10 +4589,17 @@ export function GraphChart({
             : []),
         ];
   const hoverX = hover === null ? 0 : x(hover);
+  const track = (event: PointerEvent<SVGRectElement>) => {
+    const box = event.currentTarget.ownerSVGElement!.getBoundingClientRect();
+    const px = ((event.clientX - box.left) / box.width) * width;
+    const t = t0 + ((px - LEFT) / (width - LEFT - RIGHT)) * (t1 - t0);
+    setHover(Math.min(t1, Math.max(t0, t)));
+  };
 
   return (
     <>
       <svg
+        ref={svg}
         className="graph-svg"
         width={width}
         height={height + LANES}
@@ -4591,9 +4715,9 @@ export function GraphChart({
             </text>
             {markers.deaths
               .filter((m) => inside(m.t))
-              .map((m) => (
+              .map((m, index) => (
                 <circle
-                  key={m.t}
+                  key={`${m.t}-${index}`}
                   className="mark-death"
                   cx={x(m.t)}
                   cy={lanes.deaths}
@@ -4697,22 +4821,26 @@ export function GraphChart({
           y={TOP}
           width={width - LEFT - RIGHT}
           height={height - TOP - BOTTOM}
-          onPointerMove={(event) => {
-            const box =
-              event.currentTarget.ownerSVGElement!.getBoundingClientRect();
-            const px = ((event.clientX - box.left) / box.width) * width;
-            const t = t0 + ((px - LEFT) / (width - LEFT - RIGHT)) * (t1 - t0);
-            setHover(Math.min(t1, Math.max(t0, t)));
+          onPointerMove={track}
+          onPointerDown={track}
+          // A tap keeps its tooltip; only a mouse or pen leaving clears it.
+          onPointerLeave={(event) => {
+            if (event.pointerType !== "touch") setHover(null);
           }}
-          onPointerLeave={() => setHover(null)}
         />
       </svg>
       {hover !== null && hoverRows.length > 0 && (
         <div
           className="graph-tip"
-          role="status"
+          aria-hidden="true"
           style={{
-            left: hoverX > width * 0.6 ? hoverX - 234 : hoverX + 14,
+            left: Math.max(
+              0,
+              Math.min(
+                width - TIP_WIDTH,
+                hoverX > width * 0.6 ? hoverX - TIP_WIDTH - 14 : hoverX + 14,
+              ),
+            ),
           }}
         >
           <b>
@@ -4741,6 +4869,7 @@ export function GraphChart({
 
 ```tsx
 import { useLayoutEffect, useRef, useState } from "react";
+import type { AsyncState } from "@/shared/api/useAsync";
 import { heroById, itemById } from "@/shared/catalog";
 import { Picture } from "@/shared/ui/Picture";
 import { clock } from "../utils/format";
@@ -4786,6 +4915,8 @@ const SHADES = [100, 62, 84, 46, 92, 70];
 const teamColor = (team: Team) => (team === 0 ? "var(--ally)" : "var(--enemy)");
 const shade = (team: Team, index: number) =>
   `color-mix(in srgb, ${teamColor(team)} ${SHADES[index % SHADES.length]}%, var(--cream))`;
+// Narrower than this and the plot has no room left of the axis labels.
+const MIN_CHART_WIDTH = 240;
 const FOOT =
   "Snapshots every 3 min until 15:00, then every 5 min; lines connect them.";
 
@@ -4827,16 +4958,19 @@ export function ReportGraph({
   names,
   meId,
   selected,
-  curve,
+  curve: curveState,
+  normal,
   onSelect,
 }: {
   report: MatchReport;
   names: Map<number, string>;
   meId: number | null;
   selected?: ReportPlayer;
-  curve: RankCurve | null;
+  curve: AsyncState<RankCurve>;
+  normal: boolean;
   onSelect(slot: number): void;
 }) {
+  const curve = curveState.data ?? null;
   const [metricId, setMetricId] = useState<MetricId>("souls");
   const [show, setShow] = useState<ShowMode>("player");
   const [values, setValues] = useState<ValueMode>("total");
@@ -4928,7 +5062,10 @@ export function ReportGraph({
       ? `Avg ${heroName(selected.heroId)} at ${curve.band.label}`
       : "";
 
-  const playerMarks = selected && (mode === "player" || mode === "everyone");
+  // The selected player's own markers, unless their line is hidden.
+  const playerMarks =
+    selected &&
+    (mode === "player" || (mode === "everyone" && !hidden.has(selected.slot)));
   const who = selected ? displayName(selected, names, meId) : "";
   const markers: Markers = {
     deaths:
@@ -4961,7 +5098,7 @@ export function ReportGraph({
               t: timeS,
               team: by,
               boss: false,
-              title: `${TEAM_NAMES[by]} destroyed a ${TEAM_NAMES[team]} objective at ${clock(timeS)}`,
+              title: `${TEAM_NAMES[by]} destroyed ${team === 0 ? "an" : "a"} ${TEAM_NAMES[team]} objective at ${clock(timeS)}`,
             };
           }),
           ...report.midBoss.map(({ timeS, team }) => ({
@@ -4976,32 +5113,52 @@ export function ReportGraph({
 
   const ranked = ranking(report.players, metric, values, t1);
   const top = Math.max(...ranked.map((row) => Math.abs(row.value)), 1);
+  const hero = selected ? heroName(selected.heroId) : "";
+  const end = curve?.points.at(-1)?.t ?? 0;
+  // Why there is no average line, said as honestly as the verdicts do.
+  const missing = !metric.curve
+    ? "no rank average for this stat"
+    : !normal
+      ? "rank averages cover normal matches only"
+      : curveState.loading
+        ? "loading the rank average"
+        : curveState.error
+          ? "rank average unavailable"
+          : `too few ${hero} games at ${curve?.band.label ?? "this rank"} for a rank average`;
   const notes: Record<ShowMode, string> = {
     player: selected
       ? average
-        ? `${isMe(selected, meId) ? "You" : `${who} (${heroName(selected.heroId)})`} vs the average ${heroName(selected.heroId)} at ${curve!.band.label} · shaded band = normal range (±1 standard deviation)`
-        : `${who} · no rank average for this stat`
+        ? `${isMe(selected, meId) ? "You" : `${who} (${hero})`} vs the average ${hero} at ${curve!.band.label} · shaded band = normal range (±1 standard deviation)` +
+          (end < report.durationS
+            ? ` · the average stops at ${clock(end)}`
+            : "")
+        : `${who} · ${missing}`
       : "",
-    teams: metric.rate ? "Each team's average" : "Each team's combined total",
+    teams:
+      (metric.rate ? "Each team's average" : "Each team's combined total") +
+      " · Amber in blue, Sapphire in red",
     lead: "Above the line: Amber ahead. Below: Sapphire ahead",
     everyone:
-      "Click a hero below to hide or show their line. Gold = the player you're viewing as",
+      "Click a hero below to hide or show their line" +
+      (selected ? ". Gold = the player you're viewing as" : ""),
   };
 
   return (
     <div className="report-graph">
       <div className="graph-tabs">
         <div className="graph-stat-tabs" role="group" aria-label="Stat">
-          {metrics.filter((m) => m.main).map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              aria-pressed={metricId === m.id}
-              onClick={() => setMetricId(m.id)}
-            >
-              {m.label}
-            </button>
-          ))}
+          {metrics
+            .filter((m) => m.main)
+            .map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                aria-pressed={metricId === m.id}
+                onClick={() => setMetricId(m.id)}
+              >
+                {m.label}
+              </button>
+            ))}
         </div>
         <select
           aria-label="More stats"
@@ -5011,11 +5168,13 @@ export function ReportGraph({
           }
         >
           <option value="">More stats…</option>
-          {metrics.filter((m) => !m.main).map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
+          {metrics
+            .filter((m) => !m.main)
+            .map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
         </select>
       </div>
       <div className="graph-filters">
@@ -5053,6 +5212,7 @@ export function ReportGraph({
               <input
                 type="checkbox"
                 checked={marks[key]}
+                disabled={key !== "objectives" && !playerMarks}
                 onChange={(event) =>
                   setMarks({ ...marks, [key]: event.target.checked })
                 }
@@ -5066,7 +5226,7 @@ export function ReportGraph({
         <div className="graph-chart" ref={chartRef}>
           {width > 0 && (
             <GraphChart
-              width={width}
+              width={Math.max(width, MIN_CHART_WIDTH)}
               {...{ lines, average, averageLabel, metric, markers, t0, t1 }}
               lead={mode === "lead"}
               perMinute={values === "perMinute" && !metric.rate}
@@ -5085,7 +5245,10 @@ export function ReportGraph({
                     className={
                       player.slot === selected?.slot ? "selected" : undefined
                     }
-                    aria-label={`View as ${optionLabel(player, names, meId)}`}
+                    aria-label={`View as ${optionLabel(player, names, meId)}: ${formatValue(value, metric)}`}
+                    aria-current={
+                      player.slot === selected?.slot ? "true" : undefined
+                    }
                     onClick={() => onSelect(player.slot)}
                   >
                     <Picture
@@ -5249,33 +5412,33 @@ In `src/features/match-report/styles/match-report.css`, insert this block just b
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-.segmented {
+.report-graph .segmented {
   display: inline-flex;
   flex-wrap: wrap;
   border: 1px solid var(--line);
 }
-.segmented button {
+.report-graph .segmented button {
   padding: 4px 9px;
   color: var(--muted);
   font: 600 12px var(--font-label);
   letter-spacing: 0.06em;
 }
-.segmented button + button {
+.report-graph .segmented button + button {
   border-left: 1px solid var(--line);
 }
-.segmented button[aria-pressed="true"] {
+.report-graph .segmented button[aria-pressed="true"] {
   background: rgb(from var(--gold) r g b / 0.16);
   color: var(--cream);
 }
-.segmented button:disabled {
+.report-graph .segmented button:disabled {
   opacity: 0.4;
 }
-.graph-check {
+.report-graph .graph-check {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
-.graph-check input {
+.report-graph .graph-check input {
   padding: 0;
   accent-color: var(--gold);
 }
@@ -5296,6 +5459,8 @@ In `src/features/match-report/styles/match-report.css`, insert this block just b
 }
 .graph-svg {
   display: block;
+  /* On the SVG itself: Chromium ignores touch-action on its children. */
+  touch-action: pan-y;
   font: 600 11px var(--font-label);
 }
 .graph-grid {
@@ -5317,7 +5482,7 @@ In `src/features/match-report/styles/match-report.css`, insert this block just b
   fill: var(--ally);
 }
 .graph-lead-label.team-1 {
-  fill: var(--enemy);
+  fill: color-mix(in srgb, var(--enemy) 70%, var(--cream));
 }
 .graph-band {
   fill: rgb(from var(--cream) r g b / 0.1);
@@ -5369,6 +5534,7 @@ In `src/features/match-report/styles/match-report.css`, insert this block just b
   top: 10px;
   z-index: 2;
   width: 220px;
+  max-width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--line);
   background: rgb(from var(--ink) r g b / 0.95);
@@ -6002,7 +6168,7 @@ In `web/app/styles/phone.css`, inside `@media (max-width: 640px)`:
 - [ ] **Step 5: Run the tests and confirm they pass**
 
 Run: `npm test`, `npx tsc --noEmit`, `npm run web:typecheck`, `npm run test:browser` and `npm run test:web`.
-Expected: all pass. Browser: 118 desktop and 70 website tests.
+Expected: all pass. Browser: 123 desktop and 70 website tests.
 
 - [ ] **Step 6: Commit**
 
