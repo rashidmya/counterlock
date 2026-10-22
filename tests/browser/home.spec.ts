@@ -427,6 +427,11 @@ test("empty history says no recorded matches", async ({ page }) => {
 test("a match row opens that match's report", async ({ page }) => {
   await storeAccount(page);
   await routeApi(page);
+  const metadataPaths: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith("/metadata")) metadataPaths.push(path);
+  });
   await openMyProfile(page);
   const row = view(page).locator(".match-open").first();
   await expect(row).toContainText("Report →");
@@ -435,6 +440,23 @@ test("a match row opens that match's report", async ({ page }) => {
     "Victory",
   );
   await expect(view(page).locator(".report-table tbody tr")).toHaveCount(12);
+  await view(page).getByRole("button", { name: "← Back to profile" }).click();
+  await view(page).locator(".match-open").nth(1).click();
+  await expect.poll(() => metadataPaths).toContain("/v1/matches/1002/metadata");
+});
+
+test("match rows stay on one line at the desktop minimum width", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 850, height: 900 });
+  await storeAccount(page);
+  await routeApi(page);
+  await openMyProfile(page);
+  const box = await view(page)
+    .locator(".match-open .match-report-link")
+    .first()
+    .boundingBox();
+  expect(box!.height).toBeLessThan(24);
 });
 
 test("hero cross-link opens the Heroes tab", async ({ page }) => {

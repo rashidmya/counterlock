@@ -365,7 +365,7 @@
   font: 600 14px var(--font-label);
   color: var(--cream);
 }
-.match-open:hover:not(:disabled) {
+.match-open:hover {
   text-decoration: none;
   background: rgb(from var(--cream) r g b / 0.04);
   color: var(--cream);
@@ -392,6 +392,7 @@
   letter-spacing: 0.14em;
   text-align: right;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 .show-more {
   display: block;

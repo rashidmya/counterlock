@@ -78,6 +78,7 @@ export function MatchHistory({
                 </RouteLink>
                 <RouteLink
                   className="match-open"
+                  aria-label={`Report: ${name}, ${won ? "win" : "loss"}, ${match.kills} / ${match.deaths} / ${match.assists}, ${modeLabel(match)}, ${timeAgo(match.startTime * 1000)}`}
                   route={{ page: "match", matchId: match.matchId, accountId }}
                 >
                   <span className="match-kda">
