@@ -13,11 +13,9 @@ import type { PlayerTotals } from "./match-totals";
 
 export const RANGES = [20, 50, 100] as const;
 export type PerformanceRange = (typeof RANGES)[number];
-// Fewer games than this with a value and there is no trend.
+// Fewer games than this to compare (with a rank average, where the metric
+// has one) and there is no trend. Six keeps each half at three games or more.
 export const MIN_TREND_GAMES = 6;
-// The recent half must differ from the earlier half by this many standard
-// errors to count as improving or slipping; anything less is flat.
-export const TREND_T = 2;
 
 /** The newest `range` normal and ranked games, of one hero or all, oldest first. */
 export function gamesInRange(
@@ -105,7 +103,7 @@ export function gameTotals(
 // A game's value as a fraction. Over a range the numerators and the
 // denominators are added up (a time-weighted rate) rather than averaging
 // each game's value.
-interface Fraction {
+export interface Fraction {
   num: number;
   den: number;
 }
@@ -124,8 +122,11 @@ export interface PerformanceMetric {
   id: PerformanceMetricId;
   label: string;
   // Needs the match's totals, not just the match-history row.
-  totals: boolean;
+  needsTotals: boolean;
   percent: boolean;
+  // Never divide by less than this, in a game or over the range: deaths
+  // count as at least one.
+  minDenominator?: number;
   value(game: HistoryMatch, totals: GameTotals | undefined): Fraction | null;
   // The rank average for the game; absent for metrics the curve can't give.
   average?(game: HistoryMatch, values: GameAverage["values"]): Fraction | null;
@@ -142,7 +143,7 @@ const perMinute = (
 ): PerformanceMetric => ({
   id,
   label,
-  totals: true,
+  needsTotals: true,
   percent: false,
   value: (game, totals) =>
     totals && game.durationS > 0
@@ -162,7 +163,7 @@ const share = (
 ): PerformanceMetric => ({
   id,
   label,
-  totals: true,
+  needsTotals: true,
   percent: true,
   value: (_, totals) => {
     if (!totals) return null;
@@ -175,7 +176,7 @@ export const PERFORMANCE_METRICS: PerformanceMetric[] = [
   {
     id: "soulsPerMin",
     label: "Souls / min",
-    totals: false,
+    needsTotals: false,
     percent: false,
     value: (game) =>
       game.durationS > 0 ? { num: game.netWorth, den: minutes(game) } : null,
@@ -187,16 +188,14 @@ export const PERFORMANCE_METRICS: PerformanceMetric[] = [
   {
     id: "kda",
     label: "K/D/A ratio",
-    totals: false,
+    needsTotals: false,
     percent: false,
-    value: (game) => ({
-      num: game.kills + game.assists,
-      den: Math.max(1, game.deaths),
-    }),
+    minDenominator: 1,
+    value: (game) => ({ num: game.kills + game.assists, den: game.deaths }),
     average: (_, { kills, deaths, assists }) =>
       kills === undefined || deaths === undefined || assists === undefined
         ? null
-        : { num: kills + assists, den: Math.max(1, deaths) },
+        : { num: kills + assists, den: deaths },
   },
   perMinute(
     "heroDamagePerMin",
@@ -246,15 +245,21 @@ export interface MetricSummary {
   // Over the games with a value.
   value: number | null;
   games: number;
-  // Over the games with both a value and a rank average.
+  // The rank average, and the player's value, over the games that have
+  // both; the same games as `value` unless some have no rank average.
   average: number | null;
+  comparedValue: number | null;
   compared: number;
   // Null with fewer than MIN_TREND_GAMES games to compare.
   trend: Trend | null;
 }
 
-const ratio = (parts: Fraction[]) => {
-  const den = parts.reduce((sum, part) => sum + part.den, 0);
+const ratio = (parts: Fraction[], minDenominator = 0) => {
+  if (!parts.length) return null;
+  const den = Math.max(
+    minDenominator,
+    parts.reduce((sum, part) => sum + part.den, 0),
+  );
   return den > 0 ? parts.reduce((sum, part) => sum + part.num, 0) / den : null;
 };
 
@@ -268,10 +273,34 @@ const variance = (values: number[]) => {
   );
 };
 
+// Two-sided 95% critical values of Student's t by degrees of freedom,
+// most first; between rows, the row below (the stricter value).
+const T_95: [number, number][] = [
+  [120, 1.98],
+  [60, 2.0],
+  [40, 2.02],
+  [30, 2.04],
+  [20, 2.09],
+  [15, 2.13],
+  [12, 2.18],
+  [10, 2.23],
+  [9, 2.26],
+  [8, 2.31],
+  [7, 2.36],
+  [6, 2.45],
+  [5, 2.57],
+  [4, 2.78],
+  [3, 3.18],
+  [2, 4.3],
+  [1, 12.71],
+];
+export const criticalT = (df: number) =>
+  T_95.find(([rows]) => rows <= df)?.[1] ?? T_95.at(-1)![1];
+
 /**
  * Compares the recent half of the games with the earlier half (the middle
- * game goes to the earlier half). Improving or slipping only when the
- * difference is at least TREND_T standard errors (Welch).
+ * game goes to the earlier half) with Welch's t-test: improving or slipping
+ * only when the halves differ at the 95% level, otherwise flat.
  */
 export function trend(values: number[]): Trend | null {
   if (values.length < MIN_TREND_GAMES) return null;
@@ -279,11 +308,16 @@ export function trend(values: number[]): Trend | null {
   const earlier = values.slice(0, split);
   const recent = values.slice(split);
   const diff = mean(recent) - mean(earlier);
-  const error = Math.sqrt(
-    variance(earlier) / earlier.length + variance(recent) / recent.length,
-  );
-  if (error === 0 ? diff === 0 : Math.abs(diff) < TREND_T * error)
-    return "flat";
+  const a = variance(earlier) / earlier.length;
+  const b = variance(recent) / recent.length;
+  // Without any spread, every change is a sure one.
+  const t = a + b > 0 ? Math.abs(diff) / Math.sqrt(a + b) : diff ? Infinity : 0;
+  const df =
+    a + b > 0
+      ? (a + b) ** 2 /
+        (a ** 2 / (earlier.length - 1) + b ** 2 / (recent.length - 1))
+      : Infinity;
+  if (t < criticalT(df)) return "flat";
   return diff > 0 ? "improving" : "slipping";
 }
 
@@ -298,6 +332,8 @@ export function summarizeMetric(
   totals: (matchId: number) => GameTotals | undefined,
   averages: (matchId: number) => GameAverage | undefined,
 ): MetricSummary {
+  const floor = metric.minDenominator ?? 0;
+  const divide = (part: Fraction) => part.num / Math.max(floor, part.den);
   const rows = games.map((game) => {
     const value = metric.value(game, totals(game.matchId));
     const values = averages(game.matchId)?.values;
@@ -308,10 +344,10 @@ export function summarizeMetric(
   const compared = valued.filter((row) => row.average);
   const samples = metric.average
     ? compared.flatMap(({ value, average }) => {
-        const avg = average!.num / average!.den;
-        return avg > 0 ? [value!.num / value!.den / avg] : [];
+        const avg = divide(average!);
+        return avg > 0 ? [divide(value!) / avg] : [];
       })
-    : valued.map(({ value }) => value!.num / value!.den);
+    : valued.map(({ value }) => divide(value!));
   return {
     metric,
     points: rows.map(({ game, value, average }) => ({
@@ -319,12 +355,22 @@ export function summarizeMetric(
       heroId: game.heroId,
       startTime: game.startTime,
       won: isWin(game),
-      value: value ? value.num / value.den : null,
-      average: average ? average.num / average.den : null,
+      value: value ? divide(value) : null,
+      average: average ? divide(average) : null,
     })),
-    value: ratio(valued.map((row) => row.value!)),
+    value: ratio(
+      valued.map((row) => row.value!),
+      floor,
+    ),
     games: valued.length,
-    average: ratio(compared.map((row) => row.average!)),
+    average: ratio(
+      compared.map((row) => row.average!),
+      floor,
+    ),
+    comparedValue: ratio(
+      compared.map((row) => row.value!),
+      floor,
+    ),
     compared: compared.length,
     trend: trend(samples),
   };

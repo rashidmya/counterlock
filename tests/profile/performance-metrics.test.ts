@@ -10,7 +10,7 @@ import { parseMatchTotals } from "@/features/profile/utils/match-totals";
 import {
   MIN_TREND_GAMES,
   PERFORMANCE_METRICS,
-  TREND_T,
+  criticalT,
   gameAverage,
   gameTotals,
   gamesInRange,
@@ -99,6 +99,16 @@ describe("gameAverage", () => {
     expect(average.values.deaths).toBe(
       averageAt(curve, metricById.get("deaths")!, 1800)!.avg,
     );
+    expect(Object.keys(average.values).sort()).toEqual([
+      "assists",
+      "creepKills",
+      "deaths",
+      "healing",
+      "heroDamage",
+      "kills",
+      "objectiveDamage",
+      "souls",
+    ]);
   });
 
   it("has no values past the curve's end", () => {
@@ -159,15 +169,19 @@ describe("metrics", () => {
     expect(average("soulsPerMin")).toBe(1000);
     expect(value("kda")).toBe((4 + 2) / 2);
     expect(average("kda")).toBe((6 + 9) / 5);
+    // Deaths count as at least one when dividing, not in the fraction.
     expect(metric("kda").value(match({ deaths: 0 }), undefined)).toEqual({
       num: 6,
-      den: 1,
+      den: 0,
     });
+    expect(metric("kda").minDenominator).toBe(1);
   });
 
   it("the rest need the match's totals", () => {
     expect(value("heroDamagePerMin")).toBe(1000);
     expect(average("heroDamagePerMin")).toBe(500);
+    expect(value("objectiveDamagePerMin")).toBe(200);
+    expect(value("healingPerMin")).toBe(4000 / 30);
     expect(value("creepKillsPerMin")).toBe(3);
     expect(average("creepKillsPerMin")).toBeNull();
     expect(value("killParticipation")).toBe(17 / 30);
@@ -191,24 +205,39 @@ describe("trend", () => {
     expect(trend([1, 2, 3, 4, 5])).toBeNull();
   });
 
-  it("is flat when the halves differ by less than TREND_T standard errors", () => {
-    expect(TREND_T).toBe(2);
-    // Means 1.0 and 1.1; standard error about 0.082, so t ≈ 1.22.
+  it("reads 95% critical values of t, the stricter row between rows", () => {
+    expect(criticalT(4)).toBe(2.78);
+    expect(criticalT(4.9)).toBe(2.78);
+    expect(criticalT(18)).toBe(2.13);
+    expect(criticalT(1000)).toBe(1.98);
+    expect(criticalT(0.5)).toBe(12.71);
+  });
+
+  it("is flat unless Welch's t-test finds the halves differ at 95%", () => {
+    // Means 1.0 and 1.1: t ≈ 1.22.
     expect(trend([0.9, 1.1, 1.0, 1.0, 1.2, 1.1])).toBe("flat");
+    // Means 1.0 and 1.2: t ≈ 2.45, short of 2.78 on 4 degrees of freedom.
+    expect(trend([0.9, 1.0, 1.1, 1.1, 1.2, 1.3])).toBe("flat");
     expect(trend([1, 1, 1, 1, 1, 1])).toBe("flat");
   });
 
   it("improves or slips beyond that", () => {
     expect(trend([0.9, 1.0, 1.1, 1.4, 1.5, 1.6])).toBe("improving");
     expect(trend([1.6, 1.5, 1.4, 1.1, 1.0, 0.9])).toBe("slipping");
+    // The same 0.2 step over 20 games: t ≈ 5.5 on 18 degrees of freedom.
+    const earlier = [0.9, 1.0, 1.1, 0.9, 1.0, 1.1, 0.9, 1.0, 1.1, 1.0];
+    expect(trend([...earlier, ...earlier.map((v) => v + 0.2)])).toBe(
+      "improving",
+    );
     // No spread at all: any change counts.
     expect(trend([1, 1, 1, 2, 2, 2])).toBe("improving");
   });
 
   it("puts the middle game in the earlier half", () => {
-    // Earlier [0, 0, 0, 3] and recent [1, 1, 1]: t ≈ 0.33. With the 3 in
-    // the recent half it would be t = 3, improving.
-    expect(trend([0, 0, 0, 3, 1, 1, 1])).toBe("flat");
+    // Earlier [1, 1, 1, 2] and recent [2, 2, 2]: t = 3, short of 3.18 on 3
+    // degrees of freedom. With the middle game in the recent half both
+    // halves would be constant, a sure change.
+    expect(trend([1, 1, 1, 2, 2, 2, 2])).toBe("flat");
   });
 });
 
@@ -270,6 +299,34 @@ describe("summarizeMetric", () => {
     expect(summary.value).toBe(1100);
     expect(summary.average).toBeNull();
     expect(summary.compared).toBe(0);
+  });
+
+  it("compares like with like when some games have no rank average", () => {
+    const summary = summarizeMetric(
+      metric("soulsPerMin"),
+      games,
+      () => undefined,
+      (id) => (id <= 4 ? average : undefined),
+    );
+    expect(summary.value).toBe(1150);
+    expect(summary.games).toBe(6);
+    expect(summary.average).toBe(1000);
+    expect(summary.compared).toBe(4);
+    expect(summary.comparedValue).toBe((900 + 950 + 1000 + 1300) / 4);
+    // Four games to compare are too few for a trend.
+    expect(summary.trend).toBeNull();
+  });
+
+  it("adds up deaths before counting them as at least one", () => {
+    const summary = summarizeMetric(
+      metric("kda"),
+      [0, 0, 4].map((deaths, i) => match({ matchId: i + 1, deaths })),
+      () => undefined,
+      () => undefined,
+    );
+    expect(summary.points.map((p) => p.value)).toEqual([6, 6, 1.5]);
+    // 18 kills and assists over 4 deaths, not over 1 + 1 + 4.
+    expect(summary.value).toBe(4.5);
   });
 
   it("has no trend for a rank-averaged metric until the averages load", () => {
