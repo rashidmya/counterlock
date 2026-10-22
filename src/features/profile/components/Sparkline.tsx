@@ -8,7 +8,8 @@ const PAD_Y = 8;
 
 /**
  * A path through the values, broken at games without one. A value with no
- * neighbour on either side gets a short tick, so it still shows.
+ * neighbour on either side gets a 4 px tick centred on it (one dash of the
+ * dashed average), so it still shows.
  */
 export function linePath(
   values: (number | null)[],
@@ -21,7 +22,7 @@ export function linePath(
       const before = values[index - 1] ?? null;
       const after = values[index + 1] ?? null;
       if (before === null && after === null)
-        return `M${(x(index) - 4).toFixed(1)},${y(value).toFixed(1)}h8`;
+        return `M${(x(index) - 2).toFixed(1)},${y(value).toFixed(1)}h4`;
       return `${before === null ? "M" : "L"}${x(index).toFixed(1)},${y(value).toFixed(1)}`;
     })
     .join("");
