@@ -52,9 +52,10 @@ export async function fetchPopularBuilds(
   }
   const ranked = builds.some((build) => (build.favorites ?? 0) > 0);
   if (builds.length && !ranked) {
-    const recent = await load(english, "updated_at");
+    const recent = await load(english, "updated_at").catch(() => []);
     if (recent.length) builds = recent;
   }
+  if (!ranked) builds = builds.map((build) => ({ ...build, favorites: null }));
   const ids = [
     ...new Set(builds.map((build) => build.authorId).filter(Boolean)),
   ];

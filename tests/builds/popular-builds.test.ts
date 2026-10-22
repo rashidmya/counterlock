@@ -6,6 +6,7 @@ import {
   parsePopularBuilds,
 } from "@/features/builds/utils/popular-builds";
 import {
+  BUILD_WINDOW_DAYS,
   POPULAR_BUILDS,
   fetchPopularBuilds,
   popularBuildsPath,
@@ -171,6 +172,7 @@ describe("fetchPopularBuilds", () => {
       "/v1/builds?hero_id=13&only_latest=true&sort_by=favorites&sort_direction=desc&min_unix_timestamp=1787443200&limit=5&build_language=English",
     );
     expect(POPULAR_BUILDS).toBe(5);
+    expect(BUILD_WINDOW_DAYS).toBe(60);
     expect(any).not.toContain("build_language");
     expect(popularBuildsPath(13, true, NOW, "updated_at")).toContain(
       "sort_by=updated_at",
@@ -237,5 +239,51 @@ describe("fetchPopularBuilds", () => {
     const result = await fetchPopularBuilds(13, api, NOW);
     expect(result.ranked).toBe(false);
     expect(result.builds.map((x) => x.id)).toEqual([1]);
+  });
+  it("keeps the first list when the recent reload fails", async () => {
+    const recent = popularBuildsPath(13, true, NOW, "updated_at");
+    const { api } = fakeApi({
+      [english]: [build(1, {}, 13, null)],
+      [recent]: new Error("down"),
+      "/v1/players/steam?account_ids=42": [],
+    });
+    const result = await fetchPopularBuilds(13, api, NOW);
+    expect(result.ranked).toBe(false);
+    expect(result.builds.map((x) => x.id)).toEqual([1]);
+  });
+  it("clears favourite counts on unranked builds, even zeros", async () => {
+    const { api } = fakeApi({
+      [english]: [build(1, {}, 13, 0), build(2, {}, 13, null)],
+      [popularBuildsPath(13, true, NOW, "updated_at")]: [build(3, {}, 13, 0)],
+      "/v1/players/steam?account_ids=42": [],
+    });
+    const result = await fetchPopularBuilds(13, api, NOW);
+    expect(result.builds.map((x) => x.favorites)).toEqual([null]);
+    const { api: api2 } = fakeApi({
+      [english]: [build(1, {}, 13, 0)],
+      [popularBuildsPath(13, true, NOW, "updated_at")]: new Error("down"),
+      "/v1/players/steam?account_ids=42": [],
+    });
+    const kept = await fetchPopularBuilds(13, api2, NOW);
+    expect(kept.builds.map((x) => x.favorites)).toEqual([null]);
+  });
+  it("reloads all languages by recency when there are no English builds or counts", async () => {
+    const recentAny = popularBuildsPath(13, false, NOW, "updated_at");
+    const { api, calls } = fakeApi({
+      [english]: [],
+      [any]: [build(3, {}, 13, null)],
+      [recentAny]: [build(4, {}, 13, null)],
+      "/v1/players/steam?account_ids=42": [],
+    });
+    const result = await fetchPopularBuilds(13, api, NOW);
+    expect(recentAny).not.toContain("build_language");
+    expect(calls).toEqual([
+      english,
+      any,
+      recentAny,
+      "/v1/players/steam?account_ids=42",
+    ]);
+    expect(result.english).toBe(false);
+    expect(result.builds.map((x) => x.id)).toEqual([4]);
   });
 });
