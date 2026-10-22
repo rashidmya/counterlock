@@ -6,13 +6,19 @@ import {
   parsePopularBuilds,
 } from "@/features/builds/utils/popular-builds";
 import {
+  POPULAR_BUILDS,
   fetchPopularBuilds,
   popularBuildsPath,
 } from "@/features/builds/services/popular-builds";
 
 const [a, b, c] = catalog.items.map((item) => item.id);
 const NOW = Date.UTC(2026, 9, 22, 15);
-const build = (id: number, extra: object = {}, hero = 13) => ({
+const build = (
+  id: number,
+  extra: object = {},
+  hero = 13,
+  favorites: number | null = 199,
+) => ({
   hero_build: {
     hero_id: hero,
     hero_build_id: id,
@@ -36,7 +42,7 @@ const build = (id: number, extra: object = {}, hero = 13) => ({
     },
     ...extra,
   },
-  num_favorites: 199,
+  num_favorites: favorites,
 });
 function fakeApi(routes: Record<string, unknown>) {
   const calls: string[] = [];
@@ -77,6 +83,44 @@ describe("parsePopularBuilds", () => {
       ],
     });
   });
+  it("keeps a duplicate item inside one category", () => {
+    const [parsed] = parsePopularBuilds(
+      [
+        build(1, {
+          details: {
+            mod_categories: [
+              { name: "x", mods: [{ ability_id: a }, { ability_id: a }] },
+            ],
+          },
+        }),
+      ],
+      13,
+    );
+    expect(parsed.categories[0].items).toEqual([{ itemId: a }, { itemId: a }]);
+  });
+  it("keeps long descriptions up to 4000 characters", () => {
+    const long = "x".repeat(5000);
+    const [parsed] = parsePopularBuilds(
+      [
+        build(1, {
+          details: {
+            mod_categories: [
+              { name: "x", description: long, mods: [{ ability_id: a }] },
+            ],
+          },
+        }),
+      ],
+      13,
+    );
+    expect(parsed.categories[0].description).toHaveLength(4000);
+  });
+  it("reports missing favourite counts as null and keeps zero", () => {
+    const parsed = parsePopularBuilds(
+      [build(1, {}, 13, null), build(2, {}, 13, 0), build(3, {}, 13, -4)],
+      13,
+    );
+    expect(parsed.map((x) => x.favorites)).toEqual([null, 0, null]);
+  });
   it("drops other heroes, empty builds and malformed rows", () => {
     const empty = build(2, {
       details: { mod_categories: [{ name: "x", mods: [] }] },
@@ -113,6 +157,9 @@ describe("parsePopularBuilds", () => {
     );
     expect(categoryName("")).toBe("Items");
     expect(categoryName("Core")).toBe("Core");
+    expect(categoryName("   ")).toBe("Items");
+    expect(categoryName({ a: 1 })).toBe("Items");
+    expect(categoryName(null)).toBe("Items");
   });
 });
 
@@ -123,7 +170,11 @@ describe("fetchPopularBuilds", () => {
     expect(english).toBe(
       "/v1/builds?hero_id=13&only_latest=true&sort_by=favorites&sort_direction=desc&min_unix_timestamp=1787443200&limit=5&build_language=English",
     );
+    expect(POPULAR_BUILDS).toBe(5);
     expect(any).not.toContain("build_language");
+    expect(popularBuildsPath(13, true, NOW, "updated_at")).toContain(
+      "sort_by=updated_at",
+    );
   });
   it("names authors from one Steam lookup", async () => {
     const { api, calls } = fakeApi({
@@ -137,15 +188,17 @@ describe("fetchPopularBuilds", () => {
     expect(result.english).toBe(true);
     expect(result.authors.get(42)).toBe("Ann");
     expect(result.authors.has(7)).toBe(false);
-    expect(calls).toHaveLength(2);
+    expect(result.ranked).toBe(true);
+    expect(calls).toEqual([english, "/v1/players/steam?account_ids=42,7"]);
   });
   it("falls back to every language when there are no English builds", async () => {
-    const { api } = fakeApi({
+    const { api, calls } = fakeApi({
       [english]: [],
       [any]: [build(3)],
       "/v1/players/steam?account_ids=42": [],
     });
     const result = await fetchPopularBuilds(13, api, NOW);
+    expect(calls).toEqual([english, any, "/v1/players/steam?account_ids=42"]);
     expect(result.builds.map((x) => x.id)).toEqual([3]);
     expect(result.english).toBe(false);
   });
@@ -157,5 +210,32 @@ describe("fetchPopularBuilds", () => {
     const result = await fetchPopularBuilds(13, api, NOW);
     expect(result.builds).toHaveLength(1);
     expect(result.authors.size).toBe(0);
+  });
+  it("falls back to the most recently updated builds when no counts exist", async () => {
+    const recent = popularBuildsPath(13, true, NOW, "updated_at");
+    const { api, calls } = fakeApi({
+      [english]: [build(1, {}, 13, null)],
+      [recent]: [build(5, {}, 13, null), build(6, {}, 13, null)],
+      "/v1/players/steam?account_ids=42": [],
+    });
+    const result = await fetchPopularBuilds(13, api, NOW);
+    expect(result.ranked).toBe(false);
+    expect(result.builds.map((x) => x.id)).toEqual([5, 6]);
+    expect(calls).toEqual([
+      english,
+      recent,
+      "/v1/players/steam?account_ids=42",
+    ]);
+  });
+  it("keeps the first list when the recent request finds nothing", async () => {
+    const recent = popularBuildsPath(13, true, NOW, "updated_at");
+    const { api } = fakeApi({
+      [english]: [build(1, {}, 13, null)],
+      [recent]: [],
+      "/v1/players/steam?account_ids=42": [],
+    });
+    const result = await fetchPopularBuilds(13, api, NOW);
+    expect(result.ranked).toBe(false);
+    expect(result.builds.map((x) => x.id)).toEqual([1]);
   });
 });
