@@ -22,6 +22,7 @@ const match = (overrides: Partial<HistoryMatch> = {}): HistoryMatch => ({
   denies: 0,
   durationS: 600,
   heroLevel: 1,
+  badge: 0,
   ...overrides,
 });
 

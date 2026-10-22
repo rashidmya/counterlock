@@ -26,6 +26,7 @@ const game = (
   denies: 0,
   durationS: 0,
   heroLevel: 1,
+  badge: 0,
 });
 
 describe("recentForm", () => {

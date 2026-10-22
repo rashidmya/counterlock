@@ -20,6 +20,9 @@ export interface HistoryMatch {
   denies: number;
   durationS: number;
   heroLevel: number;
+  // Rank badge at match start (tier × 10 + subrank); 0 when the game
+  // recorded none, as in unranked games.
+  badge: number;
 }
 export interface Summary {
   games: number;

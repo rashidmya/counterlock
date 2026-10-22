@@ -53,6 +53,7 @@ const match = (overrides: Partial<HistoryMatch> = {}): HistoryMatch => ({
   denies: 0,
   durationS: 600,
   heroLevel: 1,
+  badge: 0,
   ...overrides,
 });
 
@@ -80,6 +81,7 @@ describe("parseHistory", () => {
       denies: 1,
       durationS: 2047,
       heroLevel: 24,
+      badge: 0,
     });
   });
 
@@ -107,6 +109,14 @@ describe("parseHistory", () => {
       row({ denies: null, last_hits: undefined, net_worth: null }),
     ]);
     expect(parsed[0]).toMatchObject({ denies: 0, lastHits: 0, netWorth: 0 });
+  });
+
+  it("keeps the rank badge at match start, 0 when none is recorded", () => {
+    const parsed = parseHistory([
+      row({ match_id: 1, start_time: 2, ranked_display_badge: 116 }),
+      row({ match_id: 2, start_time: 1 }),
+    ]);
+    expect(parsed.map((m) => m.badge)).toEqual([116, 0]);
   });
 });
 

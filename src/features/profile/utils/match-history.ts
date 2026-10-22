@@ -41,6 +41,7 @@ export function parseHistory(rows: unknown): HistoryMatch[] {
       denies: count(r.denies),
       durationS: count(r.match_duration_s),
       heroLevel: count(r.hero_level),
+      badge: count(r.ranked_display_badge),
     });
   }
   return matches.sort((a, b) => b.startTime - a.startTime);
