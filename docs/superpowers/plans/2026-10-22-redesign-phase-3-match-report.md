@@ -43,7 +43,7 @@ All checked on real ranked match 118590607 (`GET /v1/matches/118590607/metadata`
   - **What it lacks:** damage taken, hero hits, accuracy, level and power, so those stats have no rank average.
   - **Thin late steps:** later steps have very few games (22 at 60 min, 2 at 70 min).
     - Steps with fewer than **30** games are dropped (`MIN_STEP_SAMPLES`).
-    - When the first step has fewer than **100** games (`MIN_CURVE_SAMPLES`), the band widens once, one tier each way, and the note says so.
+    - When the first step has fewer than **100** games (`MIN_CURVE_SAMPLES`), or the kept steps end before the match does, the band widens once, one tier each way, and the note says so. If the wider request fails, the tier's own curve is kept. (Review of Task 2: Warden at Eternus has 274 games at 3:00 but only 64 at 35:00, so first-step samples alone never trigger widening.)
   - **Game mode:** the endpoint defaults to `game_mode=normal`, so Street Brawl reports get no curve and say "Rank averages cover normal matches only."
 - **"Last hits" becomes "Creep kills" in the graph and verdicts (deviation).**
   - **The numbers don't match:** match-level `last_hits` (267) is neither snapshot `creep_kills` (164) nor creep plus neutral kills (219).
@@ -101,6 +101,7 @@ All checked on real ranked match 118590607 (`GET /v1/matches/118590607/metadata`
     - labels "Souls / min", "Hero damage" and "Creep kills";
     - change line "▲ 8% vs avg {Hero} at {Band}", or "No rank average";
     - note "Compared with the average {Hero} at {Band} at the same match length, over the last 30 days." plus, when widened, " Too few {Hero} games at {Tier} alone, so this covers {Band}.";
+    - when the curve ends before the match does, the note adds " Too few {Hero} games at {Band} ran this long, so the average stops at {m:ss}."; with no usable steps it reads "Too few {Hero} games at {Band} in the last 30 days.";
     - other notes "Rank averages cover normal matches only.", "Loading the rank average…" and "Rank average unavailable: {error}" with Retry.
   - **Section titles:** "Graph", "Best & worst stretches", "Impact", "Permanent buffs" and "Scoreboard".
   - **Stretches:**
@@ -2651,7 +2652,7 @@ export function ReportBanner({
 
 ```tsx
 import type { AsyncState } from "@/shared/api/useAsync";
-import { percent } from "../utils/format";
+import { clock, percent } from "../utils/format";
 import { verdicts } from "../utils/insights";
 import { heroName } from "../utils/perspective";
 import type { RankCurve } from "../utils/rank-curve";
@@ -2661,15 +2662,22 @@ export function curveNote(
   hero: string,
   curve: AsyncState<RankCurve>,
   normal: boolean,
+  durationS: number,
 ) {
   if (!normal) return "Rank averages cover normal matches only.";
   if (curve.loading) return "Loading the rank average…";
   if (!curve.data) return `Rank average unavailable: ${curve.error ?? ""}`;
-  const { band, widenedFrom } = curve.data;
+  const { band, widenedFrom, points } = curve.data;
+  if (!points.length)
+    return `Too few ${hero} games at ${band.label} in the last 30 days.`;
+  const end = points.at(-1)!.t;
   return (
     `Compared with the average ${hero} at ${band.label} at the same match length, over the last 30 days.` +
     (widenedFrom
       ? ` Too few ${hero} games at ${widenedFrom} alone, so this covers ${band.label}.`
+      : "") +
+    (end < durationS
+      ? ` Too few ${hero} games at ${band.label} ran this long, so the average stops at ${clock(end)}.`
       : "")
   );
 }
@@ -2706,7 +2714,7 @@ export function Verdicts({
         ))}
       </div>
       <p className="data-note">
-        {curveNote(hero, curve, normal)}
+        {curveNote(hero, curve, normal, durationS)}
         {curve.error && (
           <>
             {" "}
@@ -3004,8 +3012,10 @@ function Report({
   const badge = selected ? selected.badge || lobbyBadge(report.players) : 0;
   const normal = report.gameMode === NORMAL_MODE;
   const curve = useAsync(
-    selected && normal ? () => fetchRankCurve(selected.heroId, badge) : null,
-    [selected?.heroId, badge],
+    selected && normal
+      ? () => fetchRankCurve(selected.heroId, badge, report.durationS)
+      : null,
+    [selected?.heroId, badge, report.durationS],
   );
   const top = useRef<HTMLDivElement>(null);
   const select = (next: number | null) => setPicked({ slot: next });
