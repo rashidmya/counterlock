@@ -356,6 +356,38 @@
   display: grid;
   padding-bottom: 8px;
 }
+
+.build-tabs {
+  display: flex;
+  gap: 28px;
+  margin-top: 30px;
+  border-bottom: 1px solid var(--line);
+}
+.build-tabs [role="tab"] {
+  margin-bottom: -1px;
+  padding: 10px 0;
+  border-bottom: 3px solid transparent;
+  color: var(--muted);
+  font: 700 18px var(--font-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.build-tabs [role="tab"][aria-selected="true"] {
+  border-bottom-color: var(--gold);
+  color: var(--cream);
+}
+.build-tabs .tab-count {
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: var(--line);
+  color: var(--cream);
+  font: 700 12px var(--font-label);
+  letter-spacing: 0.06em;
+  vertical-align: 2px;
+}
+.build-tab-panel > .data-note {
+  margin: 14px 0 12px;
+}
 .hero-detail-body > .data-note {
   margin-top: 24px;
 }
@@ -432,20 +464,6 @@
 .skill-cell.chosen {
   border-color: var(--gold);
   background: var(--gold);
-}
-
-.hero-build .hero-build-summary {
-  padding: 8px 12px 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-.hero-build .hero-build-summary strong {
-  color: var(--tier-gold);
-  font-weight: 600;
-}
-.hero-detail .build-empty {
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .matchups {
@@ -656,6 +674,13 @@
   .detail-section .section-meta {
     flex: 1 1 100%;
     order: 3;
+  }
+  .build-tabs {
+    gap: 22px;
+    margin-top: 22px;
+  }
+  .build-tabs [role="tab"] {
+    font-size: 16px;
   }
   .matchup {
     min-height: 40px;

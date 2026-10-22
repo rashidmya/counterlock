@@ -1,8 +1,18 @@
-import { useMemo, type ReactNode } from "react";
+import {
+  useId,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { RouteLink } from "@/app/links";
 import { useAsync, type AsyncState } from "@/shared/api/useAsync";
 import { SectionHeader } from "@/shared/ui/SectionHeader";
 import { heroById, itemById } from "@/shared/catalog";
+import { MainBuild } from "@/features/builds/components/MainBuild";
+import { PopularBuilds } from "@/features/builds/components/PopularBuilds";
+import { fetchMainBuild } from "@/features/builds/services/main-build";
+import { fetchPopularBuilds } from "@/features/builds/services/popular-builds";
 import {
   fetchAbilityOrder,
   fetchHeroSummaries,
@@ -17,16 +27,22 @@ import {
   counterItems,
   matchups,
   mostCommonOrder,
+  rankLabel,
   type AnalyticsQuery,
   type ItemPerf,
 } from "../utils/analytics";
-import { HeroBuild } from "./HeroBuild";
 import { HeroHeader } from "./HeroHeader";
 import { ItemList, type ItemEntry } from "./ItemList";
 import { MatchupList } from "./MatchupList";
 import { SkillOrder } from "./SkillOrder";
 
 const percent = (rate: number) => `${(rate * 100).toFixed(1)}%`;
+
+const TABS = [
+  { key: "build", label: "Build" },
+  { key: "popular", label: "Popular builds" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
 
 const merge = (...states: AsyncState<unknown>[]) => ({
   loading: states.some((state) => state.loading),
@@ -116,6 +132,28 @@ export function HeroDetail({
   );
   const baseline = useAsync(() => fetchItemStats(query), [query.minBadge]);
   const heuristic = useMemo(() => heuristicCounterItems(heroId), [heroId]);
+  const build = useAsync(() => fetchMainBuild(heroId, query), deps);
+  const popular = useAsync(() => fetchPopularBuilds(heroId), [heroId]);
+  const tabsId = useId();
+  const [tab, setTab] = useState<TabKey>("build");
+  const tabId = (key: TabKey) => `${tabsId}-${key}-tab`;
+  const panelId = (key: TabKey) => `${tabsId}-${key}-panel`;
+  // Roving focus: arrows wrap, Home and End jump to the ends.
+  const onTabKey = (event: KeyboardEvent, index: number) => {
+    const last = TABS.length - 1;
+    const moves: Partial<Record<string, number>> = {
+      ArrowLeft: index === 0 ? last : index - 1,
+      ArrowRight: index === last ? 0 : index + 1,
+      Home: 0,
+      End: last,
+    };
+    const next = moves[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    setTab(TABS[next].key);
+    document.getElementById(tabId(TABS[next].key))?.focus();
+  };
+  const popularCount = popular.data?.builds.length ?? 0;
 
   if (!hero)
     return (
@@ -176,6 +214,48 @@ export function HeroDetail({
         </p>
       )}
       <div className="hero-detail-body">
+        <div className="build-tabs" role="tablist" aria-label="Builds">
+          {TABS.map(({ key, label }, index) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              id={tabId(key)}
+              aria-selected={tab === key}
+              aria-controls={panelId(key)}
+              tabIndex={tab === key ? 0 : -1}
+              onClick={() => setTab(key)}
+              onKeyDown={(event) => onTabKey(event, index)}
+            >
+              {label}
+              {key === "popular" && popularCount > 0 && (
+                <small className="tab-count">{popularCount}</small>
+              )}
+            </button>
+          ))}
+        </div>
+        <div
+          role="tabpanel"
+          id={panelId("build")}
+          aria-labelledby={tabId("build")}
+          className="build-tab-panel"
+          hidden={tab !== "build"}
+        >
+          <p className="data-note">
+            Most-bought items in each phase · {rankLabel(query.minBadge)} · last
+            30 days · win rate under each item
+          </p>
+          <MainBuild state={build} />
+        </div>
+        <div
+          role="tabpanel"
+          id={panelId("popular")}
+          aria-labelledby={tabId("popular")}
+          className="build-tab-panel"
+          hidden={tab !== "popular"}
+        >
+          <PopularBuilds state={popular} />
+        </div>
         <Section
           title="Skill order"
           meta={
@@ -189,9 +269,6 @@ export function HeroDetail({
               <SkillOrder abilityIds={abilityIds} order={common.abilities} />
             )}
           </Body>
-        </Section>
-        <Section title="Build" meta="MOST-PLAYED COMMUNITY BUILD">
-          <HeroBuild heroId={heroId} />
         </Section>
         <div className="detail-grid">
           <Section title="Strong against">
@@ -218,7 +295,7 @@ export function HeroDetail({
               </p>
             </Body>
           </Section>
-          <Section title="Counter items" size="half">
+          <Section title={`Items that beat ${hero.name}`} size="half">
             <Body
               state={{ ...counterState, error: undefined }}
               empty={counterEntries.length === 0}

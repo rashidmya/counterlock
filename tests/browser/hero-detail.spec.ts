@@ -67,6 +67,98 @@ const versusItems = [
   itemRow(losing.id, 0.35, 3000),
 ];
 
+// Main build: an upgrade beats its component, the 8-item cap drops `extra`
+// and the 5% noise floor drops `rare`.
+const pool = catalog.items.filter(
+  (entry) =>
+    entry.image &&
+    entry.cost > 0 &&
+    !entry.components?.length &&
+    !shopItems.includes(entry),
+);
+const upgrade = catalog.items.find(
+  (entry) =>
+    entry.image &&
+    entry.components?.length === 1 &&
+    pool.some((p) => p.className === entry.components![0]),
+)!;
+const component = pool.find((p) => p.className === upgrade.components![0])!;
+const plain = pool.filter((p) => p.id !== component.id);
+const earlyItems = plain.slice(0, 7);
+const [extra, rare] = plain.slice(7, 9);
+const midItems = plain.slice(9, 12);
+const phaseRow = (
+  itemId: number,
+  matches: number,
+  buyS: number,
+  rate = 0.55,
+) => ({
+  item_id: itemId,
+  wins: matches * rate,
+  losses: matches * (1 - rate),
+  matches,
+  avg_buy_time_s: buyS,
+});
+const phaseRows = [
+  [
+    phaseRow(component.id, 9000, 100),
+    phaseRow(upgrade.id, 8800, 400),
+    ...earlyItems.map((entry, i) =>
+      phaseRow(entry.id, 8000 - i * 100, 500 - i * 10),
+    ),
+    phaseRow(extra.id, 7000, 50),
+    phaseRow(rare.id, 300, 30),
+  ],
+  [
+    phaseRow(earlyItems[0].id, 9000, 700),
+    ...midItems.map((entry, i) => phaseRow(entry.id, 5000 - i * 100, 800 + i)),
+  ],
+  [],
+];
+const AUTHOR = 424242;
+const popularRows = [
+  {
+    hero_build: {
+      hero_id: haze.id,
+      hero_build_id: 501,
+      author_account_id: AUTHOR,
+      last_updated_timestamp: 1_791_000_000,
+      name: "Fixture Popular One",
+      details: {
+        mod_categories: [
+          {
+            name: "#Citadel_HeroBuilds_EarlyGame",
+            description: "Lane first",
+            mods: [
+              { ability_id: bestA.id, annotation: "rush it" },
+              { ability_id: bestB.id },
+            ],
+          },
+          {
+            name: "",
+            mods: [{ ability_id: losing.id }, { ability_id: bestA.id }],
+          },
+          { name: "Notes", description: "Only words here", mods: [] },
+        ],
+      },
+    },
+    num_favorites: 199,
+  },
+  {
+    hero_build: {
+      hero_id: haze.id,
+      hero_build_id: 502,
+      author_account_id: AUTHOR,
+      last_updated_timestamp: 1_791_000_000,
+      name: "Fixture Popular Two",
+      details: {
+        mod_categories: [{ name: "Core", mods: [{ ability_id: counterA.id }] }],
+      },
+    },
+    num_favorites: 1,
+  },
+];
+
 const pairs = (
   first: string,
   second: string,
@@ -103,6 +195,10 @@ interface Fixtures {
   heroItems?: unknown[];
   versus?: unknown[];
   base?: unknown[];
+  phases?: unknown[][];
+  popular?: unknown;
+  vsEnemy?: Record<number, unknown[]>;
+  url?: string;
 }
 
 async function openHaze(
@@ -120,6 +216,10 @@ async function openHaze(
     heroItems: forHero = heroItems,
     versus = versusItems,
     base = baseItems,
+    phases = phaseRows,
+    popular = popularRows,
+    vsEnemy = {},
+    url: start = "/",
   } = fixtures;
   await page.route("https://assets-bucket.deadlock-api.com/**", (route) =>
     route.fulfill({ body: PNG, contentType: "image/png", headers: cors }),
@@ -137,50 +237,25 @@ async function openHaze(
         return json(synergy);
       case "/v1/analytics/ability-order-stats":
         return json(abilityOrder);
-      case "/v1/analytics/item-stats":
-        return json(
-          url.searchParams.has("hero_id")
-            ? forHero
-            : url.searchParams.has("enemy_hero_ids")
-              ? versus
-              : base,
-        );
-      case `/v1/analytics/hero-build-stats/${haze.id}`:
-        return json([
-          {
-            hero_id: haze.id,
-            hero_build_id: 99,
-            wins: 15,
-            losses: 5,
-            matches: 20,
-            bucket: 0,
-          },
-        ]);
-      case `/v1/builds/${haze.id}/99`:
-        return json({
-          hero_build: {
-            hero_id: haze.id,
-            hero_build_id: 99,
-            name: "Fixture build",
-            details: {
-              mod_categories: [
-                {
-                  name: "#Citadel_HeroBuilds_EarlyGame",
-                  mods: [{ ability_id: bestA.id }],
-                },
-                {
-                  name: "#Citadel_HeroBuilds_LateGame",
-                  mods: [{ ability_id: bestB.id }],
-                },
-              ],
-            },
-          },
-        });
+      case "/v1/analytics/item-stats": {
+        const p = url.searchParams;
+        if (p.has("min_bought_at_s"))
+          return json(phases[Number(p.get("min_bought_at_s")) / 600] ?? []);
+        if (p.has("hero_id") && p.has("enemy_hero_ids"))
+          return json(vsEnemy[Number(p.get("enemy_hero_ids"))] ?? []);
+        if (p.has("hero_id")) return json(forHero);
+        if (p.has("enemy_hero_ids")) return json(versus);
+        return json(base);
+      }
+      case "/v1/builds":
+        return json(popular);
+      case "/v1/players/steam":
+        return json([{ account_id: AUTHOR, personaname: "Fixture Author" }]);
       default:
         return json([]);
     }
   });
-  await page.goto("/");
+  await page.goto(start);
   await page.getByRole("button", { name: "Heroes", exact: true }).click();
   await page
     .locator(".page:not([hidden]) .hero-card", { hasText: open.name })
@@ -404,20 +479,207 @@ test("matchups, synergy and items list fixture entries and navigate", async ({
   await expect(best.locator(".item-tile img.item-icon").first()).toBeVisible();
   await expect(best).toContainText("players who are ahead can afford them");
 
-  const counter = section(page, "Counter items");
+  const counter = section(page, "Items that beat Haze");
   await expect(counter.locator(".item-tile")).toHaveText([
     new RegExp(`${counterA.name}.*\\+10\\.0%`),
     new RegExp(`${counterB.name}.*\\+5\\.0%`),
   ]);
   await expect(counter).not.toContainText("Based on hero traits");
 
-  await expect(section(page, "Build")).toContainText("Fixture build");
-  await expect(section(page, "Build").locator(".build-item")).toHaveCount(2);
-
   await best.locator(".item-tile").first().click();
   await expect(
     page.getByRole("button", { name: "Items", exact: true }),
   ).toHaveClass(/active/);
+});
+
+const names = (list: { name: string }[]) => list.map((entry) => entry.name);
+
+test("Build tab is selected and lists the main build per phase", async ({
+  page,
+}) => {
+  await openHaze(page);
+  await expect(
+    page.getByRole("tab", { name: "Build", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  const panel = page.getByRole("tabpanel", { name: "Build", exact: true });
+  await expect(panel.locator(".data-note")).toContainText(
+    "Most-bought items in each phase · All ranks · last 30 days",
+  );
+  const early = page.locator(".build-phase[data-phase=early] .build-item");
+  await expect(early.locator("strong")).toHaveText(
+    names([upgrade, ...[...earlyItems].reverse()]),
+  );
+  await expect(early.first().locator("small")).toHaveText("55% win");
+  await expect(
+    page.locator(".build-phase[data-phase=mid] .build-item strong"),
+  ).toHaveText(names(midItems));
+  await expect(
+    page.locator(".build-phase[data-phase=mid] .phase-short"),
+  ).toHaveText("Only 3 items were bought often enough in this phase.");
+  await expect(
+    page.locator(".build-phase[data-phase=late] .phase-short"),
+  ).toHaveText("Not enough data for this phase.");
+  const labels = (await page.locator(".phase-label").allTextContents()).join(
+    " ",
+  );
+  for (const text of [
+    "Early",
+    "0–10 min",
+    "Mid",
+    "10–20 min",
+    "Late",
+    "20+ min",
+  ])
+    expect(labels).toContain(text);
+
+  await early.first().click();
+  await expect(
+    page.getByRole("button", { name: "Items", exact: true }),
+  ).toHaveClass(/active/);
+});
+
+test("Popular builds tab shows each build exactly as authored", async ({
+  page,
+}) => {
+  await openHaze(page);
+  const build = page.getByRole("tab", { name: "Build", exact: true });
+  const popularTab = page.getByRole("tab", { name: /Popular builds/ });
+  await expect(popularTab.locator("small.tab-count")).toHaveText("2");
+  await build.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(popularTab).toHaveAttribute("aria-selected", "true");
+  await expect(popularTab).toBeFocused();
+  await expect(build).toHaveAttribute("aria-selected", "false");
+  const panel = page.getByRole("tabpanel", { name: /Popular builds/ });
+  await expect(panel.locator(".data-note")).toContainText(
+    "Most-favourited builds updated in the last 60 days",
+  );
+  const buttons = panel.locator(".build-tab");
+  await expect(buttons).toHaveText([
+    "Fixture Popular One",
+    "Fixture Popular Two",
+  ]);
+  await expect(buttons.first()).toHaveAttribute("aria-pressed", "true");
+  const article = panel.locator(".popular-build");
+  await expect(article.locator("h3")).toHaveText("Fixture Popular One");
+  const meta = article.locator(".popular-build-meta");
+  for (const text of [
+    "by Fixture Author",
+    "Updated",
+    "4 items in 3 categories",
+    "199 favourites",
+  ])
+    await expect(meta).toContainText(text);
+  await expect(article.locator(".build-category-name")).toHaveText([
+    "Early game",
+    "Items",
+    "Notes",
+  ]);
+  const categories = article.locator(".build-category");
+  const first = categories.nth(0).locator(".build-item");
+  await expect(first.locator("strong")).toHaveText(names([bestA, bestB]));
+  await expect(first.first()).toHaveAttribute("title", /rush it/);
+  await expect(first.first()).toHaveClass(/\bhas-note\b/);
+  await expect(categories.nth(1).locator(".build-item strong")).toHaveText(
+    names([losing, bestA]),
+  );
+  await expect(categories.nth(2)).toContainText("Only words here");
+  await expect(categories.nth(2).locator(".build-item")).toHaveCount(0);
+
+  await buttons.nth(1).click();
+  await expect(buttons.nth(1)).toHaveAttribute("aria-pressed", "true");
+  await expect(article.locator("h3")).toHaveText("Fixture Popular Two");
+  await expect(meta).toContainText("1 favourite");
+  await expect(meta).not.toContainText("1 favourites");
+});
+
+test("build tabs keep one tab stop and move with arrows, Home and End", async ({
+  page,
+}) => {
+  await openHaze(page);
+  const tabs = page.getByRole("tab");
+  await expect(tabs).toHaveCount(2);
+  const [build, popularTab] = [tabs.nth(0), tabs.nth(1)];
+  for (const tab of [build, popularTab]) {
+    const panel = await tab.getAttribute("aria-controls");
+    await expect(page.locator(`[id="${panel}"]`)).toHaveAttribute(
+      "role",
+      "tabpanel",
+    );
+  }
+  const selected = async (tab: typeof build) => {
+    await expect(tab).toHaveAttribute("aria-selected", "true");
+    await expect(tab).toHaveAttribute("tabindex", "0");
+    await expect(tab).toBeFocused();
+    const other = tab === build ? popularTab : build;
+    await expect(other).toHaveAttribute("aria-selected", "false");
+    await expect(other).toHaveAttribute("tabindex", "-1");
+  };
+  await build.focus();
+  await page.keyboard.press("End");
+  await selected(popularTab);
+  await page.keyboard.press("ArrowRight");
+  await selected(build);
+  await page.keyboard.press("ArrowLeft");
+  await selected(popularTab);
+  await page.keyboard.press("Home");
+  await selected(build);
+  await expect(
+    page.getByRole("tabpanel", { name: "Build", exact: true }),
+  ).toBeVisible();
+});
+
+test("popular builds empty state", async ({ page }) => {
+  await openHaze(page, { popular: [] });
+  const popularTab = page.getByRole("tab", { name: /Popular builds/ });
+  await expect(page.locator(".build-phase").first()).toBeVisible();
+  await expect(popularTab.locator(".tab-count")).toHaveCount(0);
+  await popularTab.click();
+  await expect(
+    page.getByRole("tabpanel", { name: /Popular builds/ }),
+  ).toContainText(
+    "No community builds for this hero were updated in the last 60 days.",
+  );
+});
+
+test("popular builds without favourite counts say they are recent", async ({
+  page,
+}) => {
+  await openHaze(page, {
+    popular: popularRows.map((row) => ({ ...row, num_favorites: null })),
+  });
+  await page.getByRole("tab", { name: /Popular builds/ }).click();
+  const panel = page.getByRole("tabpanel", { name: /Popular builds/ });
+  await expect(panel.locator(".data-note")).toContainText(
+    "Most recently updated builds",
+  );
+  await expect(panel.locator(".data-note")).toContainText(
+    "This hero has no favourite counts yet.",
+  );
+  await expect(panel.locator(".popular-build-meta")).toContainText(
+    "4 items in 3 categories",
+  );
+  await expect(panel.locator(".popular-build-meta")).not.toContainText(
+    "favourite",
+  );
+});
+
+test("main build rows fit at the minimum window width", async ({ page }) => {
+  await page.setViewportSize({ width: 850, height: 650 });
+  await openHaze(page);
+  const tiles = page.locator(".build-phase[data-phase=early] .build-item");
+  await expect(tiles).toHaveCount(8);
+  const mainBuild = page.locator(".main-build");
+  expect(
+    await mainBuild.evaluate((node) => node.scrollWidth <= node.clientWidth),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(850);
+  const tops = await tiles.evaluateAll((nodes) =>
+    nodes.map((node) => node.getBoundingClientRect().top),
+  );
+  expect(new Set(tops).size).toBe(1);
 });
 
 test("clicking a matchup hero opens that hero's detail", async ({ page }) => {
@@ -436,6 +698,7 @@ test("thin data shows Not enough data and heuristic counter items", async ({
     heroItems: [],
     versus: [],
     base: [],
+    phases: [[], [], []],
   });
   for (const title of [
     "Strong against",
@@ -445,7 +708,12 @@ test("thin data shows Not enough data and heuristic counter items", async ({
     "Best items",
   ])
     await expect(section(page, title)).toContainText("Not enough data");
-  const counter = section(page, "Counter items");
+  await expect(page.locator(".phase-short")).toHaveText([
+    "Not enough data for this phase.",
+    "Not enough data for this phase.",
+    "Not enough data for this phase.",
+  ]);
+  const counter = section(page, "Items that beat Haze");
   await expect(counter).toContainText("Based on hero traits");
   await expect(counter).not.toContainText("Not enough data");
   expect(await counter.locator(".item-tile").count()).toBeGreaterThan(0);
