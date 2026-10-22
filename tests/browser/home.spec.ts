@@ -615,6 +615,7 @@ test("heroes tab hero cell navigates to the Heroes page", async ({ page }) => {
   );
 });
 
+// 60 summary games, newest first; every third one is lost. The newest ten
 // earn 1,200 souls a minute, the rest 1,000. Street Brawl, bot and
 // private-lobby games sit between them and must stay out of the cards.
 const performanceHistory = [
