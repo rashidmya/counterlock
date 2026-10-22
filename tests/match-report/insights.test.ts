@@ -39,7 +39,10 @@ describe("format", () => {
       compact(906),
       compact(12.5),
       compact(-1500),
-    ]).toEqual(["59.9K", "906", "12.5", "−1.5K"]);
+      compact(999.6),
+      compact(99.96),
+      compact(-0.04),
+    ]).toEqual(["59.9K", "906", "12.5", "−1.5K", "1.0K", "100", "0"]);
     expect([percent(0.124), percent(-0.25)]).toEqual(["12%", "25%"]);
   });
 });
@@ -91,21 +94,32 @@ describe("impact", () => {
 });
 
 describe("stretches", () => {
+  const withShares = (shares: number[]) => ({
+    ...lead,
+    values: {
+      ...lead.values,
+      souls: lead.times.map((t, i) => ((1000 * t) / 60) * shares[i]),
+    },
+  });
+  const turn = (shares: number[], c = curve) =>
+    stretches(withShares(shares), c).find((s) => s.label === "Turning point")
+      ?.text;
+
   it("names the strongest and weakest moments, the turning point and deaths", () => {
     expect(stretches(lead, curve)).toEqual([
       {
         label: "Strongest",
-        text: "Around 15:00: 20% ahead of the Emissary average.",
+        text: "Around 15:00: 20% more souls than the Emissary average.",
         tone: "good",
       },
       {
         label: "Weakest",
-        text: "Around 3:00: 10% behind the average.",
+        text: "Around 3:00: 10% fewer souls than the average.",
         tone: "bad",
       },
       {
         label: "Turning point",
-        text: "Pulled ahead of the average at 9:00 and stayed there.",
+        text: "Back within the normal range from 20:00.",
       },
       { label: "Deaths", text: "4 deaths: 6:40, 21:40, 23:20, 25:00." },
       {
@@ -116,33 +130,70 @@ describe("stretches", () => {
     ]);
   });
 
-  it("describes each kind of turning point", () => {
-    const withShares = (shares: number[]) => ({
-      ...lead,
-      values: {
-        ...lead.values,
-        souls: lead.times.map((t, i) => ((1000 * t) / 60) * shares[i]),
-      },
+  it("describes where the player ended up against the normal range", () => {
+    expect(turn([1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2])).toBe(
+      "Ahead of the normal range all game.",
+    );
+    expect(turn([0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8])).toBe(
+      "Behind the normal range all game.",
+    );
+    expect(turn([1, 1.05, 0.95, 1, 1, 1, 1, 1])).toBe(
+      "Within the normal range all game.",
+    );
+    expect(turn([0.8, 0.8, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2])).toBe(
+      "Pulled ahead of the normal range at 9:00 and stayed there.",
+    );
+    expect(turn([1.2, 1.2, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8])).toBe(
+      "Fell behind the normal range at 9:00 and stayed there.",
+    );
+    expect(turn([1.2, 0.8, 1.2, 0.8, 1.2, 0.8, 1, 1])).toBe(
+      "Back within the normal range from 25:00.",
+    );
+  });
+
+  it("goes by how the match ended, not the first crossing, and ignores wobbles inside the range", () => {
+    expect(turn([0.8, 1.2, 0.8, 1.2, 0.8, 1.2, 1.2, 1.2])).toBe(
+      "Pulled ahead of the normal range at 20:00 and stayed there.",
+    );
+    expect(turn([1.2, 0.8, 1.2, 0.8, 1.2, 0.8, 0.8, 0.8])).toBe(
+      "Fell behind the normal range at 20:00 and stayed there.",
+    );
+    expect(turn([1.2, 1.2, 1.2, 0.98, 1.2, 1.2, 1.2, 1.2])).toBe(
+      "Pulled ahead of the normal range at 15:00 and stayed there.",
+    );
+  });
+
+  it("says until when when the average stops before the match ends", () => {
+    const short = { ...curve, points: curve.points.filter((p) => p.t <= 900) };
+    expect(turn([1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2], short)).toBe(
+      "Ahead of the normal range until 15:00.",
+    );
+    expect(turn([0.8, 0.8, 1.2, 1.2, 1.2, 0.5, 0.5, 0.5], short)).toBe(
+      "Pulled ahead of the normal range at 9:00 and stayed there until 15:00.",
+    );
+  });
+
+  it("reads level within half a percent, and names the all-ranks average", () => {
+    const [strongest, weakest] = stretches(
+      withShares([1.002, 1.001, 1, 1, 1, 1, 1, 1]),
+      { ...curve, band: rankBand(0) },
+    );
+    expect(strongest).toEqual({
+      label: "Strongest",
+      text: "Around 3:00: level with the all-ranks average.",
     });
-    const turn = (shares: number[]) =>
-      stretches(withShares(shares), curve).find(
-        (s) => s.label === "Turning point",
-      )?.text;
-    expect(turn([1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1])).toBe(
-      "Ahead of the average all game.",
-    );
-    expect(turn([0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9])).toBe(
-      "Never caught the average.",
-    );
-    expect(turn([0.9, 1.1, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9])).toBe(
-      "Pulled ahead of the average at 6:00 and fell back later.",
-    );
-    expect(turn([1.1, 1.1, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9])).toBe(
-      "Fell behind the average at 9:00 and stayed behind.",
-    );
-    expect(turn([1.1, 0.9, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1])).toBe(
-      "Fell behind the average at 6:00, then caught up again.",
-    );
+    expect(weakest).toEqual({
+      label: "Weakest",
+      text: "Around 9:00: level with the average.",
+    });
+  });
+
+  it("needs two snapshots with an average to compare; otherwise only deaths", () => {
+    const first = { ...curve, points: curve.points.slice(0, 1) };
+    expect(stretches(lead, first).map((s) => s.label)).toEqual([
+      "Deaths",
+      "Rough patch",
+    ]);
   });
 
   it("without an average lists only deaths; one death reads singular", () => {
@@ -172,10 +223,14 @@ describe("perspective", () => {
     expect(displayName(lead, names, ACCOUNT)).toBe("You");
     expect(displayName(lead, names, null)).toBe("Fargo");
     expect(displayName(report.players[5], names, null)).toBe(heroes[5].name);
-    expect([possessive("You"), possessive("somdr")]).toEqual([
-      "Your",
-      "somdr's",
-    ]);
+    expect(displayName(lead, new Map([[ACCOUNT, ""]]), null)).toBe(
+      heroes[0].name,
+    );
+    expect([
+      possessive("You", true),
+      possessive("You", false),
+      possessive("somdr", false),
+    ]).toEqual(["Your", "You's", "somdr's"]);
   });
 
   it("labels options by team, hero and name, and notes whose match it is", () => {

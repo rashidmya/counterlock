@@ -32,12 +32,12 @@ export function displayName(
   meId: number | null,
 ) {
   if (isMe(player, meId)) return "You";
-  return names.get(player.accountId) ?? heroName(player.heroId);
+  return names.get(player.accountId) || heroName(player.heroId);
 }
 
-/** "Your" / "somdr's". */
-export const possessive = (name: string) =>
-  name === "You" ? "Your" : `${name}'s`;
+/** "Your" for the remembered account, otherwise "somdr's". */
+export const possessive = (name: string, me: boolean) =>
+  me ? "Your" : `${name}'s`;
 
 /** "Amber · Haze · moealali777 (you)". */
 export function optionLabel(

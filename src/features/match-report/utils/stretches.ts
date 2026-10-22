@@ -13,22 +13,39 @@ export interface Stretch {
   tone?: "good" | "bad";
 }
 
-const relative = (r: number) => (r >= 0 ? "ahead of" : "behind");
+// Souls against the rank average at one snapshot: r = souls ÷ average − 1.
+// `side` is 1 above the normal range (average ± 1 standard deviation), −1
+// below it and 0 inside it, so small wobbles around the average don't count.
+interface Point {
+  t: number;
+  r: number;
+  side: -1 | 0 | 1;
+}
 
-function turningPoint(points: { t: number; r: number }[]) {
-  const ahead = points.map((p) => p.r >= 0);
-  if (ahead.every(Boolean)) return "Ahead of the average all game.";
-  if (!ahead.some(Boolean)) return "Never caught the average.";
-  const flip = ahead.findIndex((value) => value !== ahead[0]);
-  const at = clock(points[flip].t);
-  const holds = ahead.slice(flip).every((value) => value === ahead[flip]);
-  return ahead[0]
-    ? holds
-      ? `Fell behind the average at ${at} and stayed behind.`
-      : `Fell behind the average at ${at}, then caught up again.`
-    : holds
-      ? `Pulled ahead of the average at ${at} and stayed there.`
-      : `Pulled ahead of the average at ${at} and fell back later.`;
+const level = (r: number) => Math.round(Math.abs(r) * 100) === 0;
+const toneOf = (r: number): Stretch["tone"] =>
+  level(r) ? undefined : r > 0 ? "good" : "bad";
+const versus = (r: number, average: string) =>
+  level(r)
+    ? `level with ${average}`
+    : `${percent(r)} ${r > 0 ? "more" : "fewer"} souls than ${average}`;
+
+/** Where the player ended up against the normal range, and since when. */
+function turningPoint(points: Point[], until: string) {
+  const last = points.at(-1)!.side;
+  let start = points.length - 1;
+  while (start > 0 && points[start - 1].side === last) start--;
+  if (start === 0) {
+    const where = last === 1 ? "Ahead of" : last === -1 ? "Behind" : "Within";
+    return `${where} the normal range ${until || "all game"}.`;
+  }
+  const at = clock(points[start].t);
+  const tail = until ? ` ${until}` : "";
+  if (last === 1)
+    return `Pulled ahead of the normal range at ${at} and stayed there${tail}.`;
+  if (last === -1)
+    return `Fell behind the normal range at ${at} and stayed there${tail}.`;
+  return `Back within the normal range from ${at}${tail}.`;
 }
 
 function roughPatch(deaths: number[]): Stretch | null {
@@ -50,37 +67,47 @@ function roughPatch(deaths: number[]): Stretch | null {
 
 /**
  * Rule-based sentences from the souls curve against the rank average at
- * each snapshot, plus the death times. Without an average, only deaths.
+ * each snapshot, plus the death times. With fewer than two snapshots to
+ * compare, only deaths. When the average stops before the match does, the
+ * sentences say until when.
  */
 export function stretches(
   player: ReportPlayer,
   curve: RankCurve | null,
 ): Stretch[] {
   const souls = metricById.get("souls")!;
-  const points = curve
+  const points: Point[] = curve
     ? player.times.flatMap((t, index) => {
-        const avg = averageAt(curve, souls, t)?.avg;
-        return avg && avg > 0
-          ? [{ t, r: player.values.souls[index] / avg - 1 }]
-          : [];
+        const at = averageAt(curve, souls, t);
+        if (!at || at.avg <= 0) return [];
+        const value = player.values.souls[index];
+        const side =
+          value > at.avg + at.std ? 1 : value < at.avg - at.std ? -1 : 0;
+        return [{ t, r: value / at.avg - 1, side }];
       })
     : [];
   const result: Stretch[] = [];
-  if (points.length) {
+  if (curve && points.length >= 2) {
+    const end = points.at(-1)!.t;
+    const until = end < player.times.at(-1)! ? `until ${clock(end)}` : "";
+    const average =
+      curve.band.min > 0
+        ? `the ${curve.band.label} average`
+        : "the all-ranks average";
     const best = points.reduce((a, b) => (b.r > a.r ? b : a));
     const worst = points.reduce((a, b) => (b.r < a.r ? b : a));
     result.push(
       {
         label: "Strongest",
-        text: `Around ${clock(best.t)}: ${percent(best.r)} ${relative(best.r)} the ${curve!.band.label} average.`,
-        tone: "good",
+        text: `Around ${clock(best.t)}: ${versus(best.r, average)}.`,
+        tone: toneOf(best.r),
       },
       {
         label: "Weakest",
-        text: `Around ${clock(worst.t)}: ${percent(worst.r)} ${relative(worst.r)} the average.`,
-        tone: "bad",
+        text: `Around ${clock(worst.t)}: ${versus(worst.r, "the average")}.`,
+        tone: toneOf(worst.r),
       },
-      { label: "Turning point", text: turningPoint(points) },
+      { label: "Turning point", text: turningPoint(points, until) },
     );
   }
   const deaths = player.deathTimes;

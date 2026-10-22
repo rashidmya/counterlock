@@ -7,13 +7,14 @@ export function clock(seconds: number) {
 /** 59.9K, 906, 12.5 (fractions only below 100). */
 export function compact(value: number) {
   const size = Math.abs(value);
+  if (size < 0.05) return "0";
   const sign = value < 0 ? "−" : "";
-  if (size >= 1000) return `${sign}${(size / 1000).toFixed(1)}K`;
-  if (size >= 100 || Number.isInteger(size))
+  if (size >= 999.5) return `${sign}${(size / 1000).toFixed(1)}K`;
+  if (size >= 99.95 || Number.isInteger(size))
     return `${sign}${Math.round(size)}`;
   return `${sign}${size.toFixed(1)}`;
 }
 
-/** "12%", rounding to a whole percent of a 0–1 share or change. */
+/** "12%": a 0–1 share or change as a whole percent, without its sign. */
 export const percent = (share: number) =>
   `${Math.round(Math.abs(share) * 100)}%`;
