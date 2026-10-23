@@ -1,9 +1,47 @@
-import { expect, test } from "@playwright/test";
-import { heroes } from "../fixtures/match-report";
-import { FARGO, mockApi } from "./fixtures";
+import { expect, test, type Page } from "@playwright/test";
+import { heroes, matchMetadata } from "../fixtures/match-report";
+import { FARGO, cors, historyRow, mockApi } from "./fixtures";
 
-const viewingAs = (page: import("@playwright/test").Page) =>
+const viewingAs = (page: Page) =>
   page.getByRole("combobox", { name: "Viewing as" });
+
+// Thirty matches, a page and a half of the Matches tab, each with its
+// report.
+async function mockLongHistory(page: Page) {
+  const now = Math.floor(Date.now() / 1000);
+  await page.route(
+    `https://api.deadlock-api.com/v1/players/${FARGO}/match-history`,
+    (route) =>
+      route.fulfill({
+        json: Array.from({ length: 30 }, (_, index) => ({
+          ...historyRow(2001 + index, index % 2 === 0),
+          start_time: now - 3600 * (index + 1),
+        })),
+        headers: cors,
+      }),
+  );
+  await page.route(/\/v1\/matches\/\d+\/metadata$/, (route) => {
+    const matchId = Number(/matches\/(\d+)/.exec(route.request().url())![1]);
+    return route.fulfill({
+      json: matchMetadata(FARGO, matchId),
+      headers: cors,
+    });
+  });
+}
+
+// From a report, the scoreboard's link to its player: a fresh visit.
+const openProfileAfresh = async (page: Page) => {
+  await page
+    .locator(".report-table")
+    .first()
+    .getByRole("link", { name: "A Rather Long Persona Name Fixture" })
+    .click();
+  await expect(page).toHaveURL(`/players/${FARGO}`);
+  await expect(page.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+};
 
 test("a match URL opens as the linked player", async ({ page }) => {
   await mockApi(page);
@@ -210,4 +248,87 @@ test("the profile keeps its tab, range and hero after a match report", async ({
     page.getByRole("button", { name: "Last 50", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(hero).toHaveValue(picked);
+});
+
+test("coming back keeps the matches shown, and the scroll past the first page", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1260, height: 600 });
+  await mockApi(page);
+  await mockLongHistory(page);
+  await page.goto(`/players/${FARGO}`);
+  await page.getByRole("tab", { name: "Matches" }).click();
+  const rows = page.locator(".match-row");
+  await expect(rows).toHaveCount(20);
+  await page.getByRole("button", { name: "Show more" }).click();
+  await expect(rows).toHaveCount(30);
+  // Past the first page: its rows alone leave the page too short for it.
+  await rows.nth(27).scrollIntoViewIfNeeded();
+  await expect(rows.nth(19)).not.toBeInViewport();
+  const scrolled = () => page.evaluate(() => Math.round(window.scrollY));
+  const before = await scrolled();
+  const open = async () => {
+    await rows.nth(27).locator("a.match-open").click();
+    await expect(page).toHaveURL(`/matches/2028?player=${FARGO}`);
+  };
+  // Browser Back.
+  await open();
+  await page.goBack();
+  await expect(rows).toHaveCount(30);
+  await expect.poll(scrolled).toBe(before);
+  // The report's "Back to profile".
+  await open();
+  await page.getByRole("link", { name: "← Back to profile" }).click();
+  await expect(rows).toHaveCount(30);
+  await expect.poll(scrolled).toBe(before);
+  // Opened afresh, it shows the first page.
+  await open();
+  await openProfileAfresh(page);
+  await page.getByRole("tab", { name: "Matches" }).click();
+  await expect(rows).toHaveCount(20);
+  // So does another filter.
+  await page.getByRole("button", { name: "Show more" }).click();
+  await expect(rows).toHaveCount(30);
+  await page.getByRole("button", { name: "Street Brawl", exact: true }).click();
+  await page.getByRole("button", { name: "All", exact: true }).click();
+  await expect(rows).toHaveCount(20);
+});
+
+test("coming back keeps the Heroes tab's sort; opened afresh, it sorts by games", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto(`/players/${FARGO}`);
+  await page.getByRole("tab", { name: "Heroes" }).click();
+  const wr = page.getByRole("button", { name: "WR", exact: true });
+  await wr.click();
+  await wr.click();
+  const sorted = (name: RegExp, order: string) =>
+    expect(page.getByRole("columnheader", { name })).toHaveAttribute(
+      "aria-sort",
+      order,
+    );
+  await sorted(/WR/, "ascending");
+  // Browser Back from a hero's page.
+  await page.locator(".hero-row .hero-link").first().click();
+  await expect(page).toHaveURL(/\/heroes\/[a-z-]+$/);
+  await page.goBack();
+  await expect(page.getByRole("tab", { name: "Heroes" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await sorted(/WR/, "ascending");
+  // The report's "Back to profile".
+  await page.getByRole("tab", { name: "Matches" }).click();
+  await page.locator("a.match-open").first().click();
+  await expect(page).toHaveURL(`/matches/1001?player=${FARGO}`);
+  await page.getByRole("link", { name: "← Back to profile" }).click();
+  await page.getByRole("tab", { name: "Heroes" }).click();
+  await sorted(/WR/, "ascending");
+  // Opened afresh, by games.
+  await page.getByRole("tab", { name: "Matches" }).click();
+  await page.locator("a.match-open").first().click();
+  await openProfileAfresh(page);
+  await page.getByRole("tab", { name: "Heroes" }).click();
+  await sorted(/Games/, "descending");
 });

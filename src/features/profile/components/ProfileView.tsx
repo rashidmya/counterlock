@@ -5,8 +5,8 @@ import type { AsyncState } from "@/shared/api/useAsync";
 import { useScrollBack } from "@/shared/ui/useScrollBack";
 import type { HistoryFilter, HistoryMatch } from "../types";
 import type { PerformanceRange } from "../utils/performance-metrics";
-import { HeroesTab } from "./HeroesTab";
-import { MatchHistory } from "./MatchHistory";
+import { FIRST_SORT, HeroesTab, type HeroSort } from "./HeroesTab";
+import { MatchHistory, PAGE_SIZE } from "./MatchHistory";
 import { OverviewTab } from "./OverviewTab";
 import { PerformanceTab } from "./PerformanceTab";
 
@@ -21,6 +21,10 @@ const subtabs: { id: Subtab; label: string }[] = [
 interface ViewState {
   subtab: Subtab;
   filter: HistoryFilter;
+  // The Matches tab's rows, a page more for each "Show more".
+  shown: number;
+  // The Heroes tab's.
+  sort: HeroSort;
   range: PerformanceRange;
   // Null for all heroes.
   heroId: number | null;
@@ -28,12 +32,14 @@ interface ViewState {
 const FIRST_VIEW: ViewState = {
   subtab: "overview",
   filter: "all",
+  shown: PAGE_SIZE,
+  sort: FIRST_SORT,
   range: 20,
   heroId: null,
 };
-// Each profile's tab and filters as last left, for the session: coming back
-// from a match report (a page of its own on the website) finds them as they
-// were. Switching tabs keeps them anyway.
+// Each profile's tab, filters, rows shown and sort as last left, for the
+// session: coming back from a match report (a page of its own on the
+// website) finds them as they were. Switching tabs keeps them anyway.
 const views = new Map<number, ViewState>();
 
 export function ProfileView({
@@ -63,7 +69,7 @@ export function ProfileView({
   // And its scroll position: on the website the profile loads again, so
   // the router's own restore finds it still too short.
   useScrollBack(`profile:${accountId}`, restore);
-  const { subtab, filter, range, heroId } = view;
+  const { subtab, filter, shown, sort, range, heroId } = view;
   const update = (change: Partial<ViewState>) => {
     const next = { ...latest.current, ...change };
     latest.current = next;
@@ -71,7 +77,11 @@ export function ProfileView({
     setView(next);
   };
   const setSubtab = (next: Subtab) => update({ subtab: next });
-  const setFilter = (next: HistoryFilter) => update({ filter: next });
+  const setFilter = (next: HistoryFilter) => {
+    // Another filter shows its first page.
+    if (next !== latest.current.filter)
+      update({ filter: next, shown: PAGE_SIZE });
+  };
   return (
     <LinkScope navigate={navigate}>
       <section className="profile">
@@ -110,8 +120,9 @@ export function ProfileView({
               (history.data.length ? (
                 <MatchHistory
                   matches={history.data}
-                  {...{ filter, accountId }}
+                  {...{ filter, shown, accountId }}
                   onFilter={setFilter}
+                  onShowMore={(next) => update({ shown: next })}
                 />
               ) : (
                 <p className="muted">No recorded matches</p>
@@ -119,7 +130,11 @@ export function ProfileView({
           </div>
         )}
         {subtab === "heroes" && (
-          <HeroesTab {...{ accountId, history, filter }} onFilter={setFilter} />
+          <HeroesTab
+            {...{ accountId, history, filter, sort }}
+            onFilter={setFilter}
+            onSort={(next) => update({ sort: next })}
+          />
         )}
         {subtab === "performance" && (
           <PerformanceTab

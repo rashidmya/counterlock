@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { RouteLink } from "@/app/links";
 import { heroById } from "@/shared/catalog";
 import { gameIcons } from "@/shared/ui/gameIcons";
@@ -9,13 +8,15 @@ import { compactSouls, duration, timeAgo } from "../utils/format";
 import { isWin, matchesFilter, modeLabel } from "../utils/match-history";
 import { HistoryFilterButtons } from "./HistoryFilterButtons";
 
-const PAGE_SIZE = 20;
+export const PAGE_SIZE = 20;
 const PREVIEW_SIZE = 3;
 
 export function MatchHistory({
   matches,
   filter = "all",
   onFilter = () => undefined,
+  shown = PAGE_SIZE,
+  onShowMore = () => undefined,
   accountId,
   preview = false,
   onShowAll,
@@ -23,12 +24,13 @@ export function MatchHistory({
   matches: HistoryMatch[];
   filter?: HistoryFilter;
   onFilter?(filter: HistoryFilter): void;
+  // How many the full list shows: "Show more" adds a page.
+  shown?: number;
+  onShowMore?(shown: number): void;
   accountId: number;
   preview?: boolean;
   onShowAll?(): void;
 }) {
-  const [visible, setVisible] = useState(PAGE_SIZE);
-  useEffect(() => setVisible(PAGE_SIZE), [filter]);
   const filtered = preview
     ? [...matches]
         .sort((a, b) => b.startTime - a.startTime)
@@ -55,7 +57,7 @@ export function MatchHistory({
       )}
       {!filtered.length && <p className="muted">No recorded matches</p>}
       <ul>
-        {filtered.slice(0, visible).map((match) => {
+        {filtered.slice(0, shown).map((match) => {
           const hero = heroById.get(match.heroId);
           const name = hero?.name ?? `Hero ${match.heroId}`;
           const won = isWin(match);
@@ -103,10 +105,10 @@ export function MatchHistory({
           );
         })}
       </ul>
-      {!preview && filtered.length > visible && (
+      {!preview && filtered.length > shown && (
         <button
           className="show-more"
-          onClick={() => setVisible(visible + PAGE_SIZE)}
+          onClick={() => onShowMore(shown + PAGE_SIZE)}
         >
           Show more
         </button>

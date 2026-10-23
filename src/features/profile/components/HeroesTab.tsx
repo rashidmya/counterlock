@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { RouteLink } from "@/app/links";
 import type { AsyncState } from "@/shared/api/useAsync";
 import { useAsync } from "@/shared/api/useAsync";
@@ -23,6 +22,18 @@ const percent = (rate: number) => `${(rate * 100).toFixed(1)}%`;
 const whole = (value: number) => Math.round(value).toLocaleString("en-US");
 const orNone = <T,>(value: T | null, format: (value: T) => string) =>
   value === null ? NONE : format(value);
+
+export interface HeroSort {
+  // The column, by its label: KDA and K/D/A both sort by `kda`.
+  label: string;
+  key: keyof Line;
+  dir: SortDir;
+}
+export const FIRST_SORT: HeroSort = {
+  label: "Games",
+  key: "games",
+  dir: "desc",
+};
 
 interface Column {
   key: keyof Line;
@@ -50,17 +61,16 @@ export function HeroesTab({
   history,
   filter,
   onFilter,
+  sort,
+  onSort,
 }: {
   accountId: number;
   history: AsyncState<HistoryMatch[]>;
   filter: HistoryFilter;
   onFilter(filter: HistoryFilter): void;
+  sort: HeroSort;
+  onSort(sort: HeroSort): void;
 }) {
-  const [sort, setSort] = useState<{
-    label: string;
-    key: keyof Line;
-    dir: SortDir;
-  }>({ label: "Games", key: "games", dir: "desc" });
   const stats = useAsync(
     () => fetchPlayerHeroStats(accountId, filter),
     [accountId, filter],
@@ -79,9 +89,9 @@ export function HeroesTab({
   });
   const sorted = sortRows(lines, sort.key, sort.dir);
   const toggle = ({ label, key, firstDir = "desc" }: Column) =>
-    setSort((current) =>
-      current.label === label
-        ? { label, key, dir: current.dir === "desc" ? "asc" : "desc" }
+    onSort(
+      sort.label === label
+        ? { label, key, dir: sort.dir === "desc" ? "asc" : "desc" }
         : { label, key, dir: firstDir },
     );
   return (
