@@ -203,9 +203,21 @@ describe("metrics", () => {
     const short = match({ durationS: 0 });
     expect(metric("soulsPerMin").value(short, totals)).toBeNull();
     expect(metric("soulsPerMin").average!(short, values)).toBeNull();
-    const alone = { ...totals!, teamKills: 0, teamHealing: 0 };
+    const alone = {
+      ...totals!,
+      teamKills: 0,
+      teamObjectiveDamage: 0,
+      teamHealing: 0,
+    };
     expect(metric("killParticipation").value(game, alone)).toBeNull();
+    expect(metric("objectiveShare").value(game, alone)).toBeNull();
     expect(metric("healingShare").value(game, alone)).toBeNull();
+    // Healing nothing while the team heals is a share of 0, still a game.
+    const noHeals = { ...totals!, own: { ...totals!.own, healing: 0 } };
+    expect(metric("healingShare").value(game, noHeals)).toEqual({
+      num: 0,
+      den: 19000,
+    });
   });
 });
 

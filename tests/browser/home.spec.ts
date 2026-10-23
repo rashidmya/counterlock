@@ -727,6 +727,11 @@ test("performance tab compares each metric with the rank average", async ({
       "Games without a recorded rank use the player's current rank.",
     ),
   ).toBeVisible();
+  await expect(
+    view(page).getByText(
+      "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the hero damage, objective damage and healing shares have no rank average, as it has no team totals.",
+    ),
+  ).toBeVisible();
   expect(bulk.map((ids) => ids.split(",").length)).toEqual([20]);
 
   // Last 50 asks only for the 30 games it adds.

@@ -129,7 +129,7 @@ function notes(
   const lines = [
     "Normal and ranked games, oldest on the left. The rank average is the average player on the same hero at the same rank and match length, over the last 30 days.",
     "Improving or slipping compares the recent half of these games with the earlier half, each against its rank average where there is one. Changes smaller than game-to-game noise show as flat.",
-    "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the three shares of the team's totals have no rank average.",
+    "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the hero damage, objective damage and healing shares have no rank average, as it has no team totals.",
   ];
   const sources = new Set([...(averages?.values() ?? [])].map((a) => a.source));
   if (sources.has("current"))
