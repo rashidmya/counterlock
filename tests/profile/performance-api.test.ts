@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { curvePath, rankBand } from "@/features/match-report/utils/rank-curve";
 import {
+  CURVE_CONCURRENCY,
   fetchGameAverages,
   fetchMatchTotals,
 } from "@/features/profile/services/performance-api";
@@ -187,9 +188,9 @@ describe("fetchGameAverages", () => {
       `https://api.deadlock-api.com${curvePath(6, rankBand(73))}`,
       `https://api.deadlock-api.com${curvePath(7, rankBand(73))}`,
     ]);
-    expect(averages.get(1)!.values.souls).toBe(30000);
-    expect(averages.get(2)!.values.souls).toBe(25000);
-    expect(averages.get(3)!.source).toBe("game");
+    expect(averages.byMatch.get(1)!.values.souls).toBe(30000);
+    expect(averages.byMatch.get(2)!.values.souls).toBe(25000);
+    expect(averages.byMatch.get(3)!.source).toBe("game");
   });
 
   it("uses the current rank for games that recorded none", async () => {
@@ -200,8 +201,8 @@ describe("fetchGameAverages", () => {
       api,
     );
     expect(calls).toContain(curvePath(6, rankBand(116)));
-    expect(averages.get(1)!.source).toBe("current");
-    expect(averages.get(1)!.band.label).toBe("Eternus");
+    expect(averages.byMatch.get(1)!.source).toBe("current");
+    expect(averages.byMatch.get(1)!.band.label).toBe("Eternus");
   });
 
   it("falls back to all ranks without a current rank", async () => {
@@ -212,7 +213,7 @@ describe("fetchGameAverages", () => {
       api,
     );
     expect(calls).toContain(curvePath(6, rankBand(0)));
-    expect(averages.get(1)!.source).toBe("none");
+    expect(averages.byMatch.get(1)!.source).toBe("none");
   });
 
   it("falls back to all ranks when the current rank fails to load", async () => {
@@ -223,14 +224,60 @@ describe("fetchGameAverages", () => {
       api,
     );
     expect(calls).toContain(curvePath(6, rankBand(0)));
-    expect(averages.get(1)!.source).toBe("none");
+    expect(averages.byMatch.get(1)!.source).toBe("none");
   });
 
-  it("fails as a whole when a curve fails, so the tab can offer Retry", async () => {
+  it("fails as a whole when every curve fails, so the tab can offer Retry", async () => {
     const { api } = curveApi(116, true);
     await expect(
       fetchGameAverages(77, [game({ matchId: 1 })], api),
     ).rejects.toThrow("Deadlock API unavailable (500).");
+  });
+
+  it("keeps the games whose curve loaded when another fails", async () => {
+    const api = {
+      get: async (path: string) => {
+        if (path === curvePath(7, rankBand(73)))
+          throw new Error("Deadlock API timed out.");
+        return rankCurveRows();
+      },
+    } as unknown as DeadlockApi;
+    const averages = await fetchGameAverages(
+      77,
+      [
+        game({ matchId: 1 }),
+        game({ matchId: 2, heroId: 7 }),
+        game({ matchId: 3, heroId: 7 }),
+      ],
+      api,
+    );
+    expect([...averages.byMatch.keys()]).toEqual([1]);
+    expect(averages.failed).toBe(2);
+    expect(averages.error).toBe("Deadlock API timed out.");
+  });
+
+  it(`loads at most ${CURVE_CONCURRENCY} hero-and-rank groups at once`, async () => {
+    let running = 0;
+    let most = 0;
+    const api = {
+      get: async () => {
+        running++;
+        most = Math.max(most, running);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        running--;
+        return rankCurveRows();
+      },
+    } as unknown as DeadlockApi;
+    const averages = await fetchGameAverages(
+      77,
+      Array.from({ length: 12 }, (_, i) =>
+        game({ matchId: i + 1, heroId: i + 1 }),
+      ),
+      api,
+    );
+    expect(averages.byMatch.size).toBe(12);
+    expect(averages.failed).toBe(0);
+    expect(most).toBe(CURVE_CONCURRENCY);
   });
 
   it("doesn't ask for the current rank when every game has one", async () => {

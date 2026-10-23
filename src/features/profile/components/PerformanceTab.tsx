@@ -6,6 +6,7 @@ import { SectionHeader } from "@/shared/ui/SectionHeader";
 import {
   fetchGameAverages,
   fetchMatchTotals,
+  type GameAverages,
 } from "../services/performance-api";
 import type { HistoryMatch } from "../types";
 import { timeAgo } from "../utils/format";
@@ -17,7 +18,6 @@ import {
   gamesInRange,
   heroChoices,
   summarizeMetric,
-  type GameAverage,
   type GamePoint,
   type MetricSummary,
   type PerformanceMetric,
@@ -124,21 +124,22 @@ function notes(
   accountId: number,
   games: HistoryMatch[],
   totals: Map<number, PlayerTotals[]> | undefined,
-  averages: Map<number, GameAverage> | undefined,
+  averages: GameAverages | undefined,
 ) {
   const lines = [
     "Normal and ranked games, oldest on the left. The rank average is the average player on the same hero at the same rank and match length, over the last 30 days.",
     "Improving or slipping compares the recent half of these games with the earlier half, each against its rank average where there is one. Changes smaller than game-to-game noise show as flat.",
     "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the hero damage, objective damage and healing shares have no rank average, as it has no team totals.",
   ];
-  const sources = new Set([...(averages?.values() ?? [])].map((a) => a.source));
+  const loaded = [...(averages?.byMatch.values() ?? [])];
+  const sources = new Set(loaded.map((a) => a.source));
   if (sources.has("current"))
     lines.push("Games without a recorded rank use the player's current rank.");
   if (sources.has("none"))
     lines.push(
       "Games without a recorded rank, and no current rank to use, are compared with all ranks.",
     );
-  if ([...(averages?.values() ?? [])].some((a) => a.widenedFrom))
+  if (loaded.some((a) => a.widenedFrom))
     lines.push(
       "Where a hero has too few games at one rank, its average covers the ranks either side.",
     );
@@ -181,7 +182,7 @@ export function PerformanceTab({
       metric,
       games,
       (id) => gameTotals(totals.data?.get(id), accountId),
-      (id) => averages.data?.get(id),
+      (id) => averages.data?.byMatch.get(id),
     ),
   );
   return (
@@ -246,6 +247,15 @@ export function PerformanceTab({
           {averages.error && (
             <p className="notice warning" role="status">
               Rank averages unavailable: {averages.error}
+              <button type="button" onClick={averages.retry}>
+                Retry
+              </button>
+            </p>
+          )}
+          {!!averages.data?.failed && (
+            <p className="notice warning" role="status">
+              Rank averages unavailable for {averages.data.failed} of{" "}
+              {count(games.length)}: {averages.data.error}
               <button type="button" onClick={averages.retry}>
                 Retry
               </button>

@@ -71,6 +71,8 @@ interface Fixtures {
   heroStats?: unknown[];
   failTotals?: boolean;
   failCurve?: boolean;
+  // Heroes whose curves fail while they're in the set.
+  failCurveFor?: Set<number>;
   unstoredTotals?: number[];
   unlistedPlayer?: number[];
 }
@@ -146,7 +148,10 @@ async function routeApi(page: Page, fixtures: Fixtures = {}) {
               ),
           );
     if (url.pathname === "/v1/analytics/player-performance-curve")
-      return fixtures.failCurve ? json({}, 500) : json(rankCurveRows());
+      return fixtures.failCurve ||
+        fixtures.failCurveFor?.has(Number(url.searchParams.get("hero_ids")))
+        ? json({}, 500)
+        : json(rankCurveRows());
     if (url.pathname.endsWith("/metadata")) return json(matchMetadata(ACCOUNT));
     return json([]);
   });
@@ -874,6 +879,30 @@ test("performance tab keeps history values when details and averages fail", asyn
   ).toHaveText("— No match details");
   await expect(card(page, "Hero damage / min").locator("svg")).toHaveCount(0);
   await expect(view(page).locator(".perf-trend")).toHaveCount(0);
+});
+
+test("performance tab keeps the rank averages that loaded, and Retry asks again for the rest", async ({
+  page,
+}) => {
+  const failCurveFor = new Set([heroes[1]]);
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory, failCurveFor });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const notice = view(page).getByText(
+    "Rank averages unavailable for 10 of 20 games: Deadlock API unavailable (500).",
+  );
+  await expect(notice).toBeVisible();
+  const souls = card(page, "Souls / min");
+  await expect(souls.locator(".perf-card-numbers")).toContainText(
+    "20 games · 10 with a rank average",
+  );
+  failCurveFor.clear();
+  await notice.getByRole("button", { name: "Retry" }).click();
+  await expect(souls.locator(".perf-card-numbers")).toHaveText(
+    "1,100 20 games · rank avg 1,000",
+  );
+  await expect(notice).toHaveCount(0);
 });
 
 test("performance tab degrades without match history", async ({ page }) => {
