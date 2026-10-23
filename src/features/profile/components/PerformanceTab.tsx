@@ -200,7 +200,8 @@ export function PerformanceTab({
     [accountId, key],
   );
   // While a new range or hero loads, the cards keep the last games that
-  // finished loading, dimmed, rather than blanking.
+  // finished loading, dimmed, rather than blanking. (Per account:
+  // ProfilePage keys the view by account.)
   const [last, setLast] = useState<Loaded | null>(null);
   const settled = !totals.loading && !averages.loading;
   if (
@@ -228,17 +229,24 @@ export function PerformanceTab({
     <div className="performance">
       <SectionHeader title="Performance" />
       <div className="section-head">
-        <div className="filter-buttons" role="group" aria-label="Range">
-          {RANGES.map((value) => (
-            <button
-              key={value}
-              className={range === value ? "active" : ""}
-              aria-pressed={range === value}
-              onClick={() => onRange(value)}
-            >
-              Last {value}
-            </button>
-          ))}
+        <div className="perf-range">
+          <div className="filter-buttons" role="group" aria-label="Range">
+            {RANGES.map((value) => (
+              <button
+                key={value}
+                className={range === value ? "active" : ""}
+                aria-pressed={range === value}
+                onClick={() => onRange(value)}
+              >
+                Last {value}
+              </button>
+            ))}
+          </div>
+          {/* Always there, so screen readers announce it; it takes no space
+              of its own, so the controls never move. */}
+          <p className="perf-status" role="status">
+            <span>{stale ? "Updating the cards…" : ""}</span>
+          </p>
         </div>
         {heroes.length > 1 && (
           <label className="select-field">
@@ -258,11 +266,6 @@ export function PerformanceTab({
             </select>
           </label>
         )}
-        {stale && (
-          <span className="muted" role="status">
-            Updating to the last {count(games.length)}…
-          </span>
-        )}
       </div>
       {history.loading && <p className="muted">Loading match history…</p>}
       {history.error && (
@@ -278,7 +281,9 @@ export function PerformanceTab({
       )}
       {!!games.length && (
         <>
-          {totals.error && (
+          {/* Live failures: hidden while older cards are shown, which they
+              would contradict. */}
+          {!stale && totals.error && (
             <p className="notice warning" role="status">
               Match details unavailable: {totals.error}
               <button type="button" onClick={totals.retry}>
@@ -286,7 +291,7 @@ export function PerformanceTab({
               </button>
             </p>
           )}
-          {averages.error && (
+          {!stale && averages.error && (
             <p className="notice warning" role="status">
               Rank averages unavailable: {averages.error}
               <button type="button" onClick={averages.retry}>

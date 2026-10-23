@@ -467,6 +467,33 @@
   gap: 10px 16px;
   margin-bottom: 0;
 }
+/* The range buttons, and the loading status in the space beside them: the
+   status's text is laid over that space, so it never moves the controls. */
+.perf-range {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+}
+.perf-status {
+  position: relative;
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  margin: 0;
+}
+.perf-status span {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
 .performance .data-note,
 .performance > .notice {
   margin: 0;
@@ -507,8 +534,9 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
+/* Dimmed, but every text still at 4.5:1 or more. */
 .perf-cards[aria-busy="true"] {
-  opacity: 0.55;
+  opacity: 0.85;
 }
 @container (max-width: 900px) {
   .perf-card {

@@ -938,19 +938,25 @@ test("performance tab keeps the last cards, dimmed, while new games load", async
   });
   await openMyProfile(page);
   await page.getByRole("tab", { name: "Performance" }).click();
-  const souls = card(page, "Souls / min").locator(".perf-card-numbers");
+  // A card that needs match details, so the held request matters.
+  const damage = card(page, "Hero damage / min").locator(".perf-card-numbers");
   const cards = view(page).locator(".perf-cards");
-  await expect(souls).toHaveText("1,100 20 games · rank avg 1,000");
+  const status = view(page).locator(".perf-status");
+  const hero = view(page).getByRole("combobox", { name: "Hero" });
+  const select = (await hero.boundingBox())!;
+  await expect(damage).toHaveText("1,000 20 games · rank avg 500");
+  await expect(status).toHaveText("");
   hold = new Promise((resolve) => (release = resolve));
   await page.getByRole("button", { name: "Last 50", exact: true }).click();
-  await expect(
-    view(page).getByRole("status").filter({ hasText: "Updating" }),
-  ).toHaveText("Updating to the last 50 games…");
+  await expect(status).toHaveText("Updating the cards…");
   await expect(cards).toHaveAttribute("aria-busy", "true");
-  await expect(souls).toHaveText("1,100 20 games · rank avg 1,000");
+  await expect(damage).toHaveText("1,000 20 games · rank avg 500");
+  // The status doesn't move the controls.
+  expect(await hero.boundingBox()).toEqual(select);
   release();
   await expect(cards).toHaveAttribute("aria-busy", "false");
-  await expect(souls).toContainText("50 games");
+  await expect(damage).toHaveText("1,000 50 games · rank avg 500");
+  await expect(status).toHaveText("");
 });
 
 test("performance range and hero survive a profile tab switch", async ({
