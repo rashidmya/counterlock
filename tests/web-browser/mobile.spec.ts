@@ -237,6 +237,17 @@ test.describe("phone width (375px)", () => {
 
     await page.getByRole("tab", { name: "Performance" }).click();
     await expect(page.locator(".perf-card .sparkline svg")).toHaveCount(10);
+    // The range buttons keep one row beside the loading status's space.
+    expect(
+      await page
+        .getByRole("group", { name: "Range" })
+        .getByRole("button")
+        .evaluateAll(
+          (buttons) =>
+            new Set(buttons.map((button) => button.getBoundingClientRect().top))
+              .size,
+        ),
+    ).toBe(1);
     expect((await overflow(page)).scroll).toBeLessThanOrEqual(375);
     expect(await clipped(page, 375)).toEqual([]);
   });

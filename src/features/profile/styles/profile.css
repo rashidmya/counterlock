@@ -471,7 +471,7 @@
    status's text is laid over that space, so it never moves the controls. */
 .perf-range {
   display: flex;
-  flex: 1;
+  flex: 1 1 auto;
   align-items: center;
   gap: 12px;
 }
