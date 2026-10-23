@@ -731,6 +731,13 @@ test("performance tab compares each metric with the rank average", async ({
   await expect(
     card(page, "Healing share").locator(".perf-card-numbers"),
   ).toHaveText("21% 20 games · no rank average");
+  // Two heroes' games: the shares claim no trend, and say why.
+  const mix =
+    "Kill participation and the shares show no trend over games on more than one hero: a change of hero moves them more than form does.";
+  await expect(
+    card(page, "Kill participation").locator(".perf-trend"),
+  ).toHaveCount(0);
+  await expect(view(page).getByText(mix)).toBeVisible();
 
   await expect(dots(page, "Souls / min")).toHaveCount(20);
   await expect(
@@ -775,6 +782,11 @@ test("performance tab compares each metric with the rank average", async ({
   await expect(souls.locator(".perf-card-numbers")).toHaveText(
     "1,050 20 games · rank avg 1,000",
   );
+  // One hero's games: the shares have their trend.
+  await expect(
+    card(page, "Kill participation").locator(".perf-trend"),
+  ).toHaveText("– Flat");
+  await expect(view(page).getByText(mix)).toHaveCount(0);
 });
 
 /** Match ids whose report metadata the page asks for. */
@@ -1044,12 +1056,8 @@ test("performance tab keeps the rank averages that loaded, and Retry asks again 
   await expect(souls.locator(".perf-card-numbers")).toContainText(
     "20 games · 10 with a rank average",
   );
-  // No trend from the games that kept their average; the shares, which
-  // have none, keep theirs.
+  // No trend from the games that kept their average.
   await expect(souls.locator(".perf-trend")).toHaveCount(0);
-  await expect(
-    card(page, "Kill participation").locator(".perf-trend"),
-  ).toHaveCount(1);
   const asked = curves.length;
   failCurveFor.clear();
   await notice.getByRole("button", { name: "Retry" }).click();
@@ -1331,6 +1339,11 @@ test("performance tab keeps the trends a failed curve doesn't touch", async ({
   await expect(damage.locator(".perf-trend")).toHaveText("– Flat");
   // Souls has heroes[1]'s games, so it claims no trend.
   await expect(card(page, "Souls / min").locator(".perf-trend")).toHaveCount(0);
+  // The shares, which have no rank average, keep theirs: their games with
+  // match details are all heroes[0]'s.
+  await expect(
+    card(page, "Kill participation").locator(".perf-trend"),
+  ).toHaveText("– Flat");
 });
 
 test("performance tab doesn't call failed averages missing", async ({

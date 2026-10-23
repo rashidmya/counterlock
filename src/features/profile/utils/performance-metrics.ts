@@ -264,8 +264,12 @@ export interface MetricSummary {
   average: number | null;
   comparedValue: number | null;
   compared: number;
-  // Null with fewer than MIN_TREND_GAMES games to compare.
+  // Null with fewer than MIN_TREND_GAMES games to compare, or with
+  // `heroMix`.
   trend: Trend | null;
+  // A metric without a rank average over games on more than one hero: a
+  // change of hero moves it as much as form does, so it claims no trend.
+  heroMix: boolean;
 }
 
 const ratio = (parts: Fraction[], minDenominator = 0) => {
@@ -356,6 +360,8 @@ export function summarizeMetric(
   });
   const valued = rows.filter((row) => row.value);
   const compared = valued.filter((row) => row.average);
+  const heroMix =
+    !metric.average && new Set(valued.map((row) => row.game.heroId)).size > 1;
   const samples = metric.average
     ? compared.flatMap(({ value, average }) => {
         const avg = divide(average!);
@@ -386,6 +392,7 @@ export function summarizeMetric(
       floor,
     ),
     compared: compared.length,
-    trend: trend(samples),
+    trend: heroMix ? null : trend(samples),
+    heroMix,
   };
 }

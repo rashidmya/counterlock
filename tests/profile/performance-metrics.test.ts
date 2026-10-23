@@ -397,6 +397,39 @@ describe("summarizeMetric", () => {
     );
     expect(summary.points.map((p) => p.average)).toEqual(Array(6).fill(null));
     expect(summary.trend).toBe("improving");
+    expect(summary.heroMix).toBe(false);
+  });
+
+  it("has no share trend over games on more than one hero", () => {
+    const totals = (id: number) =>
+      gameTotals(
+        parseMatchTotals([
+          bulkMatch(id, 77, { kills: id > 3 ? 20 : 2, assists: 0 }),
+        ]).get(id),
+        77,
+      );
+    // The same games, the last three on another hero: from a support to a
+    // carry, say, which alone could lift kill participation.
+    const switched = games.map((game, i) =>
+      i > 2 ? { ...game, heroId: 7 } : game,
+    );
+    const share = summarizeMetric(
+      metric("killParticipation"),
+      switched,
+      totals,
+      () => average,
+    );
+    expect(share.trend).toBeNull();
+    expect(share.heroMix).toBe(true);
+    // A rank average takes the hero out of the comparison.
+    const souls = summarizeMetric(
+      metric("soulsPerMin"),
+      switched,
+      () => undefined,
+      () => average,
+    );
+    expect(souls.trend).toBe("improving");
+    expect(souls.heroMix).toBe(false);
   });
 
   it("leaves out games without totals", () => {

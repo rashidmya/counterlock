@@ -90,12 +90,13 @@ function PerformanceCard({
                   ? // Like with like: the player over the same games.
                     ` · ${compared} with a rank average: ${format(metric, comparedValue!)} vs ${format(metric, average)}`
                   : ` · rank avg ${format(metric, average)}`);
-  // No badge while what the trend needs loads or failed, or when no game
-  // has a rank average to follow.
+  // No badge while what the trend needs loads or failed, when no game has
+  // a rank average to follow, or over a mix of heroes.
   const tooFew =
     !trend &&
     !waiting &&
     !failed &&
+    !summary.heroMix &&
     games > 0 &&
     (!metric.average || average !== null);
   const describe = (p: GamePoint) => ({
@@ -138,12 +139,17 @@ function notes(
   games: HistoryMatch[],
   totals: Map<number, PlayerTotals[]> | undefined,
   averages: GameAverages | undefined,
+  summaries: MetricSummary[],
 ) {
   const lines = [
     "Normal and ranked games, oldest on the left. The rank average is the average player on the same hero at the same rank and match length, over the last 30 days.",
     "Improving or slipping compares the recent half of these games with the earlier half, each against its rank average where there is one. Changes smaller than game-to-game noise show as flat.",
     "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the hero damage, objective damage and healing shares have no rank average, as it has no team totals.",
   ];
+  if (summaries.some((summary) => summary.heroMix))
+    lines.push(
+      "Kill participation and the shares show no trend over games on more than one hero: a change of hero moves them more than form does.",
+    );
   const loaded = [...(averages?.byMatch.values() ?? [])];
   const sources = new Set(loaded.map((a) => a.source));
   if (sources.has("current"))
@@ -369,6 +375,7 @@ export function PerformanceTab({
             shown.games,
             shown.totals.data,
             shown.averages.data,
+            summaries,
           ).map((line) => (
             <p key={line} className="data-note">
               {line}
