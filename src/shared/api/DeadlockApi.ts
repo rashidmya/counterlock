@@ -1,5 +1,6 @@
 const BASE = "https://api.deadlock-api.com";
 const BUSY = "API busy. Retry after the cooldown.";
+const MINUTE = 60_000;
 
 export const TTL = {
   analytics: 10 * 60_000,
@@ -7,13 +8,41 @@ export const TTL = {
   history: 2 * 60_000,
 };
 
+// Requests a minute per IP, from the API's OpenAPI docs, for the groups the
+// app could reach; the other endpoints allow 100 a second.
+export const RATE_LIMITS: Record<string, number> = {
+  "/v1/analytics": 200,
+  "/v1/matches/metadata": 30,
+  "/v1/players/rank": 20,
+};
+// A second's margin, so latency can't put a minute's last request into the
+// API's next window early.
+export const RATE_WINDOW = MINUTE + 1000;
+
+/**
+ * The group a path's rate limit and cooldown belong to: the analytics
+ * endpoints share one limit; any other endpoint has its own.
+ */
+export function endpointGroup(path: string) {
+  const pathname = path.split("?")[0];
+  if (pathname.startsWith("/v1/analytics/")) return "/v1/analytics";
+  return pathname.replace(/\/\d+(?=\/|$)/g, "/{id}");
+}
+
 export class DeadlockApi {
-  private cache = new Map<string, { data: unknown; fetchedAt: number }>();
+  private cache = new Map<
+    string,
+    { data: unknown; fetchedAt: number; ttl: number }
+  >();
   private inFlight = new Map<string, Promise<unknown>>();
-  private cooldownUntil = 0;
+  private cooldowns = new Map<string, number>();
+  private sent = new Map<string, number[]>();
+  private sweptAt = 0;
   constructor(
     private request: typeof fetch = globalThis.fetch.bind(globalThis),
     private now: () => number = Date.now,
+    private wait: (ms: number) => Promise<void> = (ms) =>
+      new Promise((resolve) => setTimeout(resolve, ms)),
   ) {}
 
   get<T>(path: string, ttlMs: number): Promise<T> {
@@ -22,15 +51,58 @@ export class DeadlockApi {
       return Promise.resolve(saved.data as T);
     const pending = this.inFlight.get(path);
     if (pending) return pending as Promise<T>;
-    if (this.now() < this.cooldownUntil) return Promise.reject(new Error(BUSY));
-    const run = this.fetchJson<T>(path)
+    const group = endpointGroup(path);
+    if (this.cooling(group)) return Promise.reject(new Error(BUSY));
+    const run = this.send<T>(path, group)
       .then((data) => {
-        this.cache.set(path, { data, fetchedAt: this.now() });
+        this.store(path, data, ttlMs);
         return data;
       })
       .finally(() => this.inFlight.delete(path));
     this.inFlight.set(path, run);
     return run;
+  }
+
+  private cooling(group: string) {
+    return this.now() < (this.cooldowns.get(group) ?? 0);
+  }
+
+  /** Sends at once, or when the group's rate limit has room. */
+  private async send<T>(path: string, group: string): Promise<T> {
+    const limit = RATE_LIMITS[group];
+    if (limit) {
+      await this.throttle(group, limit);
+      // A cooldown may have started while this request waited its turn.
+      if (this.cooling(group)) throw new Error(BUSY);
+    }
+    return this.fetchJson<T>(path, group);
+  }
+
+  /** Waits until the group has had fewer than `limit` requests in the window, then counts this one. */
+  private async throttle(group: string, limit: number) {
+    const sent = this.sent.get(group) ?? [];
+    this.sent.set(group, sent);
+    for (;;) {
+      const now = this.now();
+      while (sent.length && now - sent[0] >= RATE_WINDOW) sent.shift();
+      if (sent.length < limit) {
+        sent.push(now);
+        return;
+      }
+      await this.wait(sent[0] + RATE_WINDOW - now);
+    }
+  }
+
+  // Responses that have outlived their ttl are dropped, at most once a
+  // minute, so a long session doesn't keep every response it has seen.
+  private store(path: string, data: unknown, ttl: number) {
+    const now = this.now();
+    if (now - this.sweptAt >= MINUTE) {
+      this.sweptAt = now;
+      for (const [key, entry] of this.cache)
+        if (now - entry.fetchedAt >= entry.ttl) this.cache.delete(key);
+    }
+    this.cache.set(path, { data, fetchedAt: now, ttl });
   }
 
   // The timeout covers both the request and reading the body.
@@ -40,7 +112,7 @@ export class DeadlockApi {
       : error;
   }
 
-  private async fetchJson<T>(path: string): Promise<T> {
+  private async fetchJson<T>(path: string, group: string): Promise<T> {
     let response: Response;
     try {
       response = await this.request(`${BASE}${path}`, {
@@ -57,9 +129,9 @@ export class DeadlockApi {
       const until = Number.isFinite(seconds)
         ? this.now() + seconds * 1000
         : Date.parse(header ?? "");
-      this.cooldownUntil = Math.max(
-        this.now() + 30_000,
-        Number.isFinite(until) ? until : 0,
+      this.cooldowns.set(
+        group,
+        Math.max(this.now() + 30_000, Number.isFinite(until) ? until : 0),
       );
       throw new Error(BUSY);
     }

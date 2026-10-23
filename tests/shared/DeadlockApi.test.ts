@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { DeadlockApi, TTL } from "@/shared/api/DeadlockApi";
+import {
+  DeadlockApi,
+  RATE_LIMITS,
+  RATE_WINDOW,
+  TTL,
+  endpointGroup,
+} from "@/shared/api/DeadlockApi";
 
 const json = (body: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(body), init);
@@ -41,7 +47,7 @@ describe("DeadlockApi", () => {
     expect(b).toBe(a);
   });
 
-  it("cools down after 429 with Retry-After", async () => {
+  it("cools down the refused endpoint group after 429 with Retry-After", async () => {
     const request = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
@@ -53,13 +59,78 @@ describe("DeadlockApi", () => {
     await expect(api.get("/v1/x", 1000)).rejects.toThrow(
       "API busy. Retry after the cooldown.",
     );
-    await expect(api.get("/v1/other", 1000)).rejects.toThrow(
+    await expect(api.get("/v1/x?page=2", 1000)).rejects.toThrow(
       "API busy. Retry after the cooldown.",
     );
     expect(request).toHaveBeenCalledTimes(1);
-    now += 60_001;
+    // Other endpoints have limits of their own.
     await expect(api.get("/v1/other", 1000)).resolves.toEqual([]);
     expect(request).toHaveBeenCalledTimes(2);
+    now += 60_001;
+    await expect(api.get("/v1/x?page=2", 1000)).resolves.toEqual([]);
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+
+  it("groups paths as the API's rate limits do", () => {
+    expect(endpointGroup("/v1/analytics/hero-stats?x=1")).toBe("/v1/analytics");
+    expect(endpointGroup("/v1/analytics/player-performance-curve")).toBe(
+      "/v1/analytics",
+    );
+    expect(endpointGroup("/v1/matches/metadata?match_ids=1,2")).toBe(
+      "/v1/matches/metadata",
+    );
+    expect(endpointGroup("/v1/matches/1001/metadata")).toBe(
+      "/v1/matches/{id}/metadata",
+    );
+    expect(endpointGroup("/v1/players/77/match-history")).toBe(
+      "/v1/players/{id}/match-history",
+    );
+    expect(RATE_LIMITS).toEqual({
+      "/v1/analytics": 200,
+      "/v1/matches/metadata": 30,
+      "/v1/players/rank": 20,
+    });
+  });
+
+  it("waits for room in a group's rate limit rather than going over it", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => json([]));
+    let now = 0;
+    const waits: number[] = [];
+    const api = new DeadlockApi(
+      request,
+      () => now,
+      async (ms) => {
+        waits.push(ms);
+        now += ms;
+      },
+    );
+    const rank = (id: number) =>
+      api.get(`/v1/players/rank?account_ids=${id}`, 1);
+    await Promise.all(Array.from({ length: 20 }, (_, i) => rank(i)));
+    now += 5_000;
+    await rank(20);
+    expect(waits).toEqual([RATE_WINDOW - 5_000]);
+    expect(request).toHaveBeenCalledTimes(21);
+    // Endpoints without a tight limit don't wait.
+    await api.get("/v1/players/77/match-history", 1);
+    expect(waits).toHaveLength(1);
+  });
+
+  it("drops responses that outlived their ttl", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => json({ ok: true }));
+    let now = 0;
+    const api = new DeadlockApi(request, () => now);
+    await api.get("/v1/x", 1000);
+    now += 60_000;
+    // Storing another response sweeps the expired one out...
+    await api.get("/v1/y", 1000);
+    // ...so a longer ttl can't serve it any more.
+    await api.get("/v1/x", TTL.analytics);
+    expect(request).toHaveBeenCalledTimes(3);
   });
 
   it("uses a 30s cooldown on 503 without Retry-After", async () => {
