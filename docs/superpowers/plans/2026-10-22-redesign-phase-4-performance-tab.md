@@ -2825,15 +2825,19 @@ git commit -m "refactor(profile): remove what the old Performance tab used"
 ```markdown
 ### Performance tab
 
-Eight cards, each with one point per game (oldest on the left, dotted by win or loss), the dashed rank average and the value over the range. A range adds up the games rather than averaging each game's value, so longer games count for more.
+Eight cards, each with one point per game (oldest on the left, dotted by win or loss), the dashed rank average where there is one, and the value over the range. A range adds up the games rather than averaging each game's value, so longer games count for more.
 
 - **From match history:** souls / min and the K/D/A ratio, (kills + assists) ÷ deaths, with deaths counted as at least one after adding up the games.
-- **From each game's totals:** hero damage, objective damage, healing and creep kills per minute, kill participation and hero damage share. They come from `GET /v1/matches/metadata?match_ids=…&include_player_kda=true&extra_player_columns=stats.player_damage,stats.boss_damage,stats.player_healing,stats.creep_kills` (bulk metadata, every player's stat snapshots; the last one is the final total), at most 50 games per request and kept per match, so a wider range only asks for the games it adds. Bulk metadata allows 30 requests per minute per IP. Games the API hasn't stored yet are left out and the note says how many.
-- **Rank average:** the match report's curve, one request per hero and rank (shared between games), read at each game's length: the tier of the game's rank (match history's `ranked_display_badge`), the player's current rank for games without one, such as unranked games, or all ranks when neither is known. It widens as in the match report. As there, **creep kills** stand in for last hits. Kill participation and hero damage share have no rank average.
-- **Improving / Flat / Slipping** compares the recent half of the games with the earlier half (at least 6 games), each game as its value ÷ its rank average, so changing hero or rank doesn't read as a change in form; the two shares use their values. It says improving or slipping only when Welch's t-test finds the halves differ at the 95% level, and flat otherwise. When some games run past the end of the rank average, the card compares the player and the average over the games that have one.
+- **From each game's totals:** hero damage, objective damage, healing and creep kills per minute, kill participation and hero damage share. They come from `GET /v1/matches/metadata?match_ids=…&include_player_kda=true&extra_player_columns=stats.player_damage,stats.boss_damage,stats.player_healing,stats.creep_kills&limit=…` (bulk metadata, every player's stat snapshots; the last one is the final total; `limit` is the number of games asked for), at most 50 games per request and kept per match, so a wider range only asks for the games it adds. Games the API hasn't stored yet are left out and the note says how many. Bulk metadata allows 30 requests per minute per IP (checked against the live API; the app doesn't throttle), so switching heroes quickly on Last 100 can hit the cooldown, which holds back every uncached request for at least 30 seconds.
+- **Rank average:** the match report's curve, read at each game's length: the tier of the game's rank (match history's `ranked_display_badge`), the player's current rank (`/v1/players/rank`, asked only then) for games without one, such as unranked games, or all ranks when neither is known. It takes one request per hero and rank tier, plus one when it widens as in the match report, shared between games. The match report falls back to the lobby's rank instead, so an unranked game's average can differ between the two. As there, **creep kills** stand in for last hits. Kill participation and hero damage share have no rank average: the curve has no team totals.
+- **Improving / Flat / Slipping** compares the recent half of the games with the earlier half (at least 6 games with a value and, where the metric has one, a rank average), each game as its value ÷ its rank average, so changing hero or rank doesn't read as a change in form; the two shares use their values. It says improving or slipping only when Welch's t-test finds the halves differ at the 95% level, and flat otherwise. When some games run past the end of the rank average, the card compares the player and the average over the games that have one.
 ```
 
-**"Project map":** in the `src/features/profile/` row, change "heroes, charts" to "heroes, trends". Pad the cell with spaces so the table's columns stay aligned and prettier leaves the table alone.
+**"Project map":**
+- In the `src/features/profile/` row, change "heroes, charts" to "heroes, trends".
+- In the `src/shared/ui/` row, change "ribbon and section header" to "ribbon, section header and element-width hook" (`useElementWidth` moved there in Task 5).
+
+Pad each cell with spaces so the table's columns stay aligned and prettier leaves the table alone.
 
 **"API endpoints":** replace `` - `/v1/matches/{id}/metadata` and `/v1/analytics/player-performance-curve` (match report) `` with:
 
@@ -2842,6 +2846,8 @@ Eight cards, each with one point per game (oldest on the left, dotted by win or 
 - `/v1/matches/metadata` (bulk; the Performance tab's per-game totals)
 ```
 
+At the end of the paragraph after that list ("The client caches in memory … honours `Retry-After` cooldowns."), add: "The Performance tab also keeps each stored game's totals for the session."
+
 - [ ] **Step 2: Spec**
 
 In `docs/superpowers/specs/2026-10-21-redesign-design.md`:
@@ -2849,7 +2855,7 @@ In `docs/superpowers/specs/2026-10-21-redesign-design.md`:
 - At the end of "### Performance tab", add:
 
 ```markdown
-Built in phase 4: eight metrics (souls / min, K/D/A ratio, hero damage, objective damage, healing and creep kills per minute, kill participation and hero damage share) over the last 20, 50 or 100 normal and ranked games, for all heroes or one. Damage, healing, creep kills and shares come from bulk metadata (`GET /v1/matches/metadata`, 50 games per request) rather than one metadata request per game. The rank average is the match report's curve at each game's length, using the game's rank, or the player's current rank for unranked games. As in the match report, creep kills stand in for last hits. The two shares have no rank average. Improving or slipping needs Welch's t-test to find the recent half of the games different from the earlier half at the 95% level, each game against its own rank average.
+Built in phase 4: eight metrics (souls / min, K/D/A ratio, hero damage, objective damage, healing and creep kills per minute, kill participation and hero damage share) over the last 20 (the default), 50 or 100 normal and ranked games, for all heroes or one. "All" is dropped: thousands of games of metadata is too much. The tab replaces the old one entirely: K/D/A and souls / min become cards like the rest, win or loss dots on every card replace the form strip, and the accuracy, last-hits and deaths cards are gone. Damage, healing, creep kills and shares come from bulk metadata (`GET /v1/matches/metadata`, 50 games per request) rather than one metadata request per game. The rank average is the match report's curve at each game's length, using the game's rank, the player's current rank for games without one (such as unranked games), or all ranks when neither is known. As in the match report, creep kills stand in for last hits, which the curve doesn't have. Impact share is built as kill participation and hero damage share; objective damage and healing are shown per minute rather than as shares. The two shares have no rank average, as the curve has no team totals. Improving or slipping needs Welch's t-test to find the recent half of the games different from the earlier half at the 95% level, each game against its own rank average (the two shares on their own values).
 ```
 
 - [ ] **Step 3: Final check**
