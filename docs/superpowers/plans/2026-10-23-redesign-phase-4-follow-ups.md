@@ -3,14 +3,14 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close the phase 4 follow-ups the owner picked:
-- **Requests:** the shared API client keeps to each endpoint's rate limit, cools down only the endpoint that refused, and drops expired responses. Rank averages load per hero and rank tier, a few at a time, and a failed one leaves only its own games without an average.
+- **Requests:** the shared API client keeps to each endpoint's rate limit, cools down only what a 429 refused (everything after a 503), and drops expired responses. Rank averages load per hero and rank tier, a few at a time, and a failed one leaves only its own games without an average.
 - **One rank rule:** a player whose rank a match didn't record is compared at their current rank, in the match report as on the Performance tab (owner's choice).
 - **All four Impact shares:** objective damage and healing shares join kill participation and hero damage share (ten cards).
 - **The tab:** the profile keeps its tab, filter, range and hero for the session; the cards stay, dimmed, while a new range or hero loads; picking a game on a chart (pointer, tap or arrow keys) shows it and opens its match report; win and loss dots stay readable on Last 100.
 - **Tests:** the browser tests the phase 4 reviews found missing.
 
 **Architecture:**
-- **`src/shared/api/DeadlockApi.ts`** groups paths as the API's rate limits do, holds a request back while its group's last minute is full, keeps a cooldown per group, and sweeps expired responses when it stores one.
+- **`src/shared/api/DeadlockApi.ts`** groups paths as the API's rate limits do, holds a request back while its group's last minute is full, keeps cooldowns per group, per path and for everything, and sweeps expired responses when it stores one.
 - **The match report** asks `/v1/players/rank` once per match for every player without a recorded rank (`fetchRankBadges` in the profile service, `fetchCurrentBadges` in the report's); the curve waits for that answer only when the selected player needs it.
 - **`performance-api.ts`** groups games by hero and rank tier and loads at most `CURVE_CONCURRENCY` (4) groups at once; `fetchGameAverages` now returns `{ byMatch, failed, error }`.
 - **`ProfileView`** keeps each profile's view (tab, filter, range, hero) in a session map keyed by account; `PerformanceTab` takes the range and hero as props.
@@ -22,12 +22,12 @@
 **Spec:** `docs/superpowers/specs/2026-10-21-redesign-design.md` ("Performance tab", "Match report", "Profile") and the follow-ups listed in `docs/superpowers/plans/2026-10-22-redesign-phase-4-performance-tab.md`. Owner decisions on 2026-10-23: do the follow-up pass before phase 5; current rank for unranked games in both places; all four shares; also the three request items (rate limit, session memory, averages failing together).
 
 **Every code block in this plan was built and run before the plan was written** (reference commits in a scratch worktree, replayed from this plan's blocks). The full result:
-- `npm test` 377 passed;
+- `npm test` 382 passed;
 - `npm run test:browser` 142 passed;
 - `npm run test:web` 76 passed;
 - both type checks, `npm run build`, `npm run web:build` and `npm run validate:manifest` passed.
 
-Each task's end state was also checked on its own: type check and unit tests after every task (372, 373, 373, 375, 375, 375, 377 and 377 tests), and both browser suites after every task (desktop 132, 132, 132, 133, 133, 134, 136 and 142; website 74, 74, 74, 74, 75, 75, 76 and 76). Copy the code as given. If something fails, fix the cause rather than the test.
+Each task's end state was also checked on its own: type check and unit tests after every task (377, 378, 378, 380, 380, 380, 382 and 382 tests), and both browser suites after every task (desktop 132, 132, 132, 133, 133, 134, 136 and 142; website 74, 74, 74, 74, 75, 75, 76 and 76). Copy the code as given. If something fails, fix the cause rather than the test.
 
 ## Decisions made while planning (verified against the live API on 2026-10-23)
 
@@ -36,9 +36,12 @@ Each task's end state was also checked on its own: type check and unit tests aft
   - bulk match metadata (`/v1/matches/metadata`): 30 a minute;
   - rank lookups (`/v1/players/rank`): 20 a minute;
   - everything else the app calls (Steam profiles and search, match history, mate stats, hero stats, builds, single-match metadata from cache): 100 a second, so no client limit is needed.
-- **The client waits rather than going over a limit.** A sliding window of `RATE_WINDOW` (61 s: a second's margin for latency) counts each group's requests; one beyond the limit waits until the oldest leaves the window. Requests in groups without a limit start synchronously, as before (the in-flight test relies on it). A request that waited re-checks its group's cooldown before sending.
-- **Cooldowns are per group.** A 429 or 503 used to pause every request for at least 30 s; now it pauses only its own group (the analytics endpoints count as one). The 30 s minimum and `Retry-After` handling are unchanged.
-- **Expired responses are dropped.** Each cache entry keeps its ttl; storing a response sweeps out the expired ones, at most once a minute. The match report's single-match metadata (about 1 MB a game) and the bulk responses no longer stay for the whole session. The Performance service still keeps parsed totals per match (about 1 KB a game) for the session.
+- **The client waits rather than going over a limit.** A sliding window of `RATE_WINDOW` (61 s: a second's margin for latency) counts each group's requests; one beyond the limit waits until the oldest leaves the window. Requests in groups without a limit start synchronously, as before (the in-flight test relies on it). A waiting request checks for a cooldown each time it wakes, before it takes a slot (Task 1 review), so a request that fails into a cooldown doesn't use one up.
+- **What a refusal pauses (Task 1 review).** A 429 or 503 used to pause every request for at least 30 s.
+  - **A 429** now pauses the whole group for the three groups the API limits as a whole, and otherwise only the refused path. Those other endpoints' limits depend on where the data comes from: single-match metadata allows 100 a second from the API's cache but 3 an hour from Steam, so one refused match must not block every report.
+  - **A 503** pauses everything. The API's docs ("Load Shedding") say its database-backed endpoints share one query queue and that a client should wait out `Retry-After` and not send many uncached requests in parallel.
+  - The 30 s minimum and `Retry-After` handling are unchanged.
+- **Expired responses are dropped.** Each cache entry keeps the ttl it was stored with; storing a response sweeps out the expired ones, at most once a minute. Every path is always asked for with the same ttl (checked across `src`), so an entry's own ttl is the one that matters. The match report's single-match metadata (about 1 MB a game) and the bulk responses no longer stay for the whole session. The Performance service still keeps parsed totals per match (about 1 KB a game) for the session.
 - **One rank rule (owner's choice: current rank).** In the match report, a player whose rank the match didn't record (`player_rank_data` missing, as in unranked games) is compared at their current rank, then all ranks; the lobby's rank is no longer used for the average (it still names the lobby in the banner).
   - `/v1/players/rank?account_ids=a,b,c` answers for many accounts at once (checked live: three accounts, three rows), so the report asks once per match for every such player. Rank lookups allow only 20 a minute, so one request per "Viewing as" switch would have been wasteful.
   - The report asks only for normal-mode matches, and the curve waits for the answer only when the selected player has no recorded rank.
@@ -65,7 +68,8 @@ Each task's end state was also checked on its own: type check and unit tests aft
   - **Other tabs:** each browser tab or window has its own limiter, while the API counts per IP.
   - **The tip covers the card's numbers** while a game is picked.
   - **Enter on the slider** opens a report, which the slider pattern doesn't define; screen readers announce it through the label.
-  - **The live overlay's statistics client** (`src/features/player-stats/`) has its own cache and cooldowns and doesn't share these limits.
+  - **Clients outside the shared one:** the live overlay's statistics client (`src/features/player-stats/`) has its own cache and cooldowns, and `src/features/builds/services/build-analytics.ts` fetches `/v1/analytics/hero-build-stats` directly; neither counts against these limits (Task 1 review).
+  - **A waiting request learns of a cooldown only when it wakes,** up to a minute later, even when `Retry-After` is an hour.
   - **A profile reopened later in the session** opens on the tab it was left on, not Overview.
 
 ## Global Constraints
@@ -88,7 +92,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
 
 ## Review Focus
 
-1. **Limits that hold.** The throttle counts a request when it is sent, a waiting request re-checks the cooldown, unlimited groups still start synchronously, and a 429 pauses only its group. Tests: `cools down the refused endpoint group after 429 with Retry-After`, `waits for room in a group's rate limit rather than going over it`, `drops responses that outlived their ttl`.
+1. **Limits that hold.** The throttle counts a request when it is sent and never more than the limit per window, a waiting request checks for a cooldown before taking a slot, duplicates share one wait, unlimited groups still start synchronously, a 429 pauses only what it refused and a 503 everything. Tests: `cools down a rate-limited group after a 429 with Retry-After`, `cools down only the refused path of other endpoints`, `pauses everything after a 503: the API is shedding load`, `sends a burst a window at a time, never more than the limit`, `fails a waiting request when its group cools down, without using a slot`, `drops responses that outlived their ttl`, `keeps responses still fresh, and sweeps at most once a minute`.
 2. **One rank rule.** The report and the tab both use the game's rank, then the current rank, then all ranks, and the report asks for every player's current rank in one request. Tests: `a player without a recorded rank is compared at their current rank, and the note says so`, `with no ranks recorded and no current rank, the average covers all ranks and says so`, `performance tab compares ranked games at their own rank`.
 3. **Partial failure.** A failed curve leaves only its games without an average, Retry recovers, and a full failure still fails as a whole. Tests: `keeps the games whose curve loaded when another fails`, `fails as a whole when every curve fails, so the tab can offer Retry`, `performance tab keeps the rank averages that loaded, and Retry asks again for the rest`.
 4. **Picking a game.** Pointer, touch and keyboard each work, and a tap never opens a report on its own. Tests: `performance tab describes the game under the pointer and a click opens its report`, `performance tab points can be picked and opened from the keyboard`, `a tap on a Performance chart shows the game; its Report link opens it`.
@@ -98,7 +102,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
 
 | File | Responsibility |
 |---|---|
-| `src/shared/api/DeadlockApi.ts` | Endpoint groups, per-group rate limits and cooldowns, expired-response sweep |
+| `src/shared/api/DeadlockApi.ts` | Endpoint groups, per-group rate limits, cooldowns by group, path or everything, expired-response sweep |
 | `src/features/profile/services/profile-api.ts` | `fetchRankBadges()`: many accounts' current ranks in one request |
 | `src/features/match-report/services/match-report.ts` | `fetchCurrentBadges()`: the report's current ranks, empty on failure |
 | `src/features/match-report/components/MatchReportPage.tsx` | Current rank for players without a recorded one; the curve waits for it |
@@ -122,8 +126,9 @@ What changes, in the client every feature shares:
 - **`endpointGroup(path)`** names the group a path's limit and cooldown belong to: `/v1/analytics` for every analytics endpoint, otherwise the path without its query, with numeric segments as `{id}`.
 - **`RATE_LIMITS`** holds the three groups with a limit tight enough to matter (requests a minute per IP); `RATE_WINDOW` is 61 s.
 - **Throttle:** a limited group's request waits until the group has had fewer than its limit in the window, then counts itself. The wait is injectable (the constructor's third argument), so tests don't sleep.
-- **Cooldown per group:** `cooldownUntil` becomes a map.
+- **Cooldowns:** `cooldownUntil` becomes a map. A 429 pauses `refused(path, group)`: the group for the three limited groups, otherwise the path. A 503 pauses everything (`"*"`).
 - **Sweep:** cache entries keep their ttl; `store()` drops expired ones at most once a minute.
+- **Tests:** the burst and cooldown tests use Vitest's fake timers with the client's real `Date.now` and `setTimeout`. Each was checked against broken code while planning: no re-check loop, no cooldown check while waiting, one counter for all groups, no sharing of a waiting request, cooldowns by path for limited groups, a sweep that clears everything or runs on every store, a 60 s window, and a 503 that pauses one group all fail a test.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -173,7 +178,7 @@ with:
     expect(b).toBe(a);
   });
 
-  it("cools down the refused endpoint group after 429 with Retry-After", async () => {
+  it("cools down a rate-limited group after a 429 with Retry-After", async () => {
     const request = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
@@ -182,6 +187,9 @@ with:
 3. Replace:
 
 ```ts
+      .mockImplementation(async () => json([]));
+    let now = 1_000;
+    const api = new DeadlockApi(request, () => now);
     await expect(api.get("/v1/x", 1000)).rejects.toThrow(
       "API busy. Retry after the cooldown.",
     );
@@ -200,19 +208,57 @@ with:
 with:
 
 ```ts
-    await expect(api.get("/v1/x", 1000)).rejects.toThrow(
+      .mockImplementation(async () => json([]));
+    let now = 1_000;
+    const api = new DeadlockApi(request, () => now);
+    await expect(api.get("/v1/analytics/hero-stats", 1000)).rejects.toThrow(
       "API busy. Retry after the cooldown.",
     );
-    await expect(api.get("/v1/x?page=2", 1000)).rejects.toThrow(
+    // The analytics endpoints share their limit, so they share the cooldown.
+    await expect(api.get("/v1/analytics/item-stats", 1000)).rejects.toThrow(
       "API busy. Retry after the cooldown.",
     );
     expect(request).toHaveBeenCalledTimes(1);
     // Other endpoints have limits of their own.
-    await expect(api.get("/v1/other", 1000)).resolves.toEqual([]);
-    expect(request).toHaveBeenCalledTimes(2);
+    await expect(
+      api.get("/v1/players/rank?account_ids=1", 1000),
+    ).resolves.toEqual([]);
     now += 60_001;
-    await expect(api.get("/v1/x?page=2", 1000)).resolves.toEqual([]);
+    await expect(api.get("/v1/analytics/item-stats", 1000)).resolves.toEqual(
+      [],
+    );
     expect(request).toHaveBeenCalledTimes(3);
+  });
+
+  it("cools down only the refused path of other endpoints", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("", { status: 429 }))
+      .mockImplementation(async () => json({}));
+    const api = new DeadlockApi(request, () => 0);
+    await expect(api.get("/v1/matches/1/metadata", 1000)).rejects.toThrow(
+      "API busy. Retry after the cooldown.",
+    );
+    await expect(api.get("/v1/matches/1/metadata", 1000)).rejects.toThrow(
+      "API busy",
+    );
+    // Another match may come from the API's cache.
+    await expect(api.get("/v1/matches/2/metadata", 1000)).resolves.toEqual({});
+  });
+
+  it("pauses everything after a 503: the API is shedding load", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("", { status: 503 }))
+      .mockImplementation(async () => json([]));
+    const api = new DeadlockApi(request, () => 0);
+    await expect(api.get("/v1/analytics/hero-stats", 1000)).rejects.toThrow(
+      "API busy. Retry after the cooldown.",
+    );
+    await expect(api.get("/v1/players/7/match-history", 1000)).rejects.toThrow(
+      "API busy",
+    );
+    expect(request).toHaveBeenCalledTimes(1);
   });
 
   it("groups paths as the API's rate limits do", () => {
@@ -234,6 +280,7 @@ with:
       "/v1/matches/metadata": 30,
       "/v1/players/rank": 20,
     });
+    expect(RATE_WINDOW).toBe(61_000);
   });
 
   it("waits for room in a group's rate limit rather than going over it", async () => {
@@ -262,6 +309,78 @@ with:
     expect(waits).toHaveLength(1);
   });
 
+  it("sends a burst a window at a time, never more than the limit", async () => {
+    vi.useFakeTimers();
+    try {
+      const start = Date.now();
+      const sentAt = new Map<string, number>();
+      const request = vi.fn<typeof fetch>().mockImplementation(async (url) => {
+        sentAt.set(String(url), Date.now() - start);
+        return json([]);
+      });
+      const api = new DeadlockApi(request);
+      const rank = (id: number) =>
+        api.get(`/v1/players/rank?account_ids=${id}`, 1);
+      // Another group's requests don't count against this one's limit.
+      await api.get("/v1/analytics/hero-stats", 1);
+      const all = Promise.all([
+        ...Array.from({ length: 45 }, (_, i) => rank(i)),
+        // A second ask for a waiting path shares its wait.
+        rank(44),
+      ]);
+      await vi.advanceTimersByTimeAsync(3 * RATE_WINDOW);
+      await all;
+      expect(request).toHaveBeenCalledTimes(46);
+      expect(
+        sentAt.get("https://api.deadlock-api.com/v1/analytics/hero-stats"),
+      ).toBe(0);
+      sentAt.delete("https://api.deadlock-api.com/v1/analytics/hero-stats");
+      expect([...sentAt.values()]).toEqual([
+        ...Array(20).fill(0),
+        ...Array(20).fill(RATE_WINDOW),
+        ...Array(5).fill(2 * RATE_WINDOW),
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("fails a waiting request when its group cools down, without using a slot", async () => {
+    vi.useFakeTimers();
+    try {
+      let sent = 0;
+      const request = vi.fn<typeof fetch>().mockImplementation(async () =>
+        ++sent === 20
+          ? new Response("", {
+              status: 429,
+              headers: { "Retry-After": "120" },
+            })
+          : json([]),
+      );
+      const api = new DeadlockApi(request);
+      const rank = (id: number) =>
+        api.get(`/v1/players/rank?account_ids=${id}`, 1);
+      const first = Array.from({ length: 20 }, (_, i) =>
+        rank(i).catch(() => null),
+      );
+      // The 21st waits for room; a second ask for it shares the wait.
+      const waiting = Promise.allSettled([rank(20), rank(20)]);
+      await Promise.all(first);
+      await vi.advanceTimersByTimeAsync(RATE_WINDOW);
+      expect((await waiting).map((r) => r.status)).toEqual([
+        "rejected",
+        "rejected",
+      ]);
+      expect(request).toHaveBeenCalledTimes(20);
+      // Once the cooldown ends, a full window's worth goes out at once.
+      await vi.advanceTimersByTimeAsync(60_000);
+      await Promise.all(Array.from({ length: 20 }, (_, i) => rank(100 + i)));
+      expect(request).toHaveBeenCalledTimes(40);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("drops responses that outlived their ttl", async () => {
     const request = vi
       .fn<typeof fetch>()
@@ -277,16 +396,39 @@ with:
     expect(request).toHaveBeenCalledTimes(3);
   });
 
+  it("keeps responses still fresh, and sweeps at most once a minute", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => json({ ok: true }));
+    let now = 0;
+    const api = new DeadlockApi(request, () => now);
+    await api.get("/v1/fresh", TTL.analytics);
+    await api.get("/v1/short", 1000);
+    now += 2_000;
+    // Nothing is swept within a minute of the last sweep (here, the
+    // client's start), so the expired entry is still there for a longer
+    // ttl to find.
+    await api.get("/v1/other", 1000);
+    await api.get("/v1/short", TTL.analytics);
+    expect(request).toHaveBeenCalledTimes(3);
+    now += 60_000;
+    await api.get("/v1/another", 1000);
+    await api.get("/v1/fresh", TTL.analytics);
+    await api.get("/v1/short", TTL.analytics);
+    // Only the expired one was asked for again.
+    expect(request).toHaveBeenCalledTimes(5);
+  });
+
   it("uses a 30s cooldown on 503 without Retry-After", async () => {
 ```
 
 
-The old cooldown test expected `/v1/other` to be refused too; it is now in its own group, so the test checks the opposite.
+The old cooldown test refused `/v1/other` after a 429 on `/v1/x`; it is replaced by three tests, for a limited group, another endpoint's path and a 503.
 
 - [ ] **Step 2: Run them and confirm they fail**
 
 Run: `npx vitest run tests/shared/DeadlockApi.test.ts`
-Expected: FAIL (4 failed, 10 passed: `endpointGroup is not a function`; the cooldown still refuses `/v1/other`; nothing waits (`expected [] to deeply equal [ NaN ]`, as `RATE_WINDOW` doesn't exist yet); the expired response is still served).
+Expected: FAIL (8 failed, 11 passed: `endpointGroup is not a function`; a 429 still refuses other groups and other matches; nothing waits (`expected [] to deeply equal [ NaN ]`, as `RATE_WINDOW` doesn't exist yet) and the burst goes out at once; a waiting request isn't failed by the cooldown; expired responses are still served. The 503 test already passes: the old cooldown paused everything).
 
 - [ ] **Step 3: Write the client**
 
@@ -315,8 +457,8 @@ export const RATE_LIMITS: Record<string, number> = {
 export const RATE_WINDOW = MINUTE + 1000;
 
 /**
- * The group a path's rate limit and cooldown belong to: the analytics
- * endpoints share one limit; any other endpoint has its own.
+ * The group a path's rate limit belongs to: the analytics endpoints share
+ * one limit; any other endpoint has its own.
  */
 export function endpointGroup(path: string) {
   const pathname = path.split("?")[0];
@@ -324,6 +466,20 @@ export function endpointGroup(path: string) {
   return pathname.replace(/\/\d+(?=\/|$)/g, "/{id}");
 }
 
+// A 503 means the API is shedding load: its database-backed endpoints share
+// one query queue, so every request waits out the cooldown.
+const EVERYTHING = "*";
+
+// What a 429 pauses: the group when the API limits it as a whole, otherwise
+// only the refused path, as those endpoints' limits depend on where the data
+// comes from (a match from the API's cache, or from Steam).
+const refused = (path: string, group: string) =>
+  RATE_LIMITS[group] ? group : path;
+
+/**
+ * Every path is always asked for with the same ttl; an entry is kept, and
+ * swept, by the ttl it was stored with.
+ */
 export class DeadlockApi {
   private cache = new Map<
     string,
@@ -347,7 +503,7 @@ export class DeadlockApi {
     const pending = this.inFlight.get(path);
     if (pending) return pending as Promise<T>;
     const group = endpointGroup(path);
-    if (this.cooling(group)) return Promise.reject(new Error(BUSY));
+    if (this.cooling(path, group)) return Promise.reject(new Error(BUSY));
     const run = this.send<T>(path, group)
       .then((data) => {
         this.store(path, data, ttlMs);
@@ -358,26 +514,30 @@ export class DeadlockApi {
     return run;
   }
 
-  private cooling(group: string) {
-    return this.now() < (this.cooldowns.get(group) ?? 0);
+  private cooling(path: string, group: string) {
+    const now = this.now();
+    return [EVERYTHING, refused(path, group)].some(
+      (key) => now < (this.cooldowns.get(key) ?? 0),
+    );
   }
 
   /** Sends at once, or when the group's rate limit has room. */
   private async send<T>(path: string, group: string): Promise<T> {
     const limit = RATE_LIMITS[group];
-    if (limit) {
-      await this.throttle(group, limit);
-      // A cooldown may have started while this request waited its turn.
-      if (this.cooling(group)) throw new Error(BUSY);
-    }
+    if (limit) await this.throttle(path, group, limit);
     return this.fetchJson<T>(path, group);
   }
 
-  /** Waits until the group has had fewer than `limit` requests in the window, then counts this one. */
-  private async throttle(group: string, limit: number) {
+  /**
+   * Waits until the group has had fewer than `limit` requests in the window,
+   * then counts this one. A cooldown that started while it waited fails it
+   * before it takes a slot.
+   */
+  private async throttle(path: string, group: string, limit: number) {
     const sent = this.sent.get(group) ?? [];
     this.sent.set(group, sent);
     for (;;) {
+      if (this.cooling(path, group)) throw new Error(BUSY);
       const now = this.now();
       while (sent.length && now - sent[0] >= RATE_WINDOW) sent.shift();
       if (sent.length < limit) {
@@ -425,7 +585,7 @@ export class DeadlockApi {
         ? this.now() + seconds * 1000
         : Date.parse(header ?? "");
       this.cooldowns.set(
-        group,
+        response.status === 503 ? EVERYTHING : refused(path, group),
         Math.max(this.now() + 30_000, Number.isFinite(until) ? until : 0),
       );
       throw new Error(BUSY);
@@ -450,10 +610,10 @@ export const deadlockApi = new DeadlockApi();
 - [ ] **Step 4: Run the tests and confirm they pass**
 
 Run: `npx vitest run tests/shared/DeadlockApi.test.ts`
-Expected: PASS (14 tests).
+Expected: PASS (19 tests).
 
 Run: `npm test`
-Expected: PASS (372 tests).
+Expected: PASS (377 tests).
 
 - [ ] **Step 5: Check and commit**
 
@@ -1062,7 +1222,7 @@ Run: `npx playwright test tests/browser/match-report.spec.ts`
 Expected: PASS (28 tests).
 
 Run: `npm test`
-Expected: PASS (373 tests).
+Expected: PASS (378 tests).
 
 - [ ] **Step 6: Check and commit**
 
@@ -1522,7 +1682,7 @@ Run: `npx playwright test tests/browser/home.spec.ts -g "performance tab"`
 Expected: PASS (7 tests).
 
 Run: `npm test`
-Expected: PASS (373 tests).
+Expected: PASS (378 tests).
 
 - [ ] **Step 5: Check and commit**
 
@@ -2165,7 +2325,7 @@ Run: `npx playwright test tests/browser/home.spec.ts -g "performance tab"`
 Expected: PASS (8 tests).
 
 Run: `npm test`
-Expected: PASS (375 tests).
+Expected: PASS (380 tests).
 
 - [ ] **Step 6: Check and commit**
 
@@ -2487,7 +2647,7 @@ Run: `npx playwright test -c playwright.web.config.ts tests/web-browser/match-re
 Expected: PASS (10 tests).
 
 Run: `npm test`
-Expected: PASS (375 tests).
+Expected: PASS (380 tests).
 
 - [ ] **Step 5: Check and commit**
 
@@ -2826,7 +2986,7 @@ Run: `npx playwright test tests/browser/home.spec.ts`
 Expected: PASS (29 tests).
 
 Run: `npm test`
-Expected: PASS (375 tests).
+Expected: PASS (380 tests).
 
 - [ ] **Step 5: Check and commit**
 
@@ -3563,7 +3723,7 @@ Run: `npx playwright test -c playwright.web.config.ts tests/web-browser/mobile.s
 Expected: PASS (17 tests).
 
 Run: `npm test`
-Expected: PASS (377 tests).
+Expected: PASS (382 tests).
 
 - [ ] **Step 7: Look at it**
 
@@ -4015,7 +4175,7 @@ with:
 - `/v1/analytics/hero-stats`, `hero-counter-stats`, `hero-synergy-stats`, `ability-order-stats` and `item-stats` (also per build phase and per picked enemy)
 - `/v1/builds` (popular builds on the hero page)
 
-The client caches in memory (two to ten minutes depending on the data) and drops responses that have expired, times out after 15 seconds and shares in-flight requests. It keeps to the API's per-IP limits for analytics (200 a minute), bulk metadata (30) and rank lookups (20) by holding requests back, and a `Retry-After` cooldown pauses only the endpoint that was refused (all analytics endpoints share one). The Performance tab also keeps each stored game's totals for the session.
+The client caches in memory (two to ten minutes depending on the data) and drops responses that have expired, times out after 15 seconds and shares in-flight requests. It keeps to the API's per-IP limits for analytics (200 a minute, shared by every analytics endpoint), bulk metadata (30) and rank lookups (20) by holding requests back. A 429 pauses only what was refused: the whole group for those three, otherwise the one request, as other endpoints' limits depend on where the data comes from. A 503, the API shedding load, pauses everything. Either honours `Retry-After`, with a 30-second minimum. The Performance tab also keeps each stored game's totals for the session.
 
 ## Sources
 ```
@@ -4055,7 +4215,7 @@ Changed after phase 4 (follow-up pass): objective damage and healing shares join
 - [ ] **Step 3: Final check**
 
 Run all of these; every one must pass:
-- `npm test` (377)
+- `npm test` (382)
 - `npx tsc --noEmit`
 - `npm run web:typecheck`
 - `npm run test:browser` (142)
