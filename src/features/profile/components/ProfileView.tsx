@@ -49,7 +49,8 @@ export function ProfileView({
   const [view, setView] = useState(() => views.get(accountId) ?? FIRST_VIEW);
   const { subtab, filter, range, heroId } = view;
   const update = (change: Partial<ViewState>) => {
-    const next = { ...view, ...change };
+    // Onto the latest stored view, so two changes in one event both count.
+    const next = { ...(views.get(accountId) ?? view), ...change };
     views.set(accountId, next);
     setView(next);
   };

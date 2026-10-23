@@ -22,7 +22,9 @@ export function ProfilePage({
   const topHeroId = history.data && topHeroes(history.data, 1)[0]?.heroId;
   const isMe = me.meId === accountId;
   return (
+    // Keyed, so another account never starts from this one's view.
     <ProfileView
+      key={accountId}
       accountId={accountId}
       history={history}
       navigate={navigate}

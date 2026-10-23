@@ -920,6 +920,51 @@ test("performance tab keeps the rank averages that loaded, and Retry asks again 
   expect(new Set(curves.slice(asked))).toEqual(new Set([String(heroes[1])]));
 });
 
+test("performance range and hero survive a profile tab switch", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await page.getByRole("button", { name: "Last 50", exact: true }).click();
+  const hero = view(page).getByRole("combobox", { name: "Hero" });
+  await hero.selectOption({ label: `${heroName(heroes[1])} · 30 games` });
+  await expect(dots(page, "Souls / min")).toHaveCount(30);
+  await openMatches(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    view(page).getByRole("button", { name: "Last 50", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(hero).toHaveValue(String(heroes[1]));
+  await expect(dots(page, "Souls / min")).toHaveCount(30);
+});
+
+test("each profile keeps its own tab and filter for the session", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page);
+  await openMyProfile(page);
+  await openMatches(page);
+  await view(page).getByRole("button", { name: "Ranked", exact: true }).click();
+  // Another account opens on its own view.
+  await page.getByRole("button", { name: "← Back" }).click();
+  await page.getByLabel("Find a player").fill("76561198060265729");
+  await page.getByRole("button", { name: /Use this ID/ }).click();
+  await expect(
+    view(page).getByRole("tab", { name: "Overview" }),
+  ).toHaveAttribute("aria-selected", "true");
+  // Back on the first, its tab and filter are as they were.
+  await myProfile(page).click();
+  await expect(
+    view(page).getByRole("tab", { name: "Matches" }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(
+    view(page).getByRole("button", { name: "Ranked", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+});
+
 test("performance tab degrades without match history", async ({ page }) => {
   await storeAccount(page);
   await routeApi(page, { history: 403 });
