@@ -39,6 +39,17 @@ const EVERYTHING = "*";
 const refused = (path: string, group: string) =>
   RATE_LIMITS[group] ? group : path;
 
+// A request on its way: shared by everyone who asks for its path while it
+// is out.
+interface Pending {
+  promise: Promise<unknown>;
+  // Callers still waiting for it; Infinity once one came without a signal.
+  callers: number;
+  // Aborted when every caller has left while it still waits for room.
+  abandon: AbortController;
+  queued: boolean;
+}
+
 /**
  * Every path is always asked for with the same ttl, so the caller's ttl,
  * which decides whether an entry is fresh, and the one stored with it,
@@ -49,33 +60,86 @@ export class DeadlockApi {
     string,
     { data: unknown; fetchedAt: number; ttl: number }
   >();
-  private inFlight = new Map<string, Promise<unknown>>();
+  private inFlight = new Map<string, Pending>();
   private cooldowns = new Map<string, number>();
   private sent = new Map<string, number[]>();
+  // Requests waiting for room: a cooldown wakes them to fail at once.
+  private sleepers = new Set<() => void>();
   private sweptAt = 0;
   constructor(
     private request: typeof fetch = globalThis.fetch.bind(globalThis),
     private now: () => number = Date.now,
-    private wait: (ms: number) => Promise<void> = (ms) =>
-      new Promise((resolve) => setTimeout(resolve, ms)),
+    private wait: (ms: number, signal: AbortSignal) => Promise<void> = (
+      ms,
+      signal,
+    ) =>
+      new Promise((resolve) => {
+        const timer = setTimeout(resolve, ms);
+        signal.addEventListener("abort", () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      }),
   ) {}
 
-  get<T>(path: string, ttlMs: number): Promise<T> {
+  /**
+   * The response for `path`, cached for `ttlMs`. A caller whose `signal`
+   * aborts stops waiting at once; the request itself is dropped only if it
+   * hasn't gone out yet and no one else still wants it.
+   */
+  get<T>(path: string, ttlMs: number, signal?: AbortSignal): Promise<T> {
+    if (signal?.aborted) return Promise.reject(signal.reason);
     const saved = this.cache.get(path);
     if (saved && this.now() - saved.fetchedAt < ttlMs)
       return Promise.resolve(saved.data as T);
-    const pending = this.inFlight.get(path);
-    if (pending) return pending as Promise<T>;
-    const group = endpointGroup(path);
-    if (this.cooling(path, group)) return Promise.reject(new Error(BUSY));
-    const run = this.send<T>(path, group)
+    let pending = this.inFlight.get(path);
+    if (!pending) {
+      const group = endpointGroup(path);
+      if (this.cooling(path, group)) return Promise.reject(new Error(BUSY));
+      pending = this.start(path, group, ttlMs);
+    }
+    return this.follow(path, pending, signal) as Promise<T>;
+  }
+
+  private start(path: string, group: string, ttlMs: number) {
+    const pending: Pending = {
+      promise: Promise.resolve(),
+      callers: 0,
+      abandon: new AbortController(),
+      queued: true,
+    };
+    pending.promise = this.send(path, group, pending)
       .then((data) => {
         this.store(path, data, ttlMs);
         return data;
       })
-      .finally(() => this.inFlight.delete(path));
-    this.inFlight.set(path, run);
-    return run;
+      .finally(() => {
+        if (this.inFlight.get(path) === pending) this.inFlight.delete(path);
+      });
+    this.inFlight.set(path, pending);
+    return pending;
+  }
+
+  /** The request's answer, for one caller, who may leave early. */
+  private follow(path: string, pending: Pending, signal?: AbortSignal) {
+    if (!signal) {
+      pending.callers = Infinity;
+      return pending.promise;
+    }
+    pending.callers++;
+    return new Promise((resolve, reject) => {
+      const leave = () => {
+        reject(signal.reason);
+        if (--pending.callers || !pending.queued) return;
+        // No one wants it any more, and it hasn't gone out.
+        pending.abandon.abort();
+        if (this.inFlight.get(path) === pending) this.inFlight.delete(path);
+      };
+      signal.addEventListener("abort", leave, { once: true });
+      pending.promise
+        .then(resolve, reject)
+        .finally(() => signal.removeEventListener("abort", leave));
+    });
   }
 
   private cooling(path: string, group: string) {
@@ -86,21 +150,32 @@ export class DeadlockApi {
   }
 
   /** Sends at once, or when the group's rate limit has room. */
-  private async send<T>(path: string, group: string): Promise<T> {
+  private async send<T>(
+    path: string,
+    group: string,
+    pending: Pending,
+  ): Promise<T> {
     const limit = RATE_LIMITS[group];
-    if (limit) await this.throttle(path, group, limit);
+    if (limit) await this.throttle(path, group, limit, pending.abandon.signal);
+    pending.queued = false;
     return this.fetchJson<T>(path, group);
   }
 
   /**
    * Waits until the group has had fewer than `limit` requests in the window,
-   * then counts this one. A cooldown that started while it waited fails it
-   * before it takes a slot.
+   * then counts this one. A cooldown that starts while it waits fails it at
+   * once, before it takes a slot, as does every caller leaving.
    */
-  private async throttle(path: string, group: string, limit: number) {
+  private async throttle(
+    path: string,
+    group: string,
+    limit: number,
+    abandoned: AbortSignal,
+  ) {
     const sent = this.sent.get(group) ?? [];
     this.sent.set(group, sent);
     for (;;) {
+      abandoned.throwIfAborted();
       if (this.cooling(path, group)) throw new Error(BUSY);
       const now = this.now();
       while (sent.length && now - sent[0] >= RATE_WINDOW) sent.shift();
@@ -108,8 +183,34 @@ export class DeadlockApi {
         sent.push(now);
         return;
       }
-      await this.wait(sent[0] + RATE_WINDOW - now);
+      await this.pause(sent[0] + RATE_WINDOW - now, abandoned);
     }
+  }
+
+  /** Waits `ms`, or less when a cooldown starts or every caller leaves. */
+  private async pause(ms: number, abandoned: AbortSignal) {
+    const woken = new AbortController();
+    const wake = () => woken.abort();
+    this.sleepers.add(wake);
+    abandoned.addEventListener("abort", wake);
+    try {
+      await Promise.race([
+        this.wait(ms, woken.signal),
+        new Promise((resolve) =>
+          woken.signal.addEventListener("abort", resolve),
+        ),
+      ]);
+    } finally {
+      this.sleepers.delete(wake);
+      abandoned.removeEventListener("abort", wake);
+      // Clears the timer of a wait cut short.
+      woken.abort();
+    }
+  }
+
+  private cool(key: string, until: number) {
+    this.cooldowns.set(key, until);
+    for (const wake of [...this.sleepers]) wake();
   }
 
   // Responses that have outlived their ttl are dropped, at most once a
@@ -148,7 +249,7 @@ export class DeadlockApi {
       const until = Number.isFinite(seconds)
         ? this.now() + seconds * 1000
         : Date.parse(header ?? "");
-      this.cooldowns.set(
+      this.cool(
         response.status === 503 ? EVERYTHING : refused(path, group),
         Math.max(this.now() + 30_000, Number.isFinite(until) ? until : 0),
       );

@@ -226,6 +226,102 @@ describe("DeadlockApi", () => {
     }
   });
 
+  it("fails waiting requests as soon as their group cools down", async () => {
+    vi.useFakeTimers();
+    try {
+      let sent = 0;
+      const request = vi.fn<typeof fetch>().mockImplementation(async () =>
+        ++sent === 20
+          ? new Response("", {
+              status: 429,
+              headers: { "Retry-After": "3600" },
+            })
+          : json([]),
+      );
+      const api = new DeadlockApi(request);
+      const rank = (id: number) =>
+        api.get(`/v1/players/rank?account_ids=${id}`, 1);
+      const first = Array.from({ length: 20 }, (_, i) =>
+        rank(i).catch(() => null),
+      );
+      let settled = false;
+      const waiting = rank(20).finally(() => (settled = true));
+      waiting.catch(() => {});
+      await Promise.all(first);
+      // No time passes: the 429 wakes it, rather than the window freeing
+      // a slot a minute later.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(settled).toBe(true);
+      await expect(waiting).rejects.toThrow("API busy");
+      expect(request).toHaveBeenCalledTimes(20);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("drops a waiting request once no one wants it, without using a slot", async () => {
+    vi.useFakeTimers();
+    try {
+      const start = Date.now();
+      const sentAt = new Map<string, number>();
+      const request = vi.fn<typeof fetch>().mockImplementation(async (url) => {
+        sentAt.set(String(url).split("=")[1], Date.now() - start);
+        return json([]);
+      });
+      const api = new DeadlockApi(request);
+      const rank = (id: number, signal?: AbortSignal) =>
+        api.get(`/v1/players/rank?account_ids=${id}`, 1, signal);
+      await Promise.all(Array.from({ length: 20 }, (_, i) => rank(i)));
+      const left = new AbortController();
+      const leaving = rank(20, left.signal);
+      // Two ask for 21; one leaves, the other still wants it.
+      const shared = new AbortController();
+      const stays = rank(21);
+      const goes = rank(21, shared.signal);
+      const later = rank(22);
+      left.abort();
+      shared.abort();
+      // Callers that leave hear so at once.
+      await expect(leaving).rejects.toThrow(/abort/i);
+      await expect(goes).rejects.toThrow(/abort/i);
+      await vi.advanceTimersByTimeAsync(RATE_WINDOW);
+      await Promise.all([stays, later]);
+      // 20 never went out; the others went once the window had room.
+      expect(sentAt.has("20")).toBe(false);
+      expect(sentAt.get("21")).toBe(RATE_WINDOW);
+      expect(sentAt.get("22")).toBe(RATE_WINDOW);
+      expect(request).toHaveBeenCalledTimes(22);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a sent request's answer when its caller has left", async () => {
+    let release!: (response: Response) => void;
+    const request = vi.fn<typeof fetch>().mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = resolve;
+        }),
+    );
+    const api = new DeadlockApi(request, () => 0);
+    const caller = new AbortController();
+    const asked = api.get("/v1/x", 1000, caller.signal);
+    caller.abort();
+    await expect(asked).rejects.toThrow(/abort/i);
+    // A new caller shares the request already out, and its answer is kept.
+    const again = api.get("/v1/x", 1000);
+    release(json({ n: 1 }));
+    await expect(again).resolves.toEqual({ n: 1 });
+    await expect(api.get("/v1/x", 1000)).resolves.toEqual({ n: 1 });
+    expect(request).toHaveBeenCalledTimes(1);
+    // A caller that has already left asks for nothing.
+    await expect(api.get("/v1/y", 1000, caller.signal)).rejects.toThrow(
+      /abort/i,
+    );
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
   it("drops responses that outlived their ttl", async () => {
     const request = vi
       .fn<typeof fetch>()
