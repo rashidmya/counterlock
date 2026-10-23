@@ -394,44 +394,65 @@ test("a match row opens the report; Back returns to the profile", async ({
   );
 });
 
-async function openWith(page: Page, metadata: unknown) {
+async function openWith(page: Page, metadata: unknown, ranks?: unknown[]) {
   await storeAccount(page);
   await routeApi(page);
   await page.route(
     `https://api.deadlock-api.com/v1/matches/${MATCH_ID}/metadata`,
     (route) => route.fulfill({ json: metadata, headers: cors }),
   );
+  if (ranks)
+    await page.route(
+      "https://api.deadlock-api.com/v1/players/rank**",
+      (route) => route.fulfill({ json: ranks, headers: cors }),
+    );
   await page.goto("/");
   await view(page).getByRole("button", { name: "Open match report →" }).click();
   await expect(report(page).locator(".report-result")).toBeVisible();
 }
 
-test("a player without a recorded rank is compared at the lobby's rank, and the note says so", async ({
+test("a player without a recorded rank is compared at their current rank, and the note says so", async ({
   page,
 }) => {
-  const unranked = matchMetadata(ACCOUNT);
-  delete (unranked.match_info.players[0] as Record<string, unknown>)
+  const unrecorded = matchMetadata(ACCOUNT);
+  delete (unrecorded.match_info.players[0] as Record<string, unknown>)
     .player_rank_data;
-  await openWith(page, unranked);
+  // The lobby is Emissary; the player is Eternus now.
+  await openWith(page, unrecorded, [
+    { account_id: ACCOUNT, badge: 116, rank: 11, subrank: 6 },
+  ]);
   await expect(
     report(page).locator(".report-verdicts + .data-note"),
   ).toHaveText(
-    `Compared with the average ${lead.name} at Emissary at the same match length, over the last 30 days. This player's rank isn't recorded for this match, so the average uses the lobby's rank.`,
+    `Compared with the average ${lead.name} at Eternus at the same match length, over the last 30 days. This player's rank isn't recorded for this match, so the average uses their current rank.`,
   );
 });
 
-test("with no ranks recorded, the average covers all ranks without a lobby note", async ({
+test("with no ranks recorded and no current rank, the average covers all ranks and says so", async ({
   page,
 }) => {
+  const asked: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/v1/players/rank")
+      asked.push(url.searchParams.get("account_ids")!);
+  });
   const unranked = matchMetadata(ACCOUNT);
   for (const player of unranked.match_info.players)
     delete (player as Record<string, unknown>).player_rank_data;
-  await openWith(page, unranked);
+  await openWith(page, unranked, []);
   await expect(
     report(page).locator(".report-verdicts + .data-note"),
   ).toHaveText(
-    `Compared with the average ${lead.name} at all ranks at the same match length, over the last 30 days.`,
+    `Compared with the average ${lead.name} at all ranks at the same match length, over the last 30 days. This player's rank isn't recorded for this match and their current rank is unknown, so the average covers all ranks.`,
   );
+  // One request covers every player's current rank (the home page asks for
+  // the stored account's alone).
+  const players = [
+    ...Array.from({ length: 11 }, (_, i) => 5001 + i),
+    ACCOUNT,
+  ].join(",");
+  expect(asked.filter((ids) => ids.includes(","))).toEqual([players]);
 });
 
 test("Street Brawl reports say rank averages cover normal matches only", async ({

@@ -1,5 +1,8 @@
 import { TTL, deadlockApi, type DeadlockApi } from "@/shared/api/DeadlockApi";
-import { fetchSteamProfiles } from "@/features/profile/services/profile-api";
+import {
+  fetchRankBadges,
+  fetchSteamProfiles,
+} from "@/features/profile/services/profile-api";
 import { parseMatchReport, type MatchReport } from "../utils/report";
 import {
   MIN_CURVE_SAMPLES,
@@ -33,6 +36,21 @@ export async function fetchPlayerNames(
       api,
     );
     return new Map(profiles.map((p) => [p.accountId, p.name]));
+  } catch {
+    return new Map();
+  }
+}
+
+/**
+ * Current rank badges by account id, for players whose rank the match didn't
+ * record; empty when the lookup fails, so those players get all ranks.
+ */
+export async function fetchCurrentBadges(
+  accountIds: number[],
+  api: DeadlockApi = deadlockApi,
+): Promise<Map<number, number>> {
+  try {
+    return await fetchRankBadges(accountIds, api);
   } catch {
     return new Map();
   }

@@ -94,6 +94,29 @@ export async function fetchRank(
   return row ? (row as unknown as PlayerRank) : null;
 }
 
+/** Current rank badges by account id, in one request; unranked accounts are left out. */
+export async function fetchRankBadges(
+  ids: number[],
+  api: DeadlockApi = deadlockApi,
+): Promise<Map<number, number>> {
+  const asked = [...new Set(ids.filter((id) => id > 0))].sort((a, b) => a - b);
+  if (!asked.length) return new Map();
+  const data = await api.get<unknown>(
+    `/v1/players/rank?account_ids=${asked.join(",")}`,
+    TTL.profile,
+  );
+  return new Map(
+    rows(data).flatMap((r) =>
+      isNumber(r.account_id) &&
+      asked.includes(r.account_id) &&
+      isNumber(r.badge) &&
+      r.badge > 0
+        ? [[r.account_id, r.badge] as const]
+        : [],
+    ),
+  );
+}
+
 export async function fetchMatchHistory(
   id: number,
   api: DeadlockApi = deadlockApi,

@@ -5,12 +5,16 @@ import { heroName } from "../utils/perspective";
 import type { RankCurve } from "../utils/rank-curve";
 import type { ReportPlayer } from "../utils/report";
 
+// Where the player's rank came from: the match, their current rank (the
+// match recorded none), or neither (all ranks).
+export type RankSource = "match" | "current" | "none";
+
 export function curveNote(
   hero: string,
   curve: AsyncState<RankCurve>,
   normal: boolean,
   durationS: number,
-  fromLobby: boolean,
+  rank: RankSource,
 ) {
   if (!normal) return "Rank averages cover normal matches only.";
   if (curve.loading) return "Loading the rank average…";
@@ -20,9 +24,11 @@ export function curveNote(
     (widenedFrom
       ? ` Too few ${hero} games at ${widenedFrom} alone, so this covers ${band.label}.`
       : "") +
-    (fromLobby
-      ? " This player's rank isn't recorded for this match, so the average uses the lobby's rank."
-      : "");
+    (rank === "current"
+      ? " This player's rank isn't recorded for this match, so the average uses their current rank."
+      : rank === "none"
+        ? " This player's rank isn't recorded for this match and their current rank is unknown, so the average covers all ranks."
+        : "");
   if (!points.length)
     return `Too few ${hero} games at ${band.label} in the last 30 days.${notes}`;
   const end = points.at(-1)!.t;
@@ -36,12 +42,12 @@ export function Verdicts({
   durationS,
   curve,
   normal,
-  fromLobby,
+  rank,
 }: {
   player: ReportPlayer;
   durationS: number;
   curve: AsyncState<RankCurve>;
-  fromLobby: boolean;
+  rank: RankSource;
   normal: boolean;
 }) {
   const hero = heroName(player.heroId);
@@ -71,7 +77,7 @@ export function Verdicts({
         ))}
       </div>
       <p className="data-note">
-        {curveNote(hero, curve, normal, durationS, fromLobby)}
+        {curveNote(hero, curve, normal, durationS, rank)}
         {curve.error && (
           <>
             {" "}

@@ -5,6 +5,7 @@ import {
   fetchMates,
   fetchPlayerHeroStats,
   fetchRank,
+  fetchRankBadges,
   fetchSteamProfiles,
   heroStatsQueries,
   searchSteamAccounts,
@@ -174,6 +175,22 @@ describe("fetchSteamProfiles and fetchRank", () => {
     });
     expect(await fetchRank(5, api)).toEqual(row);
     expect(await fetchRank(6, api)).toBeNull();
+  });
+
+  it("asks for many accounts' ranks in one request, leaving out the unranked", async () => {
+    const { api, calls } = fakeApi({
+      "/v1/players/rank?account_ids=3,5,7": [
+        { account_id: 5, badge: 61, rank: 6, subrank: 1 },
+        { account_id: 7, badge: 0, rank: 0, subrank: 0 },
+        { account_id: 9, badge: 116, rank: 11, subrank: 6 },
+      ],
+    });
+    expect(await fetchRankBadges([7, 5, 0, 3, 5], api)).toEqual(
+      new Map([[5, 61]]),
+    );
+    expect(calls).toEqual(["/v1/players/rank?account_ids=3,5,7"]);
+    expect(await fetchRankBadges([0], api)).toEqual(new Map());
+    expect(calls).toHaveLength(1);
   });
 });
 

@@ -3,6 +3,7 @@ import { RouteLink } from "@/app/links";
 import { useAsync } from "@/shared/api/useAsync";
 import { SectionHeader } from "@/shared/ui/SectionHeader";
 import {
+  fetchCurrentBadges,
   fetchMatchReport,
   fetchPlayerNames,
   fetchRankCurve,
@@ -12,7 +13,6 @@ import {
   optionLabel,
   viewNote,
 } from "../utils/perspective";
-import { lobbyBadge } from "../utils/rank-curve";
 import { NORMAL_MODE, type MatchReport } from "../utils/report";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { PlayerInsights } from "./PlayerInsights";
@@ -42,14 +42,30 @@ function Report({
   const [picked, setPicked] = useState<{ slot: number | null } | null>(null);
   const slot = picked ? picked.slot : defaultPerspective(report, meId, fromId);
   const selected = report.players.find((p) => p.slot === slot);
-  const badge = selected ? selected.badge || lobbyBadge(report.players) : 0;
   const normal = report.gameMode === NORMAL_MODE;
-  const curve = useAsync(
-    selected && normal
+  // A player whose rank the match didn't record, as in unranked games, is
+  // compared at their current rank, as on the Performance tab; one request
+  // covers every such player.
+  const unrecorded = report.players
+    .filter((p) => !p.badge)
+    .map((p) => p.accountId);
+  const current = useAsync(
+    normal && unrecorded.length ? () => fetchCurrentBadges(unrecorded) : null,
+    [report.matchId],
+  );
+  const badge = selected
+    ? selected.badge || (current.data?.get(selected.accountId) ?? 0)
+    : 0;
+  const rank = selected?.badge ? "match" : badge ? "current" : "none";
+  // Without a recorded rank, the curve waits for the current one.
+  const waiting = !!selected && !selected.badge && current.loading;
+  const loaded = useAsync(
+    selected && normal && !waiting
       ? () => fetchRankCurve(selected.heroId, badge, report.durationS)
       : null,
-    [selected?.heroId, badge, report.durationS],
+    [selected?.heroId, badge, report.durationS, waiting],
   );
+  const curve = waiting ? { loading: true, retry: loaded.retry } : loaded;
   const top = useRef<HTMLDivElement>(null);
   const viewing = useRef<HTMLSelectElement>(null);
   const refocus = useRef(false);
@@ -119,7 +135,7 @@ function Report({
           durationS={report.durationS}
           curve={curve}
           normal={normal}
-          fromLobby={!selected.badge && lobbyBadge(report.players) > 0}
+          rank={rank}
         />
       )}
       <SectionHeader title="Graph" />
