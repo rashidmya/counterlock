@@ -2866,8 +2866,10 @@ Run all of these; every one must pass:
 
 - [ ] **Step 4: Commit**
 
+The spec has never been prettier-formatted (its token table and two blank lines predate this phase), so check only the README and leave the spec's existing formatting alone.
+
 ```bash
-npx prettier --check README.md docs/superpowers/specs/2026-10-21-redesign-design.md
+npx prettier --check README.md
 git add README.md docs/superpowers/specs/2026-10-21-redesign-design.md
 git commit -m "docs: Performance tab"
 ```
