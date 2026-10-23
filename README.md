@@ -88,12 +88,12 @@ Everything comes from `GET /v1/matches/{id}/metadata`: per-player stat snapshots
 
 ### Performance tab
 
-Eight cards, each with one point per game (oldest on the left, dotted by win or loss), the dashed rank average and the value over the range. A range adds up the games rather than averaging each game's value, so longer games count for more.
+Eight cards, each with one point per game (oldest on the left, dotted by win or loss), the dashed rank average where there is one, and the value over the range. A range adds up the games rather than averaging each game's value, so longer games count for more.
 
 - **From match history:** souls / min and the K/D/A ratio, (kills + assists) ÷ deaths, with deaths counted as at least one after adding up the games.
-- **From each game's totals:** hero damage, objective damage, healing and creep kills per minute, kill participation and hero damage share. They come from `GET /v1/matches/metadata?match_ids=…&include_player_kda=true&extra_player_columns=stats.player_damage,stats.boss_damage,stats.player_healing,stats.creep_kills` (bulk metadata, every player's stat snapshots; the last one is the final total), at most 50 games per request and kept per match, so a wider range only asks for the games it adds. Bulk metadata allows 30 requests per minute per IP. Games the API hasn't stored yet are left out and the note says how many.
-- **Rank average:** the match report's curve, one request per hero and rank (shared between games), read at each game's length: the tier of the game's rank (match history's `ranked_display_badge`), the player's current rank for games without one, such as unranked games, or all ranks when neither is known. It widens as in the match report. As there, **creep kills** stand in for last hits. Kill participation and hero damage share have no rank average.
-- **Improving / Flat / Slipping** compares the recent half of the games with the earlier half (at least 6 games), each game as its value ÷ its rank average, so changing hero or rank doesn't read as a change in form; the two shares use their values. It says improving or slipping only when Welch's t-test finds the halves differ at the 95% level, and flat otherwise. When some games run past the end of the rank average, the card compares the player and the average over the games that have one.
+- **From each game's totals:** hero damage, objective damage, healing and creep kills per minute, kill participation and hero damage share. They come from `GET /v1/matches/metadata?match_ids=…&include_player_kda=true&extra_player_columns=stats.player_damage,stats.boss_damage,stats.player_healing,stats.creep_kills&limit=…` (bulk metadata, every player's stat snapshots; the last one is the final total; `limit` is the number of games asked for), at most 50 games per request and kept per match, so a wider range only asks for the games it adds. Games the API hasn't stored yet are left out and the note says how many. Bulk metadata allows 30 requests per minute per IP (checked against the live API; the app doesn't throttle), so switching heroes quickly on Last 100 can hit the cooldown, which holds back every uncached request for at least 30 seconds.
+- **Rank average:** the match report's curve, read at each game's length: the tier of the game's rank (match history's `ranked_display_badge`), the player's current rank (`/v1/players/rank`, asked only then) for games without one, such as unranked games, or all ranks when neither is known. It takes one request per hero and rank tier, plus one when it widens as in the match report, shared between games. The match report falls back to the lobby's rank instead, so an unranked game's average can differ between the two. As there, **creep kills** stand in for last hits. Kill participation and hero damage share have no rank average: the curve has no team totals.
+- **Improving / Flat / Slipping** compares the recent half of the games with the earlier half (at least 6 games with a value and, where the metric has one, a rank average), each game as its value ÷ its rank average, so changing hero or rank doesn't read as a change in form; the two shares use their values. It says improving or slipping only when Welch's t-test finds the halves differ at the 95% level, and flat otherwise. When some games run past the end of the rank average, the card compares the player and the average over the games that have one.
 
 ## Website
 
@@ -173,7 +173,7 @@ Before a public release, test in Windows with a live match: game startup and shu
 | `src/platform/overwolf/`                          | Background lifecycle, store bridge, game detection, window controls and native window hooks        |
 | `src/shared/api/`                                 | Shared cached Deadlock API client and async request hook                                           |
 | `src/shared/catalog/`                             | Typed catalog access (heroes, roles, abilities, items), metadata types and the dated JSON snapshot |
-| `src/shared/ui/`                                  | Reusable icons, images, item artwork, page title, ribbon and section header                        |
+| `src/shared/ui/`                                  | Reusable icons, images, item artwork, page title, ribbon, section header and element-width hook    |
 | `src/background/`, `src/desktop/`, `src/in_game/` | Stable HTML and minimal TypeScript entrypoints used by the manifest                                |
 | `web/`                                            | Website: React Router app, routes, SEO, phone styles, static-host scripts; reuses `src/` features  |
 | `tests/`                                          | Unit suites grouped by feature, browser integration tests, and demo fixtures                       |
@@ -198,7 +198,7 @@ Live player statistics and the compact overlay's community build use `/v1/player
 - `/v1/analytics/hero-stats`, `hero-counter-stats`, `hero-synergy-stats`, `ability-order-stats` and `item-stats` (also per build phase and per picked enemy)
 - `/v1/builds` (popular builds on the hero page)
 
-The client caches in memory (two to ten minutes depending on the data), times out after 15 seconds, shares in-flight requests and honours `Retry-After` cooldowns.
+The client caches in memory (two to ten minutes depending on the data), times out after 15 seconds, shares in-flight requests and honours `Retry-After` cooldowns. The Performance tab also keeps each stored game's totals for the session.
 
 ## Sources
 
