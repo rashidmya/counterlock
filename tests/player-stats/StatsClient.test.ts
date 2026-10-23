@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { StatsClient } from "@/features/player-stats/services/StatsClient";
-import { DeadlockApi } from "@/shared/api/DeadlockApi";
+import { DeadlockApi, TTL } from "@/shared/api/DeadlockApi";
 
 const client = (request: typeof fetch, now = () => 0) =>
   new StatsClient(new DeadlockApi(request, now), now);
@@ -56,7 +56,7 @@ describe("stats API", () => {
     expect(stats[10].heroError).toContain("protected");
     expect(stats[10].rank?.badge).toBe(81);
   });
-  it("waits out cooldowns as the app's other requests do", async () => {
+  it("fails at once during a cooldown, as the app's other requests do", async () => {
     let now = 0;
     const request = vi.fn<typeof fetch>().mockResolvedValue(
       new Response("Busy", {
@@ -77,6 +77,78 @@ describe("stats API", () => {
     now = 121_000;
     await stats.load([3], "normal");
     expect(request).toHaveBeenCalledTimes(5);
+  });
+  it("asks again for stats that failed, and keeps those that loaded", async () => {
+    let now = 0;
+    const heroes = [
+      { account_id: 10, hero_id: 13, wins: 5, matches_played: 10 },
+    ];
+    const ranks = [{ account_id: 10, badge: 81, rank: 8, subrank: 1 }];
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (url) =>
+        String(url).includes("account_ids=99")
+          ? new Response("Busy", { status: 429 })
+          : new Response(
+              JSON.stringify(
+                String(url).includes("hero-stats") ? heroes : ranks,
+              ),
+            ),
+      );
+    const api = new DeadlockApi(request, () => now);
+    const stats = new StatsClient(api, () => now);
+    // Another view's rank lookup is refused: rank lookups pause for all.
+    await expect(
+      api.get("/v1/players/rank?account_ids=99", TTL.profile),
+    ).rejects.toThrow("API busy");
+    const busy = await stats.load([10], "normal");
+    expect(busy[10].heroes?.[0].wins).toBe(5);
+    expect(busy[10].rankError).toBe("API busy. Retry after the cooldown.");
+    expect(request).toHaveBeenCalledTimes(2);
+    // Once the cooldown is over, only the rank lookup goes out again.
+    now = 30_000;
+    const loaded = await stats.load([10], "normal");
+    expect(loaded[10].rank?.badge).toBe(81);
+    expect(loaded[10].rankError).toBeUndefined();
+    expect(loaded[10].heroes?.[0].wins).toBe(5);
+    expect(request).toHaveBeenCalledTimes(3);
+    expect(String(request.mock.calls[2][0])).toContain("/players/rank?");
+    // Stats that loaded are kept for TTL.profile.
+    now += TTL.profile - 1;
+    await stats.load([10], "normal");
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+  it("keeps the stats that loaded when the roster changes during a cooldown", async () => {
+    let now = 0;
+    const heroes = [
+      { account_id: 10, hero_id: 13, wins: 5, matches_played: 10 },
+    ];
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (url) =>
+        String(url).includes("/players/rank")
+          ? new Response("Busy", { status: 503 })
+          : new Response(JSON.stringify(heroes)),
+      );
+    const stats = client(request, () => now);
+    await stats.load([10], "normal");
+    // A player joins during the 503's cooldown: the new roster's requests
+    // fail at once, and player 10's hero stats stay.
+    now = 1_000;
+    const joined = await stats.load([10, 11], "normal");
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(joined[10].heroes?.[0].wins).toBe(5);
+    expect(joined[10].heroError).toBeUndefined();
+    expect(joined[10].rankError).toBe("API busy. Retry after the cooldown.");
+    expect(joined[11].heroError).toBe("API busy. Retry after the cooldown.");
+    // Kept for TTL.profile from when they loaded, not longer: in a later
+    // cooldown (player 12's rank lookup starts one), they are gone.
+    now = TTL.profile;
+    await stats.load([12], "normal");
+    const stale = await stats.load([10, 11], "normal");
+    expect(request).toHaveBeenCalledTimes(4);
+    expect(stale[10].heroes).toBeUndefined();
+    expect(stale[10].heroError).toBe("API busy. Retry after the cooldown.");
   });
   it("rejects malformed rows and non-array responses", async () => {
     const request = vi
