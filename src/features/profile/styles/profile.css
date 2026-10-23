@@ -659,7 +659,8 @@
   font-weight: 600;
   color: var(--cream);
 }
-/* A 24 px touch target without making the tip taller. */
+/* A 24 px touch target: a 16 px line and 4 px of padding each side, with
+   negative margins so most of it overlaps the tip's own padding. */
 .spark-tip a,
 .spark-tip button {
   display: inline-block;
