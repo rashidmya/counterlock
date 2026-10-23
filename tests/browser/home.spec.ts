@@ -885,6 +885,12 @@ test("performance tab keeps the rank averages that loaded, and Retry asks again 
   page,
 }) => {
   const failCurveFor = new Set([heroes[1]]);
+  const curves: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/v1/analytics/player-performance-curve")
+      curves.push(url.searchParams.get("hero_ids")!);
+  });
   await storeAccount(page);
   await routeApi(page, { history: performanceHistory, failCurveFor });
   await openMyProfile(page);
@@ -897,12 +903,21 @@ test("performance tab keeps the rank averages that loaded, and Retry asks again 
   await expect(souls.locator(".perf-card-numbers")).toContainText(
     "20 games · 10 with a rank average",
   );
+  // No trend from the games that kept their average; the shares, which
+  // have none, keep theirs.
+  await expect(souls.locator(".perf-trend")).toHaveCount(0);
+  await expect(
+    card(page, "Kill participation").locator(".perf-trend"),
+  ).toHaveCount(1);
+  const asked = curves.length;
   failCurveFor.clear();
   await notice.getByRole("button", { name: "Retry" }).click();
   await expect(souls.locator(".perf-card-numbers")).toHaveText(
     "1,100 20 games · rank avg 1,000",
   );
   await expect(notice).toHaveCount(0);
+  // Retry asked again only for the curve that failed.
+  expect(new Set(curves.slice(asked))).toEqual(new Set([String(heroes[1])]));
 });
 
 test("performance tab degrades without match history", async ({ page }) => {

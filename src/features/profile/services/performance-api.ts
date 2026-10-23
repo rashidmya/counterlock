@@ -1,5 +1,5 @@
 import { fetchRankCurve } from "@/features/match-report/services/match-report";
-import { rankBand } from "@/features/match-report/utils/rank-curve";
+import { curvePath, rankBand } from "@/features/match-report/utils/rank-curve";
 import { TTL, deadlockApi, type DeadlockApi } from "@/shared/api/DeadlockApi";
 import type { HistoryMatch } from "../types";
 import {
@@ -63,12 +63,13 @@ export const CURVE_CONCURRENCY = 4;
 export interface GameAverages {
   // By match id; games whose curve failed are missing.
   byMatch: Map<number, GameAverage>;
-  failed: number;
-  // The first failure's message.
+  // The games whose curve failed.
+  failed: Set<number>;
+  // A failure's message, for the notice.
   error?: string;
 }
 
-/** Runs `run` over the items, at most `limit` at a time. */
+/** Runs `run` over the items, at most `limit` at a time; `run` must not reject. */
 async function eachLimited<T>(
   items: T[],
   limit: number,
@@ -100,11 +101,14 @@ export async function fetchGameAverages(
   const badge = (game: HistoryMatch) => game.badge || current;
   const groups = new Map<string, HistoryMatch[]>();
   for (const game of games) {
-    const key = `${game.heroId} ${rankBand(badge(game)).label}`;
-    groups.set(key, [...(groups.get(key) ?? []), game]);
+    // Games that ask for the same curve form a group.
+    const key = curvePath(game.heroId, rankBand(badge(game)));
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(game);
   }
   const byMatch = new Map<number, GameAverage>();
-  const errors: string[] = [];
+  const failed = new Set<number>();
+  let error: string | undefined;
   await eachLimited([...groups.values()], CURVE_CONCURRENCY, async (group) => {
     const results = await Promise.allSettled(
       group.map(async (game) => {
@@ -118,14 +122,15 @@ export async function fetchGameAverages(
         byMatch.set(game.matchId, gameAverage(curve, game.durationS, source));
       }),
     );
-    for (const result of results)
-      if (result.status === "rejected")
-        errors.push(
-          result.reason instanceof Error
-            ? result.reason.message
-            : String(result.reason),
-        );
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") return;
+      failed.add(group[index].matchId);
+      error ??=
+        result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason);
+    });
   });
-  if (errors.length && !byMatch.size) throw new Error(errors[0]);
-  return { byMatch, failed: errors.length, error: errors[0] };
+  if (failed.size && !byMatch.size) throw new Error(error);
+  return { byMatch, failed, error };
 }

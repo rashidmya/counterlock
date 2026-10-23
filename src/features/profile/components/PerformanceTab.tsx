@@ -51,17 +51,24 @@ function PerformanceCard({
 }: {
   summary: MetricSummary;
   totals: AsyncState<unknown>;
-  averages: AsyncState<unknown>;
+  averages: AsyncState<GameAverages>;
 }) {
-  const { metric, value, games, average, comparedValue, compared, trend } =
-    summary;
+  const { metric, value, games, average, comparedValue, compared } = summary;
   // What the card still waits for, or lacks because a request failed.
   const waiting =
     (metric.needsTotals && totals.loading) ||
     (!!metric.average && averages.loading);
+  // A failed curve leaves some of the card's games without an average: the
+  // card then claims no trend from the rest.
+  const partial =
+    !!metric.average &&
+    summary.points.some(
+      (p) => p.value !== null && !!averages.data?.failed.has(p.matchId),
+    );
   const failed =
     (metric.needsTotals && !!totals.error) ||
-    (!!metric.average && !!averages.error);
+    (!!metric.average && (!!averages.error || partial));
+  const trend = failed ? null : summary.trend;
   const detail =
     metric.needsTotals && totals.loading
       ? "Loading match details…"
@@ -73,7 +80,7 @@ function PerformanceCard({
             : averages.loading
               ? " · loading rank average…"
               : average === null
-                ? averages.error
+                ? failed
                   ? ""
                   : " · no rank average for these games"
                 : compared < games
@@ -252,9 +259,9 @@ export function PerformanceTab({
               </button>
             </p>
           )}
-          {!!averages.data?.failed && (
+          {!!averages.data?.failed.size && (
             <p className="notice warning" role="status">
-              Rank averages unavailable for {averages.data.failed} of{" "}
+              Rank averages unavailable for {averages.data.failed.size} of{" "}
               {count(games.length)}: {averages.data.error}
               <button type="button" onClick={averages.retry}>
                 Retry

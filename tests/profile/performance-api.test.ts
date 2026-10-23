@@ -252,7 +252,7 @@ describe("fetchGameAverages", () => {
       api,
     );
     expect([...averages.byMatch.keys()]).toEqual([1]);
-    expect(averages.failed).toBe(2);
+    expect([...averages.failed]).toEqual([2, 3]);
     expect(averages.error).toBe("Deadlock API timed out.");
   });
 
@@ -276,7 +276,7 @@ describe("fetchGameAverages", () => {
       api,
     );
     expect(averages.byMatch.size).toBe(12);
-    expect(averages.failed).toBe(0);
+    expect(averages.failed.size).toBe(0);
     expect(most).toBe(CURVE_CONCURRENCY);
   });
 
