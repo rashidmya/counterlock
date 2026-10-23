@@ -1105,6 +1105,72 @@ test("performance tab keeps the last cards, dimmed, while new games load", async
   await expect(status).toHaveText("");
 });
 
+test("performance tab keeps older cards through a partial failure and its Retry", async ({
+  page,
+}) => {
+  // Last 50 adds 20 older games on heroes[2], whose curve fails.
+  const older = Array.from({ length: 20 }, (_, i) =>
+    historyRow(4000 + i, heroes[2], 1, 4, true, now - 3600 * (30 + i)),
+  );
+  const failCurveFor = new Set([heroes[2]]);
+  let holdTotals: Promise<void> | null = null;
+  let holdCurves: Promise<void> | null = null;
+  let release = () => {};
+  await storeAccount(page);
+  await routeApi(page, {
+    history: [...performanceHistory.slice(0, 20), ...older],
+    failCurveFor,
+    gate: (url) =>
+      (url.pathname === "/v1/matches/metadata" && holdTotals) ||
+      (url.pathname === "/v1/analytics/player-performance-curve" &&
+        holdCurves) ||
+      Promise.resolve(),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const damage = card(page, "Hero damage / min").locator(".perf-card-numbers");
+  const cards = view(page).locator(".perf-cards");
+  const status = view(page).locator(".perf-status");
+  const notice = view(page).getByText(
+    "Rank averages unavailable for 20 of 40 games: Deadlock API unavailable (500).",
+  );
+  await expect(damage).toHaveText("1,000 20 games · rank avg 500");
+  // Last 50's averages fail in part while its match details are held: the
+  // Last 20 cards stay, and the notice waits for them.
+  holdTotals = new Promise((resolve) => (release = resolve));
+  const failed = page.waitForResponse(
+    (response) =>
+      response.url().includes("player-performance-curve") &&
+      response.url().includes(`hero_ids=${heroes[2]}`),
+  );
+  await page.getByRole("button", { name: "Last 50", exact: true }).click();
+  await failed;
+  await expect(cards).toHaveAttribute("aria-busy", "true");
+  await expect(status).toHaveText("Updating…");
+  await expect(damage).toHaveText("1,000 20 games · rank avg 500");
+  await expect(notice).toHaveCount(0);
+  release();
+  holdTotals = null;
+  await expect(notice).toBeVisible();
+  await expect(damage).toHaveText(
+    "1,000 40 games · 20 with a rank average: 1,000 vs 500",
+  );
+  // Its Retry, held: the partial cards stay, dimmed, without the notice.
+  failCurveFor.clear();
+  holdCurves = new Promise((resolve) => (release = resolve));
+  await notice.getByRole("button", { name: "Retry" }).click();
+  await expect(cards).toHaveAttribute("aria-busy", "true");
+  await expect(status).toHaveText("Updating…");
+  await expect(damage).toHaveText(
+    "1,000 40 games · 20 with a rank average: 1,000 vs 500",
+  );
+  await expect(notice).toHaveCount(0);
+  release();
+  await expect(damage).toHaveText("1,000 40 games · rank avg 500");
+  await expect(cards).toHaveAttribute("aria-busy", "false");
+  await expect(notice).toHaveCount(0);
+});
+
 test("performance tab drops the rank averages of a range it has left", async ({
   page,
 }) => {
