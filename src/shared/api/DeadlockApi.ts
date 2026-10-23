@@ -40,8 +40,9 @@ const refused = (path: string, group: string) =>
   RATE_LIMITS[group] ? group : path;
 
 /**
- * Every path is always asked for with the same ttl; an entry is kept, and
- * swept, by the ttl it was stored with.
+ * Every path is always asked for with the same ttl, so the caller's ttl,
+ * which decides whether an entry is fresh, and the one stored with it,
+ * which the sweep uses, agree.
  */
 export class DeadlockApi {
   private cache = new Map<
