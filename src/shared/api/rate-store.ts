@@ -2,6 +2,10 @@
 // last request into the API's next window early.
 export const RATE_WINDOW = 61_000;
 
+// The longest a cooldown lasts. It outlives a reload, so one set from a date
+// far ahead, or by a clock that was wrong, mustn't lock the app out.
+export const MAX_COOLDOWN = 10 * 60_000;
+
 /**
  * Request counts and cooldowns for the endpoint groups the API limits per
  * IP: one tab's own, or shared by every tab and window of the app.
@@ -22,6 +26,7 @@ export interface RateStore {
     claim: () => void,
   ): Promise<number | null>;
   cooling(keys: string[]): boolean;
+  /** Cools `key` down until `until`, or keeps a later end it already has. */
   cool(key: string, until: number): void;
   /** Calls `listener` when another tab or window starts a cooldown. */
   watch(listener: () => void): () => void;
@@ -93,9 +98,13 @@ export function sharedRateStore(
       return null;
     }
   };
+  // An end further ahead than any cooldown is set for (the clock was moved
+  // back, or it was written by hand) is ignored rather than waited out.
   const until = (key: string) => {
     const value = read(`cooldown.${key}`);
-    return typeof value === "number" ? value : 0;
+    return typeof value === "number" && value - now() <= MAX_COOLDOWN
+      ? value
+      : 0;
   };
   const cooling = (keys: string[]) => keys.some((key) => now() < until(key));
   return {

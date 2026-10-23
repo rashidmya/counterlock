@@ -208,6 +208,32 @@ describe("rate limits shared by every tab", () => {
     ).toHaveLength(1);
   });
 
+  it("holds nothing back for a stored cooldown further ahead than any is set for", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => json([]));
+    const { storage } = sharedStorage();
+    const now = 1_000_000;
+    const store = sharedRateStore(
+      storage,
+      serialLocks(),
+      () => now,
+      new EventTarget(),
+    );
+    const api = new DeadlockApi(request, () => now, undefined, store);
+    // An hour ahead, as after the clock was moved back, or written by hand.
+    storage.setItem("counterlock.api.cooldown.*", String(now + 60 * 60_000));
+    await expect(api.get("/v1/players/rank?account_ids=1", 1)).resolves.toEqual(
+      [],
+    );
+    // An ordinary cooldown still holds every request back.
+    storage.setItem("counterlock.api.cooldown.*", String(now + 5 * 60_000));
+    await expect(api.get("/v1/players/rank?account_ids=2", 1)).rejects.toThrow(
+      "API busy",
+    );
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
   it("reads damaged entries as empty", async () => {
     const { storage } = sharedStorage();
     storage.setItem("counterlock.api.sent./v1/players/rank", "{not json");

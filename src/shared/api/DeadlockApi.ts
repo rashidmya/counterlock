@@ -1,4 +1,9 @@
-import { RATE_WINDOW, defaultRateStore, type RateStore } from "./rate-store";
+import {
+  MAX_COOLDOWN,
+  RATE_WINDOW,
+  defaultRateStore,
+  type RateStore,
+} from "./rate-store";
 
 export { RATE_WINDOW };
 
@@ -274,14 +279,20 @@ export class DeadlockApi {
       throw this.mapTimeout(error);
     }
     if (response.status === 429 || response.status === 503) {
+      const now = this.now();
       const header = response.headers.get("Retry-After");
       const seconds = header ? Number(header) : NaN;
       const until = Number.isFinite(seconds)
-        ? this.now() + seconds * 1000
+        ? now + seconds * 1000
         : Date.parse(header ?? "");
+      // At least 30 seconds, and at most MAX_COOLDOWN, whatever the header
+      // says: the cooldown outlives a reload.
       this.cool(
         response.status === 503 ? EVERYTHING : refused(path, group),
-        Math.max(this.now() + 30_000, Number.isFinite(until) ? until : 0),
+        Math.min(
+          now + MAX_COOLDOWN,
+          Math.max(now + 30_000, Number.isFinite(until) ? until : 0),
+        ),
       );
       throw new Error(BUSY);
     }

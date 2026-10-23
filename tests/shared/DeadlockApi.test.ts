@@ -445,6 +445,27 @@ describe("DeadlockApi", () => {
     await expect(api.get("/v1/x", 1000)).rejects.toThrow("API busy");
   });
 
+  it("ends a cooldown within ten minutes, however far ahead Retry-After is", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response("", {
+          status: 503,
+          headers: { "Retry-After": "Wed, 01 Jan 2031 00:00:00 GMT" },
+        }),
+      )
+      .mockImplementation(async () => json([]));
+    let now = Date.parse("2026-10-23T12:00:00Z");
+    const api = new DeadlockApi(request, () => now);
+    await expect(api.get("/v1/x", 1000)).rejects.toThrow(
+      "API busy. Retry after the cooldown.",
+    );
+    now += 10 * 60_000 - 1;
+    await expect(api.get("/v1/x", 1000)).rejects.toThrow("API busy");
+    now += 1;
+    await expect(api.get("/v1/x", 1000)).resolves.toEqual([]);
+  });
+
   it("maps 403 and other errors, and does not cache failures", async () => {
     const request = vi
       .fn<typeof fetch>()
