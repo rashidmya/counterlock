@@ -20,8 +20,8 @@ export const RATE_LIMITS: Record<string, number> = {
 export const RATE_WINDOW = MINUTE + 1000;
 
 /**
- * The group a path's rate limit and cooldown belong to: the analytics
- * endpoints share one limit; any other endpoint has its own.
+ * The group a path's rate limit belongs to: the analytics endpoints share
+ * one limit; any other endpoint has its own.
  */
 export function endpointGroup(path: string) {
   const pathname = path.split("?")[0];
@@ -29,6 +29,20 @@ export function endpointGroup(path: string) {
   return pathname.replace(/\/\d+(?=\/|$)/g, "/{id}");
 }
 
+// A 503 means the API is shedding load: its database-backed endpoints share
+// one query queue, so every request waits out the cooldown.
+const EVERYTHING = "*";
+
+// What a 429 pauses: the group when the API limits it as a whole, otherwise
+// only the refused path, as those endpoints' limits depend on where the data
+// comes from (a match from the API's cache, or from Steam).
+const refused = (path: string, group: string) =>
+  RATE_LIMITS[group] ? group : path;
+
+/**
+ * Every path is always asked for with the same ttl; an entry is kept, and
+ * swept, by the ttl it was stored with.
+ */
 export class DeadlockApi {
   private cache = new Map<
     string,
@@ -52,7 +66,7 @@ export class DeadlockApi {
     const pending = this.inFlight.get(path);
     if (pending) return pending as Promise<T>;
     const group = endpointGroup(path);
-    if (this.cooling(group)) return Promise.reject(new Error(BUSY));
+    if (this.cooling(path, group)) return Promise.reject(new Error(BUSY));
     const run = this.send<T>(path, group)
       .then((data) => {
         this.store(path, data, ttlMs);
@@ -63,26 +77,30 @@ export class DeadlockApi {
     return run;
   }
 
-  private cooling(group: string) {
-    return this.now() < (this.cooldowns.get(group) ?? 0);
+  private cooling(path: string, group: string) {
+    const now = this.now();
+    return [EVERYTHING, refused(path, group)].some(
+      (key) => now < (this.cooldowns.get(key) ?? 0),
+    );
   }
 
   /** Sends at once, or when the group's rate limit has room. */
   private async send<T>(path: string, group: string): Promise<T> {
     const limit = RATE_LIMITS[group];
-    if (limit) {
-      await this.throttle(group, limit);
-      // A cooldown may have started while this request waited its turn.
-      if (this.cooling(group)) throw new Error(BUSY);
-    }
+    if (limit) await this.throttle(path, group, limit);
     return this.fetchJson<T>(path, group);
   }
 
-  /** Waits until the group has had fewer than `limit` requests in the window, then counts this one. */
-  private async throttle(group: string, limit: number) {
+  /**
+   * Waits until the group has had fewer than `limit` requests in the window,
+   * then counts this one. A cooldown that started while it waited fails it
+   * before it takes a slot.
+   */
+  private async throttle(path: string, group: string, limit: number) {
     const sent = this.sent.get(group) ?? [];
     this.sent.set(group, sent);
     for (;;) {
+      if (this.cooling(path, group)) throw new Error(BUSY);
       const now = this.now();
       while (sent.length && now - sent[0] >= RATE_WINDOW) sent.shift();
       if (sent.length < limit) {
@@ -130,7 +148,7 @@ export class DeadlockApi {
         ? this.now() + seconds * 1000
         : Date.parse(header ?? "");
       this.cooldowns.set(
-        group,
+        response.status === 503 ? EVERYTHING : refused(path, group),
         Math.max(this.now() + 30_000, Number.isFinite(until) ? until : 0),
       );
       throw new Error(BUSY);
