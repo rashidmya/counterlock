@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { AsyncState } from "@/shared/api/useAsync";
 import { useAsync } from "@/shared/api/useAsync";
 import { heroById } from "@/shared/catalog";
@@ -164,12 +163,19 @@ function notes(
 export function PerformanceTab({
   accountId,
   history,
+  range,
+  heroId: picked,
+  onRange,
+  onHero,
 }: {
   accountId: number;
   history: AsyncState<HistoryMatch[]>;
+  range: PerformanceRange;
+  // Null for all heroes.
+  heroId: number | null;
+  onRange(range: PerformanceRange): void;
+  onHero(heroId: number | null): void;
 }) {
-  const [range, setRange] = useState<PerformanceRange>(20);
-  const [picked, setPicked] = useState<number | null>(null);
   const matches = history.data ?? [];
   const heroes = heroChoices(matches);
   // All heroes when the picked one has no games (left the history).
@@ -202,7 +208,7 @@ export function PerformanceTab({
               key={value}
               className={range === value ? "active" : ""}
               aria-pressed={range === value}
-              onClick={() => setRange(value)}
+              onClick={() => onRange(value)}
             >
               Last {value}
             </button>
@@ -214,9 +220,7 @@ export function PerformanceTab({
             <select
               value={heroId ?? ""}
               onChange={(event) =>
-                setPicked(
-                  event.target.value ? Number(event.target.value) : null,
-                )
+                onHero(event.target.value ? Number(event.target.value) : null)
               }
             >
               <option value="">All heroes</option>

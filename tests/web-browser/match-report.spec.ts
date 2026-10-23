@@ -126,3 +126,28 @@ test("profile match rows link to the report and Back returns", async ({
   await page.getByRole("link", { name: "← Back to profile" }).click();
   await expect(page).toHaveURL(`/players/${FARGO}`);
 });
+
+test("the profile keeps its tab, range and hero after a match report", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto(`/players/${FARGO}`);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await page.getByRole("button", { name: "Last 50", exact: true }).click();
+  const hero = page.getByRole("combobox", { name: "Hero" });
+  await hero.selectOption({ index: 1 });
+  const picked = await hero.inputValue();
+  await page.getByRole("tab", { name: "Matches" }).click();
+  await page.locator("a.match-open").first().click();
+  await expect(page).toHaveURL(`/matches/1001?player=${FARGO}`);
+  await page.getByRole("link", { name: "← Back to profile" }).click();
+  await expect(page.getByRole("tab", { name: "Matches" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    page.getByRole("button", { name: "Last 50", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(hero).toHaveValue(picked);
+});

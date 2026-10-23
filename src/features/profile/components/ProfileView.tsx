@@ -3,6 +3,7 @@ import { LinkScope } from "@/app/links";
 import type { Navigate } from "@/app/navigation";
 import type { AsyncState } from "@/shared/api/useAsync";
 import type { HistoryFilter, HistoryMatch } from "../types";
+import type { PerformanceRange } from "../utils/performance-metrics";
 import { HeroesTab } from "./HeroesTab";
 import { MatchHistory } from "./MatchHistory";
 import { OverviewTab } from "./OverviewTab";
@@ -16,6 +17,24 @@ const subtabs: { id: Subtab; label: string }[] = [
   { id: "heroes", label: "Heroes" },
 ];
 
+interface ViewState {
+  subtab: Subtab;
+  filter: HistoryFilter;
+  range: PerformanceRange;
+  // Null for all heroes.
+  heroId: number | null;
+}
+const FIRST_VIEW: ViewState = {
+  subtab: "overview",
+  filter: "all",
+  range: 20,
+  heroId: null,
+};
+// Each profile's tab and filters, kept for the session: switching tabs, or
+// coming back from a match report (a page of its own on the website),
+// finds them as they were.
+const views = new Map<number, ViewState>();
+
 export function ProfileView({
   accountId,
   history,
@@ -27,8 +46,15 @@ export function ProfileView({
   header: React.ReactNode;
   navigate: Navigate;
 }) {
-  const [subtab, setSubtab] = useState<Subtab>("overview");
-  const [filter, setFilter] = useState<HistoryFilter>("all");
+  const [view, setView] = useState(() => views.get(accountId) ?? FIRST_VIEW);
+  const { subtab, filter, range, heroId } = view;
+  const update = (change: Partial<ViewState>) => {
+    const next = { ...view, ...change };
+    views.set(accountId, next);
+    setView(next);
+  };
+  const setSubtab = (next: Subtab) => update({ subtab: next });
+  const setFilter = (next: HistoryFilter) => update({ filter: next });
   return (
     <LinkScope navigate={navigate}>
       <section className="profile">
@@ -79,7 +105,11 @@ export function ProfileView({
           <HeroesTab {...{ accountId, history, filter }} onFilter={setFilter} />
         )}
         {subtab === "performance" && (
-          <PerformanceTab accountId={accountId} history={history} />
+          <PerformanceTab
+            {...{ accountId, history, range, heroId }}
+            onRange={(next) => update({ range: next })}
+            onHero={(next) => update({ heroId: next })}
+          />
         )}
       </section>
     </LinkScope>
