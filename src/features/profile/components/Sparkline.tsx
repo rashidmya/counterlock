@@ -158,9 +158,12 @@ export function Sparkline({
         if (!box.current?.contains(event.relatedTarget as Node))
           setPicked(null);
       }}
-      // Escape clears the pick, from the chart or the tip's link.
+      // Escape clears the pick, from the chart or the tip's link; from the
+      // link, which goes with the tip, focus moves back to the chart first.
       onKeyDown={(event) => {
-        if (event.key === "Escape") setPicked(null);
+        if (event.key !== "Escape") return;
+        if (event.target !== chart.current) chart.current?.focus();
+        setPicked(null);
       }}
     >
       <div
@@ -228,7 +231,8 @@ export function Sparkline({
               onPointerMove={track}
               onPointerDown={track}
               onClick={(event) => {
-                // A tap only picks; a modified click is the browser's.
+                // A tap only picks; a modified click does nothing here
+                // (the tip's link can open the report in a new tab).
                 if (
                   pointer.current === "touch" ||
                   event.ctrlKey ||

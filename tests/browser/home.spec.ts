@@ -809,6 +809,17 @@ test("performance tab describes the game under the pointer and a click opens its
   ]);
   await expect(tip).toHaveClass(/right/);
   await expect(souls.locator("circle.picked")).toHaveCount(1);
+  // The link in the tip is a 24 px target.
+  const link = (await tip
+    .getByRole("button", { name: "Match report" })
+    .boundingBox())!;
+  expect(link.height).toBeGreaterThanOrEqual(24);
+  // A click with Ctrl held doesn't open the report; a plain one does.
+  await page.keyboard.down("Control");
+  await page.mouse.click(chart.x + chart.width - 2, chart.y + 40);
+  await page.keyboard.up("Control");
+  await expect(tip).toBeVisible();
+  expect(reports).toEqual([]);
   await page.mouse.click(chart.x + chart.width - 2, chart.y + 40);
   await expect(view(page).locator(".match-report")).toBeVisible();
   expect(reports).toEqual([3000]);
@@ -839,6 +850,13 @@ test("performance tab points can be picked and opened from the keyboard", async 
   await chart.focus();
   await page.keyboard.press("Home");
   await expect(chart).toHaveAttribute("aria-valuenow", "1");
+  await page.keyboard.press("ArrowUp");
+  await expect(chart).toHaveAttribute("aria-valuenow", "2");
+  await page.keyboard.press("ArrowDown");
+  await expect(chart).toHaveAttribute("aria-valuenow", "1");
+  // Keys with Ctrl held are the browser's.
+  await page.keyboard.press("Control+ArrowRight");
+  await expect(chart).toHaveAttribute("aria-valuenow", "1");
   await page.keyboard.press("End");
   await expect(chart).toHaveAttribute("aria-valuenow", "20");
   await page.keyboard.press("ArrowLeft");
@@ -856,8 +874,11 @@ test("performance tab points can be picked and opened from the keyboard", async 
   await expect(tip.getByRole("button", { name: "Match report" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(tip).toHaveCount(0);
-  // Back on the chart, Enter opens the picked game.
-  await chart.focus();
+  // Focus is back on the chart, where the arrows start again from the
+  // newest game; Enter opens the picked one.
+  await expect(chart).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(chart).toHaveAttribute("aria-valuenow", "20");
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("Enter");
   await expect(view(page).locator(".match-report")).toBeVisible();

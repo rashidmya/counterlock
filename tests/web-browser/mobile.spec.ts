@@ -60,6 +60,12 @@ test.describe("a touch screen at phone width", () => {
     await page.touchscreen.tap(chart.x + chart.width - 2, chart.y + 40);
     await expect(tip).toBeVisible();
     await expect(page).toHaveURL(`/players/${FARGO}`);
+    // A horizontal drag picks games rather than scrolling the page.
+    expect(
+      await souls
+        .locator(".sparkline svg")
+        .evaluate((svg) => getComputedStyle(svg).touchAction),
+    ).toBe("pan-y");
     await tip.getByRole("link", { name: "Match report" }).tap();
     await expect(page).toHaveURL(`/matches/1001?player=${FARGO}`);
   });
