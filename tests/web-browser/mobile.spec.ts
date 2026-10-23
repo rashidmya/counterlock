@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
-import { FARGO, mockApi } from "./fixtures";
+import { FARGO, cors, mockApi } from "./fixtures";
 
 const SCROLLERS = ".hero-table-wrap, .report-table-wrap, .skill-order";
 const clipped = (page: Page, limit: number) =>
@@ -69,6 +69,41 @@ test.describe("a touch screen at phone width", () => {
     await tip.getByRole("link", { name: "Match report" }).tap();
     await expect(page).toHaveURL(`/matches/1001?player=${FARGO}`);
   });
+});
+
+test("Updating… is never cut short beside the Performance range buttons", async ({
+  page,
+}) => {
+  await mockApi(page);
+  // Match details fail once; the Retry is then held, so the cards stay and
+  // the status shows.
+  let asked = 0;
+  await page.route(
+    "https://api.deadlock-api.com/v1/matches/metadata**",
+    async (route) => {
+      if (asked++ === 0)
+        return route.fulfill({ status: 500, json: {}, headers: cors });
+      await new Promise(() => {});
+    },
+  );
+  await page.goto(`/players/${FARGO}`);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await page.getByRole("button", { name: "Retry" }).click();
+  const status = page.locator(".perf-status span");
+  await expect(status).toHaveText("Updating…");
+  // Between about 530 and 585 px the Hero select used to squeeze it.
+  for (const width of [375, 414, 530, 560, 585, 640, 800]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect
+      .poll(() => status.evaluate((el) => el.scrollWidth <= el.clientWidth), {
+        message: `at ${width} px`,
+      })
+      .toBe(true);
+    // The range buttons stay on one line.
+    expect(
+      (await page.locator(".perf-range .filter-buttons").boundingBox())!.height,
+    ).toBeLessThan(40);
+  }
 });
 
 test.describe("phone width (375px)", () => {

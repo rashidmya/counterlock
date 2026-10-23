@@ -1296,7 +1296,7 @@ test("performance tab widens a thin rank's average and says so", async ({
   ).toBeVisible();
 });
 
-test("performance cards sit in four columns, two on a narrower window", async ({
+test("performance cards sit in five columns when wide, then four, then two", async ({
   page,
 }) => {
   await storeAccount(page);
@@ -1311,7 +1311,27 @@ test("performance cards sit in four columns, two on a narrower window", async ({
         (cards) =>
           new Set(cards.map((card) => card.getBoundingClientRect().left)).size,
       );
-  expect(await columns()).toBe(4);
+  expect(await columns()).toBe(5);
+  // Each share under its per-minute card, kill participation under K/D/A.
+  const left = (label: string) =>
+    card(page, label).evaluate((el) => el.getBoundingClientRect().left);
+  for (const [above, below] of [
+    ["K/D/A ratio", "Kill participation"],
+    ["Hero damage / min", "Hero damage share"],
+    ["Objective damage / min", "Objective damage share"],
+    ["Healing / min", "Healing share"],
+  ])
+    expect(await left(below)).toBe(await left(above));
+  // A title takes two lines ("Objective damage / min"), yet the first
+  // row's charts line up.
+  const tops = await view(page)
+    .locator(".perf-card .sparkline")
+    .evaluateAll((charts) =>
+      charts.slice(0, 5).map((chart) => chart.getBoundingClientRect().top),
+    );
+  expect(new Set(tops).size).toBe(1);
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await expect.poll(columns).toBe(4);
   await page.setViewportSize({ width: 850, height: 800 });
   await expect.poll(columns).toBe(2);
 });
