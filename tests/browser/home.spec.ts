@@ -75,12 +75,15 @@ interface Fixtures {
   failCurveFor?: Set<number>;
   unstoredTotals?: number[];
   unlistedPlayer?: number[];
+  // Awaited before each answer, so a test can hold requests back.
+  gate?: (url: URL) => Promise<void>;
 }
 
 async function routeApi(page: Page, fixtures: Fixtures = {}) {
   let historyRequests = 0;
-  await page.route("https://api.deadlock-api.com/**", (route) => {
+  await page.route("https://api.deadlock-api.com/**", async (route) => {
     const url = new URL(route.request().url());
+    await fixtures.gate?.(url);
     const json = (body: unknown, status = 200) =>
       route.fulfill({
         status,
@@ -918,6 +921,36 @@ test("performance tab keeps the rank averages that loaded, and Retry asks again 
   await expect(notice).toHaveCount(0);
   // Retry asked again only for the curve that failed.
   expect(new Set(curves.slice(asked))).toEqual(new Set([String(heroes[1])]));
+});
+
+test("performance tab keeps the last cards, dimmed, while new games load", async ({
+  page,
+}) => {
+  let hold: Promise<void> | null = null;
+  let release = () => {};
+  await storeAccount(page);
+  await routeApi(page, {
+    history: performanceHistory,
+    gate: (url) =>
+      url.pathname === "/v1/matches/metadata" && hold
+        ? hold
+        : Promise.resolve(),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const souls = card(page, "Souls / min").locator(".perf-card-numbers");
+  const cards = view(page).locator(".perf-cards");
+  await expect(souls).toHaveText("1,100 20 games · rank avg 1,000");
+  hold = new Promise((resolve) => (release = resolve));
+  await page.getByRole("button", { name: "Last 50", exact: true }).click();
+  await expect(
+    view(page).getByRole("status").filter({ hasText: "Updating" }),
+  ).toHaveText("Updating to the last 50 games…");
+  await expect(cards).toHaveAttribute("aria-busy", "true");
+  await expect(souls).toHaveText("1,100 20 games · rank avg 1,000");
+  release();
+  await expect(cards).toHaveAttribute("aria-busy", "false");
+  await expect(souls).toContainText("50 games");
 });
 
 test("performance range and hero survive a profile tab switch", async ({

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { AsyncState } from "@/shared/api/useAsync";
 import { useAsync } from "@/shared/api/useAsync";
 import { heroById } from "@/shared/catalog";
@@ -160,6 +161,14 @@ function notes(
   return lines;
 }
 
+// The games the cards show, with their requests.
+interface Loaded {
+  key: string;
+  games: HistoryMatch[];
+  totals: AsyncState<Map<number, PlayerTotals[]>>;
+  averages: AsyncState<GameAverages>;
+}
+
 export function PerformanceTab({
   accountId,
   history,
@@ -190,12 +199,29 @@ export function PerformanceTab({
     games.length ? () => fetchGameAverages(accountId, games) : null,
     [accountId, key],
   );
+  // While a new range or hero loads, the cards keep the last games that
+  // finished loading, dimmed, rather than blanking.
+  const [last, setLast] = useState<Loaded | null>(null);
+  const settled = !totals.loading && !averages.loading;
+  if (
+    settled &&
+    games.length &&
+    (last?.key !== key ||
+      last.totals.data !== totals.data ||
+      last.totals.error !== totals.error ||
+      last.averages.data !== averages.data ||
+      last.averages.error !== averages.error)
+  )
+    setLast({ key, games, totals, averages });
+  const shown =
+    !settled && last && games.length ? last : { games, totals, averages };
+  const stale = shown === last;
   const summaries = PERFORMANCE_METRICS.map((metric) =>
     summarizeMetric(
       metric,
-      games,
-      (id) => gameTotals(totals.data?.get(id), accountId),
-      (id) => averages.data?.byMatch.get(id),
+      shown.games,
+      (id) => gameTotals(shown.totals.data?.get(id), accountId),
+      (id) => shown.averages.data?.byMatch.get(id),
     ),
   );
   return (
@@ -231,6 +257,11 @@ export function PerformanceTab({
               ))}
             </select>
           </label>
+        )}
+        {stale && (
+          <span className="muted" role="status">
+            Updating to the last {count(games.length)}…
+          </span>
         )}
       </div>
       {history.loading && <p className="muted">Loading match history…</p>}
@@ -290,15 +321,22 @@ export function PerformanceTab({
               Loss
             </span>
           </div>
-          <div className="perf-cards">
+          <div className="perf-cards" aria-busy={stale}>
             {summaries.map((summary) => (
               <PerformanceCard
                 key={summary.metric.id}
-                {...{ summary, totals, averages }}
+                summary={summary}
+                totals={shown.totals}
+                averages={shown.averages}
               />
             ))}
           </div>
-          {notes(accountId, games, totals.data, averages.data).map((line) => (
+          {notes(
+            accountId,
+            shown.games,
+            shown.totals.data,
+            shown.averages.data,
+          ).map((line) => (
             <p key={line} className="data-note">
               {line}
             </p>
