@@ -23,11 +23,11 @@
 
 **Every code block in this plan was built and run before the plan was written** (reference commits in a scratch worktree, replayed from this plan's blocks). The full result:
 - `npm test` 382 passed;
-- `npm run test:browser` 147 passed;
+- `npm run test:browser` 148 passed;
 - `npm run test:web` 76 passed;
 - both type checks, `npm run build`, `npm run web:build` and `npm run validate:manifest` passed.
 
-Each task's end state was also checked on its own: type check and unit tests after every task (377, 378, 378, 380, 380, 380, 382 and 382 tests), and both browser suites after every task (desktop 132, 133, 133, 134, 136, 137, 139 and 147; website 74, 74, 74, 74, 75, 75, 76 and 76). Copy the code as given. If something fails, fix the cause rather than the test.
+Each task's end state was also checked on its own: type check and unit tests after every task (377, 378, 378, 380, 380, 380, 382 and 382 tests), and both browser suites after every task (desktop 132, 134, 134, 135, 137, 138, 140 and 148; website 74, 74, 74, 74, 75, 75, 76 and 76). Copy the code as given. If something fails, fix the cause rather than the test.
 
 ## Decisions made while planning (verified against the live API on 2026-10-23)
 
@@ -45,7 +45,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
 - **One rank rule (owner's choice: current rank).** In the match report, a player whose rank the match didn't record (`player_rank_data` missing, as in unranked games) is compared at their current rank, then all ranks; the lobby's rank is no longer used for the average (it still names the lobby in the banner).
   - `/v1/players/rank?account_ids=a,b,c` answers for many accounts at once (checked live: three accounts, three rows), so the report asks once per match for every such player. Rank lookups allow only 20 a minute, so one request per "Viewing as" switch would have been wasteful.
   - The report asks only for normal-mode matches, and the curve waits for the answer only when the selected player has no recorded rank.
-  - A failed lookup, like a player without a current rank, means all ranks, with the note "This player's rank isn't recorded for this match, and there's no current rank to use." The wording doesn't claim which of the two it was (Task 2 review), as on the Performance tab.
+  - A failed lookup, like a player without a current rank, means all ranks, with the note "This player's rank isn't recorded for this match, and there's no current rank to use." The wording doesn't claim which of the two it was (Task 2 review), as on the Performance tab. A failed lookup reaches the page, and the curve's Retry asks for the current ranks again, as the tab's Retry does (final review: before, Retry only asked for the curve again and left the player at all ranks).
 - **All four Impact shares.** Kill participation and the player's share of their team's hero damage, objective damage and healing, as in the match report's Impact. None has a rank average (the curve has no team totals). The test fixture's teammates now have 1,500 objective damage and 3,000 healing each, so the three damage-type shares differ (29%, 44%, 21%) and a test can't pass by reading the wrong team total.
 - **Rank averages per hero and rank tier, four at a time.** Games that ask for the same curve (`curvePath(hero, rankBand(badge))`) share their requests (the client shares them anyway); grouping lets a limit apply to distinct curves. A group never has more than one request in flight (its base curve, then its wider one), so four groups mean at most four curve requests at once. `CURVE_CONCURRENCY = 4`: an uncached curve takes about 7 s, and Last 100 can need a dozen, which all at once ran past the client's 15 s timeout. Each game's curve is awaited separately (`Promise.allSettled`), so a failure costs only its own games. `fetchGameAverages` fails as a whole only when no game gets an average, so the existing "Rank averages unavailable: {error}" notice and Retry still cover a full failure; a partial one gets "Rank averages unavailable for {n} of {count}: {error}" with Retry. Retry re-asks only the failed curves (the others are cached for 10 minutes).
   - **A card with any game whose curve failed claims no trend (Task 4 review).** Its trend would follow only the games that kept their average: after a rank-up, the recent games form the new, uncached group most likely to fail, and a trend from the older games alone could even point the wrong way. Such a card also shows no "Too few games" and no "no rank average for these games"; its numbers stay like for like ("20 games · 10 with a rank average: … vs …"). `GameAverages.failed` is the set of those games' match ids.
@@ -79,6 +79,10 @@ Each task's end state was also checked on its own: type check and unit tests aft
   - **A waiting request learns of a cooldown only when it wakes,** up to a minute later, even when `Retry-After` is an hour.
   - **A profile reopened later in the session** opens on the tab it was left on, not Overview.
   - **The tip's spacing (Task 7 review):** the tip sits right under the card's title row; with the 24 px link it is 40 px tall and its top meets the trend badge's baseline without covering it.
+  - **Website scroll (final review):** browser Back from a report restores the profile's tab and filters but not its scroll position: the profile remounts, and its first render is "loading", so React Router's scroll restoration runs before the cards exist.
+  - **Focus after Retry (final review):** the notice holding Retry unmounts as soon as it is pressed, so focus falls to the page; moving it to the status or the cards would keep keyboard users in place.
+  - **One rank rule, two places (final review):** the report and the tab each code the fallback (game's rank, then current, then all ranks), with different names for the source ("match" against "game"); a shared helper in `rank-curve.ts` would keep them together.
+  - **Combined states without tests (final review):** a partial failure while older cards are kept, and Retry while they are kept, work (checked by probe) but no test holds them.
   - **"Updating…" is cut short** on the website between about 530 and 585 px, where the Hero select squeezes the space beside the range buttons (Task 6 re-review); screen readers still get it.
   - **Share trends on "All heroes" (Task 3 review):** shares have no rank average, so a trend can follow the hero mix (from a healer to a carry, healing share slips) rather than form. Hiding share trends on "All heroes" is an option.
   - **Card rows (Task 3 review):** at full width the ten cards run 4/4/2, so the shares are split across two rows; five columns above about 1100 px would put each share under its per-minute card.
@@ -105,7 +109,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
 ## Review Focus
 
 1. **Limits that hold.** The throttle counts a request when it is sent and never more than the limit per window, a waiting request checks for a cooldown before taking a slot, duplicates share one wait, unlimited groups still start synchronously, a 429 pauses only what it refused and a 503 everything. Tests: `cools down a rate-limited group after a 429 with Retry-After`, `cools down only the refused path of other endpoints`, `pauses everything after a 503: the API is shedding load`, `sends a burst a window at a time, never more than the limit`, `fails a waiting request when its group cools down, without using a slot`, `drops responses that outlived their ttl`, `keeps responses still fresh, and sweeps at most once a minute`.
-2. **One rank rule.** The report and the tab both use the game's rank, then the current rank, then all ranks, and the report asks for every player's current rank in one request. Tests: `a player without a recorded rank is compared at their current rank, and the note says so`, `with no ranks recorded and no current rank, the average covers all ranks and says so`, `the report waits for current ranks only where it needs them, and asks for each curve once`, `Street Brawl reports say rank averages cover normal matches only` (no lookup), `performance tab compares ranked games at their own rank`.
+2. **One rank rule.** The report and the tab both use the game's rank, then the current rank, then all ranks, and the report asks for every player's current rank in one request. Tests: `a player without a recorded rank is compared at their current rank, and the note says so`, `with no ranks recorded and no current rank, the average covers all ranks and says so`, `the report waits for current ranks only where it needs them, and asks for each curve once`, `Street Brawl reports say rank averages cover normal matches only` (no lookup), `Retry asks again for current ranks that failed to load`, `performance tab compares ranked games at their own rank`.
 3. **Partial failure.** A failed curve leaves only its games without an average, cards with such games claim no trend, Retry re-asks only the failed curve and recovers, and a full failure still fails as a whole. Tests: `keeps the games whose curve loaded when another fails`, `fails as a whole when every curve fails, so the tab can offer Retry`, `performance tab keeps the rank averages that loaded, and Retry asks again for the rest`, `performance tab keeps the trends a failed curve doesn't touch`, `performance tab doesn't call failed averages missing`.
 4. **Picking a game.** Pointer, touch and keyboard each work, and a tap never opens a report on its own. Tests: `performance tab describes the game under the pointer and a click opens its report`, `performance tab points can be picked and opened from the keyboard`, `a tap on a Performance chart shows the game; its Report link opens it`.
 5. **No lost state.** Tests: `the profile keeps its tab, range and hero after a match report`, `performance range and hero survive a profile tab switch`, `each profile keeps its own tab and filter for the session`, `performance tab keeps the last cards, dimmed, while new games load`.
@@ -490,8 +494,9 @@ const refused = (path: string, group: string) =>
   RATE_LIMITS[group] ? group : path;
 
 /**
- * Every path is always asked for with the same ttl; an entry is kept, and
- * swept, by the ttl it was stored with.
+ * Every path is always asked for with the same ttl, so the caller's ttl,
+ * which decides whether an entry is fresh, and the one stored with it,
+ * which the sweep uses, agree.
  */
 export class DeadlockApi {
   private cache = new Map<
@@ -653,7 +658,7 @@ Expected: 132 desktop and 74 website tests pass.
 
 The Performance tab already uses the game's rank, then the player's current rank, then all ranks. The report used the lobby's rank instead. Now it follows the tab's rule (owner's choice):
 - **`fetchRankBadges(ids)`** asks `/v1/players/rank` once for many accounts (sorted, unique, above 0) and returns each ranked account's badge; unranked accounts (badge 0) are left out.
-- **`fetchCurrentBadges(ids)`** wraps it for the report and returns an empty map on failure, so those players get all ranks.
+- **`fetchCurrentBadges(ids)`** is the report's name for it. A failure reaches the page: those players are compared with all ranks meanwhile, and the curve's Retry asks for the current ranks again (final review).
 - **The report** asks once per normal-mode match for every player whose rank the match didn't record. While that answer loads, the selected player's curve waits only if they are one of them.
 - **`Verdicts`** takes `rank: RankSource` (`"match" | "current" | "none"`) instead of `fromLobby`, for its note. `lobbyBadge` stays: the banner still names the lobby ("Emissary-level lobby").
 
@@ -923,6 +928,49 @@ test("the report waits for current ranks only where it needs them, and asks for 
   );
 });
 
+test("Retry asks again for current ranks that failed to load", async ({
+  page,
+}) => {
+  let healthy = false;
+  const unrecorded = matchMetadata(ACCOUNT);
+  delete (unrecorded.match_info.players[0] as Record<string, unknown>)
+    .player_rank_data;
+  await storeAccount(page);
+  await routeApi(page);
+  await page.route(
+    `https://api.deadlock-api.com/v1/matches/${MATCH_ID}/metadata`,
+    (route) => route.fulfill({ json: unrecorded, headers: cors }),
+  );
+  // The lookup and the curve fail until the test heals them.
+  await page.route("https://api.deadlock-api.com/v1/players/rank**", (route) =>
+    healthy
+      ? route.fulfill({
+          json: [{ account_id: ACCOUNT, badge: 116, rank: 11, subrank: 6 }],
+          headers: cors,
+        })
+      : route.fulfill({ status: 500, json: {}, headers: cors }),
+  );
+  await page.route(
+    "https://api.deadlock-api.com/v1/analytics/player-performance-curve**",
+    (route) =>
+      healthy
+        ? route.fallback()
+        : route.fulfill({ status: 500, json: {}, headers: cors }),
+  );
+  await page.goto("/");
+  await view(page).getByRole("button", { name: "Open match report →" }).click();
+  const note = report(page).locator(".report-verdicts + .data-note");
+  await expect(note).toHaveText(
+    /^Rank average unavailable: Deadlock API unavailable \(500\)\./,
+  );
+  healthy = true;
+  await note.getByRole("button", { name: "Retry" }).click();
+  // The player's current rank, looked up again, not all ranks.
+  await expect(note).toHaveText(
+    `Compared with the average ${lead.name} at Eternus at the same match length, over the last 30 days. This player's rank isn't recorded for this match, so the average uses their current rank.`,
+  );
+});
+
 test("Street Brawl reports say rank averages cover normal matches only", async ({
   page,
 }) => {
@@ -967,14 +1015,15 @@ The browser tests:
 - **No current rank:** one request covers all twelve players. `rankLookups()` records only requests with a comma, as the home page asks for the stored account alone.
 - **Timing (Task 2 review):** the lookup is held back. The lead waits for it, a player with a recorded rank loads at once, and each curve is asked for once, never first at all ranks. Checked while planning against a curve that doesn't wait, and against recorded players that wait too: both fail.
 - **Street Brawl:** a Street Brawl report without recorded ranks asks for none.
+- **Retry (final review):** the lookup and the curve fail until healed; Retry then compares the player at their current rank, not all ranks. Checked against a Retry that only asks for the curve: it fails.
 
 - [ ] **Step 2: Run them and confirm they fail**
 
 Run: `npx vitest run tests/profile/profile-api.test.ts`
 Expected: FAIL (1 failed, 13 passed: `fetchRankBadges is not a function`).
 
-Run: `npx playwright test tests/browser/match-report.spec.ts -g "recorded rank|no ranks recorded|waits for current ranks|Street Brawl"`
-Expected: FAIL (3 failed, 1 passed: the notes still say "at Emissary … uses the lobby's rank." or end without the no-current-rank sentence, and the timing test sees the lead compared at once (the Street Brawl test already passes: the old report never looks ranks up)).
+Run: `npx playwright test tests/browser/match-report.spec.ts -g "recorded rank|no ranks recorded|waits for current ranks|Retry asks again|Street Brawl"`
+Expected: FAIL (4 failed, 1 passed: the notes still say "at Emissary … uses the lobby's rank." or end without the no-current-rank sentence, the timing test sees the lead compared at once, and after Retry the player is compared at the lobby's rank (the Street Brawl test already passes: the old report never looks ranks up)).
 
 - [ ] **Step 3: Ask for current ranks**
 
@@ -1070,18 +1119,13 @@ with:
 
 /**
  * Current rank badges by account id, for players whose rank the match didn't
- * record; empty when the lookup fails, so those players get all ranks.
+ * record. A failure reaches the page, which compares those players with all
+ * ranks meanwhile and asks again on Retry.
  */
-export async function fetchCurrentBadges(
+export const fetchCurrentBadges = (
   accountIds: number[],
   api: DeadlockApi = deadlockApi,
-): Promise<Map<number, number>> {
-  try {
-    return await fetchRankBadges(accountIds, api);
-  } catch {
-    return new Map();
-  }
-}
+): Promise<Map<number, number>> => fetchRankBadges(accountIds, api);
 
 /**
  * The hero's rank-average curve for the badge's tier, widened one tier each
@@ -1316,7 +1360,12 @@ with:
       : null,
     [selected?.heroId, badge, report.durationS, waiting],
   );
-  const curve = waiting ? { loading: true, retry: loaded.retry } : loaded;
+  // The curve's Retry also asks again for current ranks that failed to load.
+  const retry = () => {
+    if (current.error) current.retry();
+    loaded.retry();
+  };
+  const curve = waiting ? { loading: true, retry } : { ...loaded, retry };
   const top = useRef<HTMLDivElement>(null);
   const viewing = useRef<HTMLSelectElement>(null);
   const refocus = useRef(false);
@@ -1353,7 +1402,7 @@ Run: `npx vitest run tests/profile/profile-api.test.ts`
 Expected: PASS (14 tests).
 
 Run: `npx playwright test tests/browser/match-report.spec.ts`
-Expected: PASS (29 tests).
+Expected: PASS (30 tests).
 
 Run: `npm test`
 Expected: PASS (378 tests).
@@ -1368,7 +1417,7 @@ git add src/features/match-report src/features/profile/services/profile-api.ts t
 git commit -m "feat(match-report): compare players without a recorded rank at their current rank"
 ```
 
-Expected: 133 desktop and 74 website tests pass.
+Expected: 134 desktop and 74 website tests pass.
 
 ---
 
@@ -1867,7 +1916,7 @@ git add src/features/profile tests/profile tests/fixtures/performance.ts tests/b
 git commit -m "feat(profile): objective damage and healing shares on the Performance tab"
 ```
 
-Expected: 133 desktop and 74 website tests pass.
+Expected: 134 desktop and 74 website tests pass.
 
 ---
 
@@ -2606,7 +2655,7 @@ git add src/features/profile tests/profile/performance-api.test.ts tests/browser
 git commit -m "feat(profile): rank averages load per hero and rank, a few at a time; a failed curve leaves only its games out"
 ```
 
-Expected: 134 desktop and 74 website tests pass.
+Expected: 135 desktop and 74 website tests pass.
 
 ---
 
@@ -3043,7 +3092,7 @@ git add src/features/profile/components tests/web-browser/match-report.spec.ts t
 git commit -m "feat(profile): keep each profile's tab, filter, range and hero for the session"
 ```
 
-Expected: 136 desktop and 75 website tests pass.
+Expected: 137 desktop and 75 website tests pass.
 
 ---
 
@@ -3568,7 +3617,7 @@ git add src/features/profile tests/browser/home.spec.ts tests/web-browser/mobile
 git commit -m "feat(profile): keep the last cards, dimmed, while new games load"
 ```
 
-Expected: 137 desktop and 75 website tests pass.
+Expected: 138 desktop and 75 website tests pass.
 
 ---
 
@@ -4430,7 +4479,7 @@ git add src/features/profile tests/profile/sparkline.test.ts tests/browser/home.
 git commit -m "feat(profile): pick a game on a Performance chart to see it and open its report; readable dots on Last 100"
 ```
 
-Expected: 139 desktop and 76 website tests pass.
+Expected: 140 desktop and 76 website tests pass.
 
 ---
 
@@ -4761,7 +4810,7 @@ Run: `npx playwright test tests/browser/home.spec.ts -g "performance"`
 Expected: PASS (20 tests).
 
 Run: `npm run test:browser && npm run test:web`
-Expected: PASS (147 and 76).
+Expected: PASS (148 and 76).
 
 - [ ] **Step 3: Check and commit**
 
@@ -4972,7 +5021,7 @@ Run all of these; every one must pass:
 - `npm test` (382)
 - `npx tsc --noEmit`
 - `npm run web:typecheck`
-- `npm run test:browser` (147)
+- `npm run test:browser` (148)
 - `npm run test:web` (76)
 - `npm run build`
 - `npm run web:build`
