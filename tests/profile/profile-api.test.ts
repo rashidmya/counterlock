@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { DeadlockApi } from "@/shared/api/DeadlockApi";
 import {
-  SUMMARY_HERO_STATS,
   fetchMatchHistory,
   fetchMates,
   fetchPlayerHeroStats,
   fetchRank,
-  fetchSummaryHeroStats,
   fetchSteamProfiles,
   heroStatsQueries,
   searchSteamAccounts,
@@ -38,32 +36,6 @@ describe("heroStatsQueries", () => {
     ]);
     expect(heroStatsQueries("street_brawl")).toEqual([
       "game_mode=street_brawl",
-    ]);
-    expect(SUMMARY_HERO_STATS).toBe(
-      "game_mode=normal&match_mode=ranked,unranked",
-    );
-  });
-});
-
-describe("fetchSummaryHeroStats", () => {
-  it("requests only normal ranked and unranked games", async () => {
-    const { api, calls } = fakeApi({
-      "/v1/players/hero-stats?account_ids=7&game_mode=normal&match_mode=ranked,unranked":
-        [
-          {
-            hero_id: 1,
-            matches_played: 2,
-            accuracy: 0.5,
-            damage_per_min: 100,
-          },
-        ],
-    });
-    const rows = await fetchSummaryHeroStats(7, api);
-    expect(calls).toEqual([
-      "/v1/players/hero-stats?account_ids=7&game_mode=normal&match_mode=ranked,unranked",
-    ]);
-    expect(rows).toEqual([
-      { heroId: 1, matches: 2, accuracy: 0.5, damagePerMin: 100 },
     ]);
   });
 });

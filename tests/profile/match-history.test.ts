@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  form,
   heroBreakdown,
   isSummaryMatch,
   isWin,
@@ -322,18 +321,5 @@ describe("heroBreakdown", () => {
   it("returns top heroes limited to n", () => {
     expect(topHeroes(ms, 1).map((r) => r.heroId)).toEqual([6]);
     expect(topHeroes(ms).map((r) => r.heroId)).toEqual([6, 31]);
-  });
-});
-
-describe("form", () => {
-  it("returns results for the first n matches (newest first)", () => {
-    const parsed = parseHistory([
-      row({ match_id: 1, start_time: 100, player_team: 0, match_result: 0 }),
-      row({ match_id: 2, start_time: 300, player_team: 0, match_result: 1 }),
-      row({ match_id: 3, start_time: 200, player_team: 1, match_result: 1 }),
-    ]);
-    expect(form(parsed)).toEqual([false, true, true]);
-    expect(form(parsed, 2)).toEqual([false, true]);
-    expect(form([...parsed].reverse())).toEqual([false, true, true]);
   });
 });

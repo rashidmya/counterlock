@@ -20,8 +20,6 @@ export interface PlayerHeroStat {
   damagePerMin: number;
 }
 
-export const SUMMARY_HERO_STATS = "game_mode=normal&match_mode=ranked,unranked";
-
 const MIN_MATE_GAMES = 3;
 const MAX_MATES = 5;
 const MIN_SEARCH_LENGTH = 2;
@@ -144,11 +142,6 @@ export const fetchPlayerHeroStats = (
   filter: HistoryFilter,
   api: DeadlockApi = deadlockApi,
 ) => fetchHeroStats(id, heroStatsQueries(filter), api);
-
-export const fetchSummaryHeroStats = (
-  id: number,
-  api: DeadlockApi = deadlockApi,
-) => fetchHeroStats(id, [SUMMARY_HERO_STATS], api);
 
 async function fetchHeroStats(
   id: number,

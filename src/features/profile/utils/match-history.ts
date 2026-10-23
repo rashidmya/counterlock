@@ -141,9 +141,3 @@ export function heroBreakdown(ms: HistoryMatch[]): HeroRow[] {
 
 export const topHeroes = (ms: HistoryMatch[], n = 3) =>
   heroBreakdown(ms).slice(0, n);
-
-export const form = (ms: HistoryMatch[], n = 20) =>
-  [...ms]
-    .sort((a, b) => b.startTime - a.startTime)
-    .slice(0, n)
-    .map(isWin);
