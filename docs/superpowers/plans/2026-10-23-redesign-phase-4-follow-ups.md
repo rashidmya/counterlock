@@ -79,6 +79,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
   - **A waiting request learns of a cooldown only when it wakes,** up to a minute later, even when `Retry-After` is an hour.
   - **A profile reopened later in the session** opens on the tab it was left on, not Overview.
   - **The tip's spacing (Task 7 review):** the tip sits right under the card's title row; with the 24 px link it is 40 px tall and its top meets the trend badge's baseline without covering it.
+  - **A failed rank lookup with a curve that loads (final review):** the report then compares at all ranks with no Retry (only a failed curve's Retry asks for the current ranks again), for example after a 429 on rank lookups alone or after switching "Viewing as" once a cooldown has passed.
   - **Website scroll (final review):** browser Back from a report restores the profile's tab and filters but not its scroll position: the profile remounts, and its first render is "loading", so React Router's scroll restoration runs before the cards exist.
   - **Focus after Retry (final review):** the notice holding Retry unmounts as soon as it is pressed, so focus falls to the page; moving it to the status or the cards would keep keyboard users in place.
   - **One rank rule, two places (final review):** the report and the tab each code the fallback (game's rank, then current, then all ranks), with different names for the source ("match" against "game"); a shared helper in `rank-curve.ts` would keep them together.
@@ -120,7 +121,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
 |---|---|
 | `src/shared/api/DeadlockApi.ts` | Endpoint groups, per-group rate limits, cooldowns by group, path or everything, expired-response sweep |
 | `src/features/profile/services/profile-api.ts` | `fetchRankBadges()`: many accounts' current ranks in one request |
-| `src/features/match-report/services/match-report.ts` | `fetchCurrentBadges()`: the report's current ranks, empty on failure |
+| `src/features/match-report/services/match-report.ts` | `fetchCurrentBadges()`: the report's current ranks; a failure reaches the page |
 | `src/features/match-report/components/MatchReportPage.tsx` | Current rank for players without a recorded one; the curve waits for it |
 | `src/features/match-report/components/Verdicts.tsx` | `RankSource` and the rank note |
 | `src/features/profile/utils/performance-metrics.ts` | Team objective damage and healing; the two new shares |
