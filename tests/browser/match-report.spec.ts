@@ -530,6 +530,49 @@ test("the report waits for current ranks only where it needs them, and asks for 
   );
 });
 
+test("Retry asks again for current ranks that failed to load", async ({
+  page,
+}) => {
+  let healthy = false;
+  const unrecorded = matchMetadata(ACCOUNT);
+  delete (unrecorded.match_info.players[0] as Record<string, unknown>)
+    .player_rank_data;
+  await storeAccount(page);
+  await routeApi(page);
+  await page.route(
+    `https://api.deadlock-api.com/v1/matches/${MATCH_ID}/metadata`,
+    (route) => route.fulfill({ json: unrecorded, headers: cors }),
+  );
+  // The lookup and the curve fail until the test heals them.
+  await page.route("https://api.deadlock-api.com/v1/players/rank**", (route) =>
+    healthy
+      ? route.fulfill({
+          json: [{ account_id: ACCOUNT, badge: 116, rank: 11, subrank: 6 }],
+          headers: cors,
+        })
+      : route.fulfill({ status: 500, json: {}, headers: cors }),
+  );
+  await page.route(
+    "https://api.deadlock-api.com/v1/analytics/player-performance-curve**",
+    (route) =>
+      healthy
+        ? route.fallback()
+        : route.fulfill({ status: 500, json: {}, headers: cors }),
+  );
+  await page.goto("/");
+  await view(page).getByRole("button", { name: "Open match report →" }).click();
+  const note = report(page).locator(".report-verdicts + .data-note");
+  await expect(note).toHaveText(
+    /^Rank average unavailable: Deadlock API unavailable \(500\)\./,
+  );
+  healthy = true;
+  await note.getByRole("button", { name: "Retry" }).click();
+  // The player's current rank, looked up again, not all ranks.
+  await expect(note).toHaveText(
+    `Compared with the average ${lead.name} at Eternus at the same match length, over the last 30 days. This player's rank isn't recorded for this match, so the average uses their current rank.`,
+  );
+});
+
 test("Street Brawl reports say rank averages cover normal matches only", async ({
   page,
 }) => {

@@ -43,18 +43,13 @@ export async function fetchPlayerNames(
 
 /**
  * Current rank badges by account id, for players whose rank the match didn't
- * record; empty when the lookup fails, so those players get all ranks.
+ * record. A failure reaches the page, which compares those players with all
+ * ranks meanwhile and asks again on Retry.
  */
-export async function fetchCurrentBadges(
+export const fetchCurrentBadges = (
   accountIds: number[],
   api: DeadlockApi = deadlockApi,
-): Promise<Map<number, number>> {
-  try {
-    return await fetchRankBadges(accountIds, api);
-  } catch {
-    return new Map();
-  }
-}
+): Promise<Map<number, number>> => fetchRankBadges(accountIds, api);
 
 /**
  * The hero's rank-average curve for the badge's tier, widened one tier each

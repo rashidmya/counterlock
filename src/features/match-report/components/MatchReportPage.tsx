@@ -65,7 +65,12 @@ function Report({
       : null,
     [selected?.heroId, badge, report.durationS, waiting],
   );
-  const curve = waiting ? { loading: true, retry: loaded.retry } : loaded;
+  // The curve's Retry also asks again for current ranks that failed to load.
+  const retry = () => {
+    if (current.error) current.retry();
+    loaded.retry();
+  };
+  const curve = waiting ? { loading: true, retry } : { ...loaded, retry };
   const top = useRef<HTMLDivElement>(null);
   const viewing = useRef<HTMLSelectElement>(null);
   const refocus = useRef(false);
