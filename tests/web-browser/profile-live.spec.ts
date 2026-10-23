@@ -169,3 +169,120 @@ test("coming back from another page finds the profile on its Live tab", async ({
   );
   await expect(page.getByRole("heading", { name: "Live match" })).toBeVisible();
 });
+
+test("the Live tab checks again every minute while it's open", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockApi(page);
+  const startTime = Math.floor(Date.now() / 1000) - 23 * 60;
+  const asked = await mockLive(page, [
+    { startTime },
+    { startTime, netWorth: [120000, 125000] },
+  ]);
+  await openLive(page);
+  const stats = page.locator(".live-stats .stat-card");
+  await expect(stats.nth(1)).toContainText("Amber +5,426");
+  await page.clock.runFor(30_000);
+  expect(asked).toHaveLength(1);
+  await page.clock.runFor(30_000);
+  await expect(stats.nth(1)).toContainText("Sapphire +5,000");
+  await expect(stats.nth(0)).toContainText("24 min");
+  expect(asked).toHaveLength(2);
+  // A check that goes well isn't announced.
+  await expect(page.locator(".live-status")).toHaveText("");
+});
+
+test("a check that falls due while the page is hidden waits until it's back", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockApi(page);
+  const asked = await mockLive(page, [{}]);
+  await openLive(page);
+  await expect(page.getByRole("heading", { name: "Live match" })).toBeVisible();
+  const visibility = (value: string) =>
+    page.evaluate((value) => {
+      Object.defineProperty(document, "visibilityState", {
+        value,
+        configurable: true,
+      });
+    }, value);
+  await visibility("hidden");
+  await page.clock.runFor(180_000);
+  // Time for a request the page made to reach the route.
+  await page.waitForTimeout(300);
+  expect(asked).toHaveLength(1);
+  await visibility("visible");
+  await page.clock.runFor(5_000);
+  await expect.poll(() => asked.length).toBe(2);
+});
+
+test("a check that fails keeps the match shown and says so; Retry asks again", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockApi(page);
+  await mockLive(page, [{}, 500, { netWorth: [120000, 125000] }]);
+  await openLive(page);
+  await expect(page.getByRole("heading", { name: "Live match" })).toBeVisible();
+  await page.clock.runFor(60_000);
+  const notice = page.locator(".live-tab .notice");
+  await expect(notice).toContainText(
+    "Couldn't check again: Deadlock API unavailable (500).",
+  );
+  await expect(page.locator(".live-stats .stat-card").nth(1)).toContainText(
+    "Amber +5,426",
+  );
+  await notice.getByRole("button", { name: "Retry" }).click();
+  await expect(page.locator(".live-stats .stat-card").nth(1)).toContainText(
+    "Sapphire +5,000",
+  );
+  await expect(notice).toHaveCount(0);
+  await expect(page.locator(".live-status")).toBeFocused();
+});
+
+test("the minute's checks leave the notice, and focus on its Retry, in place", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockApi(page);
+  const asked = await mockLive(page, [{}, 500, 500, {}]);
+  await openLive(page);
+  await expect(page.getByRole("heading", { name: "Live match" })).toBeVisible();
+  await page.clock.runFor(60_000);
+  const notice = page.locator(".live-tab .notice");
+  const retry = notice.getByRole("button", { name: "Retry" });
+  await retry.focus();
+  // Failing again: the same notice, still focused, and nothing announced.
+  await page.clock.runFor(60_000);
+  await expect.poll(() => asked.length).toBe(3);
+  await expect(retry).toBeFocused();
+  await expect(page.locator(".live-status")).toHaveText("");
+  // Going well: the notice goes, and focus moves to the status.
+  await page.clock.runFor(60_000);
+  await expect(notice).toHaveCount(0);
+  await expect(page.locator(".live-status")).toBeFocused();
+});
+
+test("a check that goes well leaves alone focus that has left the notice", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockApi(page);
+  await mockLive(page, [{}, 500, {}]);
+  await openLive(page);
+  await expect(page.getByRole("heading", { name: "Live match" })).toBeVisible();
+  await page.clock.runFor(60_000);
+  const notice = page.locator(".live-tab .notice");
+  await notice.getByRole("button", { name: "Retry" }).focus();
+  // A click on nothing in particular leaves focus on the page.
+  await page.locator(".live-stats").click();
+  const onPage = () =>
+    page.evaluate(() => document.activeElement === document.body);
+  expect(await onPage()).toBe(true);
+  await page.clock.runFor(60_000);
+  await expect(notice).toHaveCount(0);
+  await expect(page.locator(".live-status")).not.toBeFocused();
+  expect(await onPage()).toBe(true);
+});

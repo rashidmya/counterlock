@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
 import { RouteLink } from "@/app/links";
 import {
   STREET_BRAWL_MODE,
@@ -209,44 +209,77 @@ function LiveMatchView({
         ))}
       </div>
       <p className="data-note">
-        From the game&apos;s Watch list, through Deadlock API.
+        From the game&apos;s Watch list, through Deadlock API, checked again
+        every minute while this tab is open. The API&apos;s copy of the list can
+        be a few minutes old.
       </p>
     </>
   );
 }
 
+/**
+ * A notice with Retry. Taken away with focus in it (a check that went well),
+ * it leaves focus on `status` rather than let it fall to the page: React
+ * runs the cleanup before it removes the notice.
+ */
+function LiveNotice({
+  status,
+  onRetry,
+  children,
+}: {
+  status: RefObject<HTMLElement | null>;
+  onRetry(): void;
+  children: ReactNode;
+}) {
+  const notice = useRef<HTMLParagraphElement>(null);
+  useLayoutEffect(() => {
+    const node = notice.current;
+    return () => {
+      if (node?.contains(document.activeElement)) status.current?.focus();
+    };
+  }, [status]);
+  return (
+    <p className="notice warning" role="status" ref={notice}>
+      {children}
+      <button type="button" onClick={onRetry}>
+        Retry
+      </button>
+    </p>
+  );
+}
+
 export function LiveTab({ accountId }: { accountId: number }) {
-  const live = useLiveMatch(accountId);
+  const tab = useRef<HTMLDivElement>(null);
+  const live = useLiveMatch(accountId, tab);
   // Retry goes with its notice as soon as it's pressed: focus moves to the
   // status, which says what is being checked, rather than falling to the
-  // page.
+  // page. (Before the notice goes, as not every browser focuses a button
+  // that is clicked.)
   const status = useRef<HTMLParagraphElement>(null);
   const retry = () => {
     status.current?.focus();
     live.retry();
   };
   return (
-    <div className="live-tab">
+    <div className="live-tab" ref={tab}>
       <p className="live-status" role="status" ref={status} tabIndex={-1}>
         {live.loading &&
           (live.match === undefined
             ? "Looking for a live match…"
-            : live.error && "Checking again…")}
+            : "Checking again…")}
       </p>
       {live.error && !live.loading && (
-        <p className="notice warning" role="status">
+        <LiveNotice status={status} onRetry={retry}>
           {live.match === undefined
             ? `Live matches unavailable: ${live.error}`
             : `Couldn't check again: ${live.error}`}
-          <button type="button" onClick={retry}>
-            Retry
-          </button>
-        </p>
+        </LiveNotice>
       )}
       {live.match === null && (
         <LiveEmpty title="No live match found">
           Live matches show here only while the game&apos;s Watch list has them:
-          about the top 200 matches being played.
+          about the top 200 matches being played. This tab checks again every
+          minute.
         </LiveEmpty>
       )}
       {live.match && <LiveMatchView match={live.match} accountId={accountId} />}

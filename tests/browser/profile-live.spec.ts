@@ -74,3 +74,25 @@ test("another player's Live tab in the app shows their match; a name opens that 
     "Player 7006",
   );
 });
+
+test("a profile hidden behind another page of the app checks nothing", async ({
+  page,
+}) => {
+  await page.clock.install();
+  const asked = await routeApi(page);
+  await openProfile(page);
+  await view(page).getByRole("tab", { name: "Live" }).click();
+  await expect(
+    view(page).getByRole("heading", { name: "Live match" }),
+  ).toBeVisible();
+  await page.clock.runFor(60_000);
+  await expect.poll(() => asked.length).toBe(2);
+  await page
+    .getByRole("navigation", { name: "Main" })
+    .getByRole("button", { name: "Heroes" })
+    .click();
+  await page.clock.runFor(180_000);
+  // Time for a request the page made to reach the route.
+  await page.waitForTimeout(300);
+  expect(asked).toHaveLength(2);
+});
