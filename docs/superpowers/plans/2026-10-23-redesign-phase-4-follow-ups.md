@@ -23,11 +23,11 @@
 
 **Every code block in this plan was built and run before the plan was written** (reference commits in a scratch worktree, replayed from this plan's blocks). The full result:
 - `npm test` 382 passed;
-- `npm run test:browser` 143 passed;
+- `npm run test:browser` 145 passed;
 - `npm run test:web` 76 passed;
 - both type checks, `npm run build`, `npm run web:build` and `npm run validate:manifest` passed.
 
-Each task's end state was also checked on its own: type check and unit tests after every task (377, 378, 378, 380, 380, 380, 382 and 382 tests), and both browser suites after every task (desktop 132, 133, 133, 134, 134, 135, 137 and 143; website 74, 74, 74, 74, 75, 75, 76 and 76). Copy the code as given. If something fails, fix the cause rather than the test.
+Each task's end state was also checked on its own: type check and unit tests after every task (377, 378, 378, 380, 380, 380, 382 and 382 tests), and both browser suites after every task (desktop 132, 133, 133, 134, 134, 135, 137 and 145; website 74, 74, 74, 74, 75, 75, 76 and 76). Copy the code as given. If something fails, fix the cause rather than the test.
 
 ## Decisions made while planning (verified against the live API on 2026-10-23)
 
@@ -98,7 +98,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
 
 1. **Limits that hold.** The throttle counts a request when it is sent and never more than the limit per window, a waiting request checks for a cooldown before taking a slot, duplicates share one wait, unlimited groups still start synchronously, a 429 pauses only what it refused and a 503 everything. Tests: `cools down a rate-limited group after a 429 with Retry-After`, `cools down only the refused path of other endpoints`, `pauses everything after a 503: the API is shedding load`, `sends a burst a window at a time, never more than the limit`, `fails a waiting request when its group cools down, without using a slot`, `drops responses that outlived their ttl`, `keeps responses still fresh, and sweeps at most once a minute`.
 2. **One rank rule.** The report and the tab both use the game's rank, then the current rank, then all ranks, and the report asks for every player's current rank in one request. Tests: `a player without a recorded rank is compared at their current rank, and the note says so`, `with no ranks recorded and no current rank, the average covers all ranks and says so`, `the report waits for current ranks only where it needs them, and asks for each curve once`, `Street Brawl reports say rank averages cover normal matches only` (no lookup), `performance tab compares ranked games at their own rank`.
-3. **Partial failure.** A failed curve leaves only its games without an average, cards with such games claim no trend, Retry re-asks only the failed curve and recovers, and a full failure still fails as a whole. Tests: `keeps the games whose curve loaded when another fails`, `fails as a whole when every curve fails, so the tab can offer Retry`, `performance tab keeps the rank averages that loaded, and Retry asks again for the rest`.
+3. **Partial failure.** A failed curve leaves only its games without an average, cards with such games claim no trend, Retry re-asks only the failed curve and recovers, and a full failure still fails as a whole. Tests: `keeps the games whose curve loaded when another fails`, `fails as a whole when every curve fails, so the tab can offer Retry`, `performance tab keeps the rank averages that loaded, and Retry asks again for the rest`, `performance tab keeps the trends a failed curve doesn't touch`, `performance tab doesn't call failed averages missing`.
 4. **Picking a game.** Pointer, touch and keyboard each work, and a tap never opens a report on its own. Tests: `performance tab describes the game under the pointer and a click opens its report`, `performance tab points can be picked and opened from the keyboard`, `a tap on a Performance chart shows the game; its Report link opens it`.
 5. **No lost state.** Tests: `the profile keeps its tab, range and hero after a match report`, `performance tab keeps the last cards, dimmed, while new games load`.
 
@@ -4018,6 +4018,10 @@ These cover behaviour that already works, so they pass at once. While planning, 
 - **All ranks:** with no current rank, the all-ranks note shows.
 - **Widening:** thin tiers widen, and the note says so (`thinTiers`).
 - **Columns:** four at 1260 px and two at 850 px on the desktop; one at 375 px on the website.
+- **Partial failure, per card (Task 4 review):**
+  - **Untouched cards keep their trend.** The failed hero's games have no match details either, so the per-minute cards have none of them: they keep their average and trend, while souls, which has them, shows none.
+  - **Failed averages aren't called missing.** Every game with match details is on the failed hero, so the card shows "1,000 10 games" with no trend and no "no rank average for these games".
+  - Checked against broken code: a card that ignores whether a game has a value, and a detail that checks only a full failure, each fail one of them.
 
 - [ ] **Step 1: Add the tests**
 
@@ -4220,6 +4224,50 @@ test("performance cards sit in four columns, two on a narrower window", async ({
   await expect.poll(columns).toBe(2);
 });
 
+// The newest 20 games alternate heroes: heroes[0] on even indices.
+const recent = (hero: 0 | 1) =>
+  Array.from({ length: 10 }, (_, i) => 3000 + 2 * i + hero);
+
+test("performance tab keeps the trends a failed curve doesn't touch", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  // heroes[1]'s curve fails, and its games have no match details either.
+  await routeApi(page, {
+    history: performanceHistory,
+    failCurveFor: new Set([heroes[1]]),
+    unstoredTotals: recent(1),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const damage = card(page, "Hero damage / min");
+  await expect(damage.locator(".perf-card-numbers")).toHaveText(
+    "1,000 10 games · rank avg 500",
+  );
+  await expect(damage.locator(".perf-trend")).toHaveText("– Flat");
+  // Souls has heroes[1]'s games, so it claims no trend.
+  await expect(card(page, "Souls / min").locator(".perf-trend")).toHaveCount(0);
+});
+
+test("performance tab doesn't call failed averages missing", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  // heroes[1]'s curve fails, and heroes[0]'s games have no match details.
+  await routeApi(page, {
+    history: performanceHistory,
+    failCurveFor: new Set([heroes[1]]),
+    unstoredTotals: recent(0),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const damage = card(page, "Hero damage / min");
+  await expect(damage.locator(".perf-card-numbers")).toHaveText(
+    "1,000 10 games",
+  );
+  await expect(damage.locator(".perf-trend")).toHaveCount(0);
+});
+
 test("performance tab degrades without match history", async ({ page }) => {
   await storeAccount(page);
   await routeApi(page, { history: 403 });
@@ -4264,10 +4312,10 @@ with:
 - [ ] **Step 2: Run them**
 
 Run: `npx playwright test tests/browser/home.spec.ts -g "performance"`
-Expected: PASS (17 tests).
+Expected: PASS (19 tests).
 
 Run: `npm run test:browser && npm run test:web`
-Expected: PASS (143 and 76).
+Expected: PASS (145 and 76).
 
 - [ ] **Step 3: Check and commit**
 
@@ -4478,7 +4526,7 @@ Run all of these; every one must pass:
 - `npm test` (382)
 - `npx tsc --noEmit`
 - `npm run web:typecheck`
-- `npm run test:browser` (143)
+- `npm run test:browser` (145)
 - `npm run test:web` (76)
 - `npm run build`
 - `npm run web:build`
