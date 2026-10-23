@@ -11,9 +11,16 @@ export interface RateStore {
    * Counts a request against the group if none of `keys` is cooling down
    * and the group has had fewer than `limit` in the window: then 0.
    * Otherwise null while cooling down, or how long until the oldest
-   * request leaves the window.
+   * request leaves the window. `claim` runs just before the request is
+   * counted, in the same step: if it throws, as for a request no one wants
+   * any more, nothing is counted and the promise rejects with its error.
    */
-  take(group: string, limit: number, keys: string[]): Promise<number | null>;
+  take(
+    group: string,
+    limit: number,
+    keys: string[],
+    claim: () => void,
+  ): Promise<number | null>;
   cooling(keys: string[]): boolean;
   cool(key: string, until: number): void;
   /** Calls `listener` when another tab or window starts a cooldown. */
@@ -33,12 +40,13 @@ export function memoryRateStore(now: () => number): RateStore {
     keys.some((key) => now() < (cooldowns.get(key) ?? 0));
   return {
     // Synchronous inside: requests take slots in the order they ask.
-    async take(group, limit, keys) {
+    async take(group, limit, keys, claim) {
       if (cooling(keys)) return null;
       const at = now();
       const times = recent(sent.get(group) ?? [], at);
       sent.set(group, times);
       if (times.length >= limit) return times[0] + RATE_WINDOW - at;
+      claim();
       times.push(at);
       return 0;
     },
@@ -91,7 +99,7 @@ export function sharedRateStore(
   };
   const cooling = (keys: string[]) => keys.some((key) => now() < until(key));
   return {
-    take: (group, limit, keys) =>
+    take: (group, limit, keys, claim) =>
       locks.request(`${PREFIX}lock`, () => {
         if (cooling(keys)) return null;
         const at = now();
@@ -103,6 +111,7 @@ export function sharedRateStore(
           at,
         );
         if (times.length >= limit) return times[0] + RATE_WINDOW - at;
+        claim();
         storage.setItem(
           `${PREFIX}sent.${group}`,
           JSON.stringify([...times, at]),

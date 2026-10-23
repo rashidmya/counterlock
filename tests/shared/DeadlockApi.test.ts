@@ -296,6 +296,59 @@ describe("DeadlockApi", () => {
     }
   });
 
+  it("keeps a waiting request one of its two callers still wants", async () => {
+    vi.useFakeTimers();
+    try {
+      const request = vi
+        .fn<typeof fetch>()
+        .mockImplementation(async () => json([]));
+      const api = new DeadlockApi(request);
+      const rank = (id: number, signal?: AbortSignal) =>
+        api.get(`/v1/players/rank?account_ids=${id}`, 1, signal);
+      await Promise.all(Array.from({ length: 20 }, (_, i) => rank(i)));
+      const leaves = new AbortController();
+      const goes = rank(20, leaves.signal);
+      const stays = rank(20, new AbortController().signal);
+      leaves.abort();
+      await expect(goes).rejects.toThrow(/abort/i);
+      await vi.advanceTimersByTimeAsync(RATE_WINDOW);
+      await expect(stays).resolves.toEqual([]);
+      expect(request).toHaveBeenCalledTimes(21);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("sends a request asked for again just after its caller left once, using one slot", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => json([]));
+    let now = 0;
+    const waits: number[] = [];
+    const api = new DeadlockApi(
+      request,
+      () => now,
+      async (ms) => {
+        waits.push(ms);
+        now += ms;
+      },
+    );
+    const rank = (id: number, signal?: AbortSignal) =>
+      api.get(`/v1/players/rank?account_ids=${id}`, 1, signal);
+    // As React's StrictMode does: a load, its cleanup, the load again.
+    const first = new AbortController();
+    const left = rank(0, first.signal);
+    first.abort();
+    const again = rank(0, new AbortController().signal);
+    await expect(left).rejects.toThrow(/abort/i);
+    await expect(again).resolves.toEqual([]);
+    expect(request).toHaveBeenCalledTimes(1);
+    // The window still has room for the limit's other 19.
+    await Promise.all(Array.from({ length: 19 }, (_, i) => rank(1 + i)));
+    expect(waits).toEqual([]);
+    expect(request).toHaveBeenCalledTimes(20);
+  });
+
   it("keeps a sent request's answer when its caller has left", async () => {
     let release!: (response: Response) => void;
     const request = vi.fn<typeof fetch>().mockImplementation(

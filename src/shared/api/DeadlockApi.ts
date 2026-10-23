@@ -51,8 +51,11 @@ interface Pending {
   promise: Promise<unknown>;
   // Callers still waiting for it; Infinity once one came without a signal.
   callers: number;
-  // Aborted when every caller has left while it still waits for room.
+  // Aborted when every caller has left before it claimed its slot.
   abandon: AbortController;
+  // Until it claims its slot in the group's rate limit (at once where the
+  // group has none): every caller leaving before then drops it, and once
+  // claimed it goes out.
   queued: boolean;
 }
 
@@ -95,7 +98,7 @@ export class DeadlockApi {
   /**
    * The response for `path`, cached for `ttlMs`. A caller whose `signal`
    * aborts stops waiting at once; the request itself is dropped only if it
-   * hasn't gone out yet and no one else still wants it.
+   * hasn't claimed its slot yet and no one else still wants it.
    */
   get<T>(path: string, ttlMs: number, signal?: AbortSignal): Promise<T> {
     if (signal?.aborted) return Promise.reject(signal.reason);
@@ -141,7 +144,7 @@ export class DeadlockApi {
       const leave = () => {
         reject(signal.reason);
         if (--pending.callers || !pending.queued) return;
-        // No one wants it any more, and it hasn't gone out.
+        // No one wants it any more, and it hasn't claimed its slot.
         pending.abandon.abort();
         if (this.inFlight.get(path) === pending) this.inFlight.delete(path);
       };
@@ -166,26 +169,37 @@ export class DeadlockApi {
     pending: Pending,
   ): Promise<T> {
     const limit = RATE_LIMITS[group];
-    if (limit) await this.throttle(path, group, limit, pending.abandon.signal);
-    pending.queued = false;
+    if (limit) await this.throttle(path, group, limit, pending);
+    else pending.queued = false;
     return this.fetchJson<T>(path, group);
   }
 
   /**
    * Waits until the group has had fewer than `limit` requests in the window
-   * (in every tab), then counts this one. A cooldown that starts while it
-   * waits fails it at once, before it takes a slot, as does every caller
-   * leaving.
+   * (in every tab), then counts this one: from then on it goes out, even
+   * if every caller leaves. A cooldown that starts while it waits fails it
+   * at once, before it takes a slot, as does every caller leaving.
    */
   private async throttle(
     path: string,
     group: string,
     limit: number,
-    abandoned: AbortSignal,
+    pending: Pending,
   ) {
+    const abandoned = pending.abandon.signal;
+    // In the same step as the count, so no caller can leave between the two.
+    const claim = () => {
+      abandoned.throwIfAborted();
+      pending.queued = false;
+    };
     for (;;) {
       abandoned.throwIfAborted();
-      const wait = await this.limits.take(group, limit, sharedKeys(group));
+      const wait = await this.limits.take(
+        group,
+        limit,
+        sharedKeys(group),
+        claim,
+      );
       if (wait === null) throw new Error(BUSY);
       if (!wait) return;
       await this.pause(wait, abandoned, () => this.cooling(path, group));
@@ -216,8 +230,6 @@ export class DeadlockApi {
     } finally {
       this.sleepers.delete(wake);
       abandoned.removeEventListener("abort", wake);
-      // Clears the timer of a wait cut short.
-      woken.abort();
     }
   }
 

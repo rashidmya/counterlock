@@ -4,6 +4,7 @@ import {
   defaultRateStore,
   serialLocks,
   sharedRateStore,
+  type Locks,
   type RateStore,
 } from "@/shared/api/rate-store";
 
@@ -144,6 +145,69 @@ describe("rate limits shared by every tab", () => {
     }
   });
 
+  it("neither sends nor counts a request every caller left before the lock was granted", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => json([]));
+    const { items, a } = twoTabs(request);
+    const rank = (signal: AbortSignal) =>
+      a.api.get("/v1/players/rank?account_ids=1", 1, signal);
+    const first = new AbortController();
+    const left = rank(first.signal);
+    first.abort();
+    // Asked for again at once, as React's StrictMode does.
+    const again = rank(new AbortController().signal);
+    await expect(left).rejects.toThrow(/abort/i);
+    await expect(again).resolves.toEqual([]);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(
+      JSON.parse(items.get("counterlock.api.sent./v1/players/rank")!),
+    ).toHaveLength(1);
+  });
+
+  it("sends a request whose callers left once its slot was claimed, for whoever asks next", async () => {
+    const answers: (() => void)[] = [];
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(
+        () =>
+          new Promise<Response>((resolve) =>
+            answers.push(() => resolve(json([{ account_id: 1 }]))),
+          ),
+      );
+    const { items, storage } = sharedStorage();
+    const serial = serialLocks();
+    const caller = new AbortController();
+    const locks: Locks = {
+      request: (name, callback) =>
+        serial.request(name, () => {
+          const taken = callback();
+          // The caller leaves after the slot is claimed, before the
+          // request is sent.
+          caller.abort();
+          return taken;
+        }),
+    };
+    const store = sharedRateStore(storage, locks, Date.now, new EventTarget());
+    const api = new DeadlockApi(request, Date.now, undefined, store);
+    const path = "/v1/players/rank?account_ids=1";
+    await expect(api.get(path, 60_000, caller.signal)).rejects.toThrow(
+      /abort/i,
+    );
+    // A new caller shares it while it is out...
+    const again = api.get(path, 60_000);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(request).toHaveBeenCalledTimes(1);
+    for (const answer of answers) answer();
+    await expect(again).resolves.toEqual([{ account_id: 1 }]);
+    // ...and its answer is kept.
+    await expect(api.get(path, 60_000)).resolves.toEqual([{ account_id: 1 }]);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(
+      JSON.parse(items.get("counterlock.api.sent./v1/players/rank")!),
+    ).toHaveLength(1);
+  });
+
   it("reads damaged entries as empty", async () => {
     const { storage } = sharedStorage();
     storage.setItem("counterlock.api.sent./v1/players/rank", "{not json");
@@ -155,7 +219,9 @@ describe("rate limits shared by every tab", () => {
       new EventTarget(),
     );
     expect(store.cooling(["*"])).toBe(false);
-    await expect(store.take("/v1/players/rank", 20, ["*"])).resolves.toBe(0);
+    await expect(
+      store.take("/v1/players/rank", 20, ["*"], () => {}),
+    ).resolves.toBe(0);
     expect(storage.getItem("counterlock.api.sent./v1/players/rank")).toBe(
       "[1000]",
     );
@@ -164,8 +230,10 @@ describe("rate limits shared by every tab", () => {
   it("counts per tab where nothing can be shared", async () => {
     // As in Node, with no window, storage or locks.
     const store = defaultRateStore(() => 0);
-    await expect(store.take("/v1/players/rank", 1, [])).resolves.toBe(0);
-    await expect(store.take("/v1/players/rank", 1, [])).resolves.toBe(
+    await expect(store.take("/v1/players/rank", 1, [], () => {})).resolves.toBe(
+      0,
+    );
+    await expect(store.take("/v1/players/rank", 1, [], () => {})).resolves.toBe(
       RATE_WINDOW,
     );
   });
