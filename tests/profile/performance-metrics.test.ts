@@ -125,6 +125,8 @@ describe("gameTotals", () => {
     expect(totals.own.accountId).toBe(77);
     expect(totals.teamKills).toBe(10 + 5 * 4);
     expect(totals.teamHeroDamage).toBe(30000 + 5 * 15000);
+    expect(totals.teamObjectiveDamage).toBe(6000 + 5 * 1500);
+    expect(totals.teamHealing).toBe(4000 + 5 * 3000);
   });
 
   it("is undefined when the player isn't in the match", () => {
@@ -152,7 +154,7 @@ describe("metrics", () => {
     return fraction ? fraction.num / fraction.den : null;
   };
 
-  it("are the eight in the spec, in order", () => {
+  it("are the ten in the spec, in order", () => {
     expect(PERFORMANCE_METRICS.map((m) => m.label)).toEqual([
       "Souls / min",
       "K/D/A ratio",
@@ -162,6 +164,8 @@ describe("metrics", () => {
       "Creep kills / min",
       "Kill participation",
       "Hero damage share",
+      "Objective damage share",
+      "Healing share",
     ]);
   });
 
@@ -187,7 +191,11 @@ describe("metrics", () => {
     expect(average("creepKillsPerMin")).toBeNull();
     expect(value("killParticipation")).toBe(17 / 30);
     expect(value("damageShare")).toBe(30000 / 105000);
+    expect(value("objectiveShare")).toBe(6000 / 13500);
+    expect(value("healingShare")).toBe(4000 / 19000);
     expect(metric("damageShare").average).toBeUndefined();
+    expect(metric("objectiveShare").average).toBeUndefined();
+    expect(metric("healingShare").average).toBeUndefined();
     expect(metric("heroDamagePerMin").value(game, undefined)).toBeNull();
   });
 
@@ -195,8 +203,9 @@ describe("metrics", () => {
     const short = match({ durationS: 0 });
     expect(metric("soulsPerMin").value(short, totals)).toBeNull();
     expect(metric("soulsPerMin").average!(short, values)).toBeNull();
-    const alone = { ...totals!, teamKills: 0 };
+    const alone = { ...totals!, teamKills: 0, teamHealing: 0 };
     expect(metric("killParticipation").value(game, alone)).toBeNull();
+    expect(metric("healingShare").value(game, alone)).toBeNull();
   });
 });
 

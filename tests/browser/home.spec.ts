@@ -678,6 +678,8 @@ test("performance tab compares each metric with the rank average", async ({
     "Creep kills / min",
     "Kill participation",
     "Hero damage share",
+    "Objective damage share",
+    "Healing share",
   ]);
   // Last 20: ten games at 1,000 souls a minute, then ten at 1,200.
   const souls = card(page, "Souls / min");
@@ -700,6 +702,12 @@ test("performance tab compares each metric with the rank average", async ({
   await expect(
     card(page, "Hero damage share").locator(".perf-card-numbers"),
   ).toHaveText("29% 20 games · no rank average");
+  await expect(
+    card(page, "Objective damage share").locator(".perf-card-numbers"),
+  ).toHaveText("44% 20 games · no rank average");
+  await expect(
+    card(page, "Healing share").locator(".perf-card-numbers"),
+  ).toHaveText("21% 20 games · no rank average");
 
   await expect(dots(page, "Souls / min")).toHaveCount(20);
   await expect(
@@ -752,7 +760,7 @@ test("performance tab says so with too few games", async ({ page }) => {
     card(page, "Souls / min").locator(".perf-card-numbers"),
   ).toContainText("1 game · rank avg 1,000");
   await expect(view(page).locator(".perf-trend")).toHaveText(
-    Array(8).fill("Too few games"),
+    Array(10).fill("Too few games"),
   );
   await expect(dots(page, "Souls / min")).toHaveCount(1);
   await expect(view(page).getByRole("combobox", { name: "Hero" })).toHaveCount(

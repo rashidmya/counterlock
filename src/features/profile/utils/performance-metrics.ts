@@ -85,6 +85,8 @@ export interface GameTotals {
   own: PlayerTotals;
   teamKills: number;
   teamHeroDamage: number;
+  teamObjectiveDamage: number;
+  teamHealing: number;
 }
 
 export function gameTotals(
@@ -98,6 +100,8 @@ export function gameTotals(
     own,
     teamKills: team.reduce((sum, p) => sum + p.kills, 0),
     teamHeroDamage: team.reduce((sum, p) => sum + p.heroDamage, 0),
+    teamObjectiveDamage: team.reduce((sum, p) => sum + p.objectiveDamage, 0),
+    teamHealing: team.reduce((sum, p) => sum + p.healing, 0),
   };
 }
 
@@ -117,7 +121,9 @@ export type PerformanceMetricId =
   | "healingPerMin"
   | "creepKillsPerMin"
   | "killParticipation"
-  | "damageShare";
+  | "damageShare"
+  | "objectiveShare"
+  | "healingShare";
 
 export interface PerformanceMetric {
   id: PerformanceMetricId;
@@ -224,6 +230,14 @@ export const PERFORMANCE_METRICS: PerformanceMetric[] = [
   share("damageShare", "Hero damage share", (t) => ({
     num: t.own.heroDamage,
     den: t.teamHeroDamage,
+  })),
+  share("objectiveShare", "Objective damage share", (t) => ({
+    num: t.own.objectiveDamage,
+    den: t.teamObjectiveDamage,
+  })),
+  share("healingShare", "Healing share", (t) => ({
+    num: t.own.healing,
+    den: t.teamHealing,
   })),
 ];
 

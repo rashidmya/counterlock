@@ -236,7 +236,7 @@ test.describe("phone width (375px)", () => {
     ).toBe(true);
 
     await page.getByRole("tab", { name: "Performance" }).click();
-    await expect(page.locator(".perf-card .sparkline svg")).toHaveCount(8);
+    await expect(page.locator(".perf-card .sparkline svg")).toHaveCount(10);
     expect((await overflow(page)).scroll).toBeLessThanOrEqual(375);
     expect(await clipped(page, 375)).toEqual([]);
   });

@@ -12,8 +12,9 @@ export interface OwnTotals {
 }
 
 // The account's totals unless a test says otherwise. With five teammates at
-// 4 kills and 15,000 hero damage each, kill participation is 17 / 30 and the
-// damage share 30,000 / 105,000.
+// 4 kills, 15,000 hero damage, 1,500 objective damage and 3,000 healing each,
+// kill participation is 17 / 30, the hero damage share 30,000 / 105,000, the
+// objective damage share 6,000 / 13,500 and the healing share 4,000 / 19,000.
 export const OWN: OwnTotals = {
   kills: 10,
   assists: 7,
@@ -26,8 +27,8 @@ const OTHER: OwnTotals = {
   kills: 4,
   assists: 6,
   heroDamage: 15000,
-  objectiveDamage: 3000,
-  healing: 2000,
+  objectiveDamage: 1500,
+  healing: 3000,
   creepKills: 60,
 };
 
