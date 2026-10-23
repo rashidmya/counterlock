@@ -1234,6 +1234,13 @@ test("performance tab says what is still loading", async ({ page }) => {
     card(page, "Hero damage / min").locator(".perf-card-numbers"),
   ).toHaveText("— Loading match details…");
   await expect(view(page).locator(".perf-trend")).toHaveCount(0);
+  // Without a chart yet, its numbers stay under the title, as high as
+  // those of a charted card in its row.
+  const top = (label: string) =>
+    card(page, label)
+      .locator(".perf-card-numbers")
+      .evaluate((el) => el.getBoundingClientRect().top);
+  expect(await top("Hero damage / min")).toBe(await top("Souls / min"));
   release();
   await expect(
     card(page, "Hero damage / min").locator(".perf-card-numbers"),
@@ -1392,14 +1399,30 @@ test("performance cards sit in five columns when wide, then four, then two", asy
     ["Healing / min", "Healing share"],
   ])
     expect(await left(below)).toBe(await left(above));
-  // A title takes two lines ("Objective damage / min"), yet the first
-  // row's charts line up.
+  // One card's title row taller than the rest of its row's (as a title on
+  // two lines makes it), yet the row's charts line up.
+  await page.addStyleTag({
+    content:
+      '.perf-card[aria-label="Souls / min"] .perf-card-head { padding-bottom: 40px; }',
+  });
+  const head = (label: string) =>
+    card(page, label).locator(".perf-card-head").boundingBox();
+  expect((await head("Souls / min"))!.height).toBeGreaterThan(
+    (await head("K/D/A ratio"))!.height,
+  );
   const tops = await view(page)
     .locator(".perf-card .sparkline")
     .evaluateAll((charts) =>
       charts.slice(0, 5).map((chart) => chart.getBoundingClientRect().top),
     );
   expect(new Set(tops).size).toBe(1);
+  // In the shorter card, a game's tip covers the numbers it stands for.
+  const kda = card(page, "K/D/A ratio");
+  await kda.getByRole("slider").focus();
+  const tip = (await kda.locator(".spark-tip").boundingBox())!;
+  const number = (await kda.locator(".perf-card-numbers b").boundingBox())!;
+  expect(tip.y).toBeLessThanOrEqual(number.y);
+  expect(tip.y + tip.height).toBeGreaterThanOrEqual(number.y + number.height);
   await page.setViewportSize({ width: 1100, height: 800 });
   await expect.poll(columns).toBe(4);
   await page.setViewportSize({ width: 850, height: 800 });

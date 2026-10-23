@@ -570,8 +570,9 @@
 .perf-cards[aria-busy="true"] {
   opacity: 0.85;
 }
-/* A column, its chart at the foot: in a row where one title wraps to two
-   lines, the charts still line up. */
+/* A column, its numbers and chart at the foot: in a row where one title
+   wraps to two lines, the charts still line up, and the chart's tip still
+   covers the numbers above it. */
 .perf-card {
   display: flex;
   flex-direction: column;
@@ -607,7 +608,13 @@
   color: var(--bad);
 }
 .perf-card-numbers {
+  margin-top: auto;
   margin-bottom: 6px;
+}
+/* A card without a chart (no game with a value yet) keeps its numbers
+   under the title, not at the foot of a row the charts make tall. */
+.perf-card-numbers:last-child {
+  margin-top: 0;
 }
 .perf-card-numbers b {
   font: 700 26px var(--font-label);
@@ -618,7 +625,6 @@
 }
 .sparkline-box {
   position: relative;
-  margin-top: auto;
 }
 .sparkline {
   height: 80px;
