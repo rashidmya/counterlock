@@ -71,6 +71,9 @@ Each task's end state was also checked on its own: type check and unit tests aft
   - **Clients outside the shared one:** the live overlay's statistics client (`src/features/player-stats/`) has its own cache and cooldowns, and `src/features/builds/services/build-analytics.ts` fetches `/v1/analytics/hero-build-stats` directly; neither counts against these limits (Task 1 review).
   - **A waiting request learns of a cooldown only when it wakes,** up to a minute later, even when `Retry-After` is an hour.
   - **A profile reopened later in the session** opens on the tab it was left on, not Overview.
+  - **Share trends on "All heroes" (Task 3 review):** shares have no rank average, so a trend can follow the hero mix (from a healer to a carry, healing share slips) rather than form. Hiding share trends on "All heroes" is an option.
+  - **Card rows (Task 3 review):** at full width the ten cards run 4/4/2, so the shares are split across two rows; five columns above about 1100 px would put each share under its per-minute card.
+  - **A team total of 0:** the report shows 0% where the tab leaves the game out of that share (copying kill participation); none of 40 live team totals was 0.
 
 ## Global Constraints
 
@@ -78,7 +81,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
 - **Constants (exported; tests import them):** `RATE_LIMITS`, `RATE_WINDOW` and `endpointGroup()` in `DeadlockApi.ts`; `CURVE_CONCURRENCY = 4` in `performance-api.ts`; `dotRadius()` and `nearestGame()` in `Sparkline.tsx`.
 - **New or changed copy strings (tests assert them):**
   - **Card titles:** "Objective damage share" and "Healing share" after "Hero damage share".
-  - **Notes:** "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the three shares of the team's totals have no rank average."
+  - **Notes:** "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the hero damage, objective damage and healing shares have no rank average, as it has no team totals."
   - **Partial failure:** "Rank averages unavailable for {n} of {count}: {error}" with Retry, for example "Rank averages unavailable for 10 of 20 games: Deadlock API unavailable (500)."
   - **Loading:** "Updating to the last {count}…", for example "Updating to the last 50 games…".
   - **Tip:** "{Hero} · Win · 3d ago" over "{value} rank avg {x} · Report →" ("—" without a value; no "rank avg" without an average).
@@ -1367,7 +1370,7 @@ Expected: 133 desktop and 74 website tests pass.
 - Modify: `tests/fixtures/performance.ts`
 - Test: `tests/profile/performance-metrics.test.ts`, `tests/browser/home.spec.ts`, `tests/web-browser/mobile.spec.ts`
 
-`GameTotals` gains the team's objective damage and healing, and two `share()` metrics follow "Hero damage share": "Objective damage share" and "Healing share". A game whose team healed nothing has no healing share (as with team kills). The always-on note changes to name the three shares.
+`GameTotals` gains the team's objective damage and healing, and two `share()` metrics follow "Hero damage share": "Objective damage share" and "Healing share". A game whose team healed nothing has no healing share (as with team kills); a player who healed nothing while the team healed has a share of 0, and the game still counts. The always-on note names the shares without a rank average and says why, and the main browser test now asserts it (Task 3 review).
 
 - [ ] **Step 1: Change the fixture and write the failing tests**
 
@@ -1541,9 +1544,21 @@ with:
     const short = match({ durationS: 0 });
     expect(metric("soulsPerMin").value(short, totals)).toBeNull();
     expect(metric("soulsPerMin").average!(short, values)).toBeNull();
-    const alone = { ...totals!, teamKills: 0, teamHealing: 0 };
+    const alone = {
+      ...totals!,
+      teamKills: 0,
+      teamObjectiveDamage: 0,
+      teamHealing: 0,
+    };
     expect(metric("killParticipation").value(game, alone)).toBeNull();
+    expect(metric("objectiveShare").value(game, alone)).toBeNull();
     expect(metric("healingShare").value(game, alone)).toBeNull();
+    // Healing nothing while the team heals is a share of 0, still a game.
+    const noHeals = { ...totals!, own: { ...totals!.own, healing: 0 } };
+    expect(metric("healingShare").value(game, noHeals)).toEqual({
+      num: 0,
+      den: 19000,
+    });
   });
 });
 ```
@@ -1552,6 +1567,87 @@ with:
 In `tests/browser/home.spec.ts`:
 
 1. Replace:
+
+```ts
+  heroStats?: unknown[];
+  failTotals?: boolean;
+  failCurve?: boolean;
+  unstoredTotals?: number[];
+  unlistedPlayer?: number[];
+}
+
+async function routeApi(page: Page, fixtures: Fixtures = {}) {
+  let historyRequests = 0;
+  await page.route("https://api.deadlock-api.com/**", (route) => {
+    const url = new URL(route.request().url());
+    const json = (body: unknown, status = 200) =>
+      route.fulfill({
+        status,
+```
+
+with:
+
+```ts
+  heroStats?: unknown[];
+  failTotals?: boolean;
+  failCurve?: boolean;
+  // Heroes whose curves fail while they're in the set.
+  failCurveFor?: Set<number>;
+  // One tier's curves come back thin (50 games), so they widen.
+  thinTiers?: boolean;
+  unstoredTotals?: number[];
+  unlistedPlayer?: number[];
+  // Awaited before each answer, so a test can hold requests back.
+  gate?: (url: URL) => Promise<void>;
+}
+
+async function routeApi(page: Page, fixtures: Fixtures = {}) {
+  let historyRequests = 0;
+  await page.route("https://api.deadlock-api.com/**", async (route) => {
+    const url = new URL(route.request().url());
+    await fixtures.gate?.(url);
+    const json = (body: unknown, status = 200) =>
+      route.fulfill({
+        status,
+```
+
+2. Replace:
+
+```ts
+              ),
+          );
+    if (url.pathname === "/v1/analytics/player-performance-curve")
+      return fixtures.failCurve ? json({}, 500) : json(rankCurveRows());
+    if (url.pathname.endsWith("/metadata")) return json(matchMetadata(ACCOUNT));
+    return json([]);
+  });
+```
+
+with:
+
+```ts
+              ),
+          );
+    if (url.pathname === "/v1/analytics/player-performance-curve")
+      return fixtures.failCurve ||
+        fixtures.failCurveFor?.has(Number(url.searchParams.get("hero_ids")))
+        ? json({}, 500)
+        : json(
+            rankCurveRows(
+              fixtures.thinTiers &&
+                Number(url.searchParams.get("max_average_badge")) -
+                  Number(url.searchParams.get("min_average_badge")) ===
+                  5
+                ? 50
+                : 5000,
+            ),
+          );
+    if (url.pathname.endsWith("/metadata")) return json(matchMetadata(ACCOUNT));
+    return json([]);
+  });
+```
+
+3. Replace:
 
 ```ts
     "Creep kills / min",
@@ -1575,7 +1671,7 @@ with:
   const souls = card(page, "Souls / min");
 ```
 
-2. Replace:
+4. Replace:
 
 ```ts
   await expect(
@@ -1603,7 +1699,120 @@ with:
   await expect(
 ```
 
-3. Replace:
+5. Replace:
+
+```ts
+      "Games without a recorded rank use the player's current rank.",
+    ),
+  ).toBeVisible();
+  expect(bulk.map((ids) => ids.split(",").length)).toEqual([20]);
+
+  // Last 50 asks only for the 30 games it adds.
+```
+
+with:
+
+```ts
+      "Games without a recorded rank use the player's current rank.",
+    ),
+  ).toBeVisible();
+  await expect(
+    view(page).getByText(
+      "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the hero damage, objective damage and healing shares have no rank average, as it has no team totals.",
+    ),
+  ).toBeVisible();
+  expect(bulk.map((ids) => ids.split(",").length)).toEqual([20]);
+
+  // Last 50 asks only for the 30 games it adds.
+```
+
+6. Replace:
+
+```ts
+  );
+});
+
+test("performance tab says so with too few games", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, {
+```
+
+with:
+
+```ts
+  );
+});
+
+/** Match ids whose report metadata the page asks for. */
+function reportRequests(page: Page) {
+  const ids: number[] = [];
+  page.on("request", (request) => {
+    const id = new URL(request.url()).pathname.match(
+      /^\/v1\/matches\/(\d+)\/metadata$/,
+    )?.[1];
+    if (id) ids.push(Number(id));
+  });
+  return ids;
+}
+
+test("performance tab describes the game under the pointer and a click opens its report", async ({
+  page,
+}) => {
+  const reports = reportRequests(page);
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const souls = card(page, "Souls / min");
+  await expect(dots(page, "Souls / min")).toHaveCount(20);
+  const chart = (await souls.getByRole("slider").boundingBox())!;
+  // The newest game is on the right: 1h ago, lost, 1,200 souls a minute.
+  await page.mouse.move(chart.x + chart.width - 2, chart.y + 40);
+  const tip = souls.locator(".spark-tip span");
+  await expect(tip).toHaveText([
+    `${heroName(heroes[0])} · Loss · 1h ago`,
+    "1,200 rank avg 1,000 · Report →",
+  ]);
+  await expect(souls.locator("circle.picked")).toHaveCount(1);
+  await page.mouse.click(chart.x + chart.width - 2, chart.y + 40);
+  await expect(view(page).locator(".match-report")).toBeVisible();
+  expect(reports).toEqual([3000]);
+});
+
+test("performance tab points can be picked and opened from the keyboard", async ({
+  page,
+}) => {
+  const reports = reportRequests(page);
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(dots(page, "Souls / min")).toHaveCount(20);
+  const chart = card(page, "Souls / min").getByRole("slider");
+  // Focus starts on the newest game.
+  await chart.focus();
+  await expect(chart).toHaveAttribute("aria-valuenow", "20");
+  await expect(chart).toHaveAttribute(
+    "aria-valuetext",
+    `${heroName(heroes[0])} · Loss · 1h ago: 1,200, rank avg 1,000`,
+  );
+  await page.keyboard.press("ArrowLeft");
+  await expect(chart).toHaveAttribute("aria-valuenow", "19");
+  await expect(chart).toHaveAttribute(
+    "aria-valuetext",
+    `${heroName(heroes[1])} · Win · 2h ago: 1,200, rank avg 1,000`,
+  );
+  await page.keyboard.press("Enter");
+  await expect(view(page).locator(".match-report")).toBeVisible();
+  expect(reports).toEqual([3001]);
+});
+
+test("performance tab says so with too few games", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, {
+```
+
+7. Replace:
 
 ```ts
     card(page, "Souls / min").locator(".perf-card-numbers"),
@@ -1625,6 +1834,205 @@ with:
   );
   await expect(dots(page, "Souls / min")).toHaveCount(1);
   await expect(view(page).getByRole("combobox", { name: "Hero" })).toHaveCount(
+```
+
+8. Replace:
+
+```ts
+  await expect(view(page).locator(".perf-trend")).toHaveCount(0);
+});
+
+test("performance tab degrades without match history", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, { history: 403 });
+```
+
+with:
+
+```ts
+  await expect(view(page).locator(".perf-trend")).toHaveCount(0);
+});
+
+test("performance tab keeps the rank averages that loaded, and Retry asks again for the rest", async ({
+  page,
+}) => {
+  const failCurveFor = new Set([heroes[1]]);
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory, failCurveFor });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const notice = view(page).getByText(
+    "Rank averages unavailable for 10 of 20 games: Deadlock API unavailable (500).",
+  );
+  await expect(notice).toBeVisible();
+  const souls = card(page, "Souls / min");
+  await expect(souls.locator(".perf-card-numbers")).toContainText(
+    "20 games · 10 with a rank average",
+  );
+  failCurveFor.clear();
+  await notice.getByRole("button", { name: "Retry" }).click();
+  await expect(souls.locator(".perf-card-numbers")).toHaveText(
+    "1,100 20 games · rank avg 1,000",
+  );
+  await expect(notice).toHaveCount(0);
+});
+
+test("performance tab keeps the last cards, dimmed, while new games load", async ({
+  page,
+}) => {
+  let hold: Promise<void> | null = null;
+  let release = () => {};
+  await storeAccount(page);
+  await routeApi(page, {
+    history: performanceHistory,
+    gate: (url) =>
+      url.pathname === "/v1/matches/metadata" && hold
+        ? hold
+        : Promise.resolve(),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const souls = card(page, "Souls / min").locator(".perf-card-numbers");
+  const cards = view(page).locator(".perf-cards");
+  await expect(souls).toHaveText("1,100 20 games · rank avg 1,000");
+  hold = new Promise((resolve) => (release = resolve));
+  await page.getByRole("button", { name: "Last 50", exact: true }).click();
+  await expect(
+    view(page).getByRole("status").filter({ hasText: "Updating" }),
+  ).toHaveText("Updating to the last 50 games…");
+  await expect(cards).toHaveAttribute("aria-busy", "true");
+  await expect(souls).toHaveText("1,100 20 games · rank avg 1,000");
+  release();
+  await expect(cards).toHaveAttribute("aria-busy", "false");
+  await expect(souls).toContainText("50 games");
+});
+
+test("performance tab says what is still loading", async ({ page }) => {
+  let release = () => {};
+  const hold = new Promise<void>((resolve) => (release = resolve));
+  await storeAccount(page);
+  await routeApi(page, {
+    history: performanceHistory,
+    gate: (url) =>
+      url.pathname === "/v1/matches/metadata" ||
+      url.pathname === "/v1/analytics/player-performance-curve"
+        ? hold
+        : Promise.resolve(),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    card(page, "Souls / min").locator(".perf-card-numbers"),
+  ).toHaveText("1,100 20 games · loading rank average…");
+  await expect(
+    card(page, "Hero damage / min").locator(".perf-card-numbers"),
+  ).toHaveText("— Loading match details…");
+  await expect(view(page).locator(".perf-trend")).toHaveCount(0);
+  release();
+  await expect(
+    card(page, "Hero damage / min").locator(".perf-card-numbers"),
+  ).toHaveText("1,000 20 games · rank avg 500");
+});
+
+test("performance tab asks for match details again on Retry", async ({
+  page,
+}) => {
+  const fixtures = { history: performanceHistory, failTotals: true };
+  await storeAccount(page);
+  await routeApi(page, fixtures);
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const notice = view(page).getByText(
+    "Match details unavailable: Deadlock API unavailable (500).",
+  );
+  await expect(notice).toBeVisible();
+  fixtures.failTotals = false;
+  await notice.getByRole("button", { name: "Retry" }).click();
+  await expect(
+    card(page, "Hero damage / min").locator(".perf-card-numbers"),
+  ).toHaveText("1,000 20 games · rank avg 500");
+  await expect(notice).toHaveCount(0);
+});
+
+test("performance tab compares ranked games at their own rank", async ({
+  page,
+}) => {
+  const bands: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/v1/analytics/player-performance-curve")
+      bands.push(url.searchParams.get("min_average_badge")!);
+  });
+  await storeAccount(page);
+  await routeApi(page, {
+    history: performanceHistory.map((row) => ({
+      ...row,
+      ranked_display_badge: 116,
+    })),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    card(page, "Souls / min").locator(".perf-card-numbers"),
+  ).toHaveText("1,100 20 games · rank avg 1,000");
+  // Eternus, not the player's current Mystic.
+  expect(new Set(bands)).toEqual(new Set(["111"]));
+  await expect(
+    view(page).getByText(/^Games without a recorded rank/),
+  ).toHaveCount(0);
+});
+
+test("performance tab notes games compared with all ranks", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory, rank: [] });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    view(page).getByText(
+      "Games without a recorded rank, and no current rank to use, are compared with all ranks.",
+    ),
+  ).toBeVisible();
+});
+
+test("performance tab widens a thin rank's average and says so", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory, thinTiers: true });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    view(page).getByText(
+      "Where a hero has too few games at one rank, its average covers the ranks either side.",
+    ),
+  ).toBeVisible();
+});
+
+test("performance cards sit in four columns, two on a narrower window", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(dots(page, "Souls / min")).toHaveCount(20);
+  const columns = () =>
+    view(page)
+      .locator(".perf-card")
+      .evaluateAll(
+        (cards) =>
+          new Set(cards.map((card) => card.getBoundingClientRect().left)).size,
+      );
+  expect(await columns()).toBe(4);
+  await page.setViewportSize({ width: 850, height: 800 });
+  await expect.poll(columns).toBe(2);
+});
+
+test("performance tab degrades without match history", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, { history: 403 });
 ```
 
 
@@ -1769,9 +2177,149 @@ export interface GamePoint {
 
 In `src/features/profile/components/PerformanceTab.tsx`:
 
-Replace:
+1. Replace:
 
 ```tsx
+import {
+  fetchGameAverages,
+  fetchMatchTotals,
+} from "../services/performance-api";
+import type { HistoryMatch } from "../types";
+import { timeAgo } from "../utils/format";
+```
+
+with:
+
+```tsx
+import {
+  fetchGameAverages,
+  fetchMatchTotals,
+  type GameAverages,
+} from "../services/performance-api";
+import type { HistoryMatch } from "../types";
+import { timeAgo } from "../utils/format";
+```
+
+2. Replace:
+
+```tsx
+  gamesInRange,
+  heroChoices,
+  summarizeMetric,
+  type GameAverage,
+  type GamePoint,
+  type MetricSummary,
+  type PerformanceMetric,
+```
+
+with:
+
+```tsx
+  gamesInRange,
+  heroChoices,
+  summarizeMetric,
+  type GamePoint,
+  type MetricSummary,
+  type PerformanceMetric,
+```
+
+3. Replace:
+
+```tsx
+};
+
+function PerformanceCard({
+  summary,
+  totals,
+  averages,
+}: {
+  summary: MetricSummary;
+  totals: AsyncState<unknown>;
+  averages: AsyncState<unknown>;
+```
+
+with:
+
+```tsx
+};
+
+function PerformanceCard({
+  accountId,
+  summary,
+  totals,
+  averages,
+}: {
+  accountId: number;
+  summary: MetricSummary;
+  totals: AsyncState<unknown>;
+  averages: AsyncState<unknown>;
+```
+
+4. Replace:
+
+```tsx
+    !failed &&
+    games > 0 &&
+    (!metric.average || average !== null);
+  const title = (p: GamePoint) =>
+    `${heroName(p.heroId)} · ${p.won ? "Win" : "Loss"} · ${timeAgo(p.startTime * 1000)}: ` +
+    format(metric, p.value!) +
+    (p.average === null ? "" : ` (rank avg ${format(metric, p.average)})`);
+  return (
+    <section className="perf-card" aria-label={metric.label}>
+      <div className="perf-card-head">
+```
+
+with:
+
+```tsx
+    !failed &&
+    games > 0 &&
+    (!metric.average || average !== null);
+  const describe = (p: GamePoint) => ({
+    game: `${heroName(p.heroId)} · ${p.won ? "Win" : "Loss"} · ${timeAgo(p.startTime * 1000)}`,
+    value: p.value === null ? "—" : format(metric, p.value),
+    average:
+      p.average === null ? undefined : `rank avg ${format(metric, p.average)}`,
+  });
+  return (
+    <section className="perf-card" aria-label={metric.label}>
+      <div className="perf-card-head">
+```
+
+5. Replace:
+
+```tsx
+        <Sparkline
+          points={summary.points}
+          label={`${metric.label}, game by game`}
+          title={title}
+        />
+      )}
+    </section>
+```
+
+with:
+
+```tsx
+        <Sparkline
+          points={summary.points}
+          label={`${metric.label}, game by game`}
+          describe={describe}
+          route={(p) => ({ page: "match", matchId: p.matchId, accountId })}
+        />
+      )}
+    </section>
+```
+
+6. Replace:
+
+```tsx
+  accountId: number,
+  games: HistoryMatch[],
+  totals: Map<number, PlayerTotals[]> | undefined,
+  averages: Map<number, GameAverage> | undefined,
+) {
   const lines = [
     "Normal and ranked games, oldest on the left. The rank average is the average player on the same hero at the same rank and match length, over the last 30 days.",
     "Improving or slipping compares the recent half of these games with the earlier half, each against its rank average where there is one. Changes smaller than game-to-game noise show as flat.",
@@ -1779,18 +2327,304 @@ Replace:
   ];
   const sources = new Set([...(averages?.values() ?? [])].map((a) => a.source));
   if (sources.has("current"))
+    lines.push("Games without a recorded rank use the player's current rank.");
+  if (sources.has("none"))
+    lines.push(
+      "Games without a recorded rank, and no current rank to use, are compared with all ranks.",
+    );
+  if ([...(averages?.values() ?? [])].some((a) => a.widenedFrom))
+    lines.push(
+      "Where a hero has too few games at one rank, its average covers the ranks either side.",
+    );
 ```
 
 with:
 
 ```tsx
+  accountId: number,
+  games: HistoryMatch[],
+  totals: Map<number, PlayerTotals[]> | undefined,
+  averages: GameAverages | undefined,
+) {
   const lines = [
     "Normal and ranked games, oldest on the left. The rank average is the average player on the same hero at the same rank and match length, over the last 30 days.",
     "Improving or slipping compares the recent half of these games with the earlier half, each against its rank average where there is one. Changes smaller than game-to-game noise show as flat.",
-    "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the three shares of the team's totals have no rank average.",
+    "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the hero damage, objective damage and healing shares have no rank average, as it has no team totals.",
   ];
-  const sources = new Set([...(averages?.values() ?? [])].map((a) => a.source));
+  const loaded = [...(averages?.byMatch.values() ?? [])];
+  const sources = new Set(loaded.map((a) => a.source));
   if (sources.has("current"))
+    lines.push("Games without a recorded rank use the player's current rank.");
+  if (sources.has("none"))
+    lines.push(
+      "Games without a recorded rank, and no current rank to use, are compared with all ranks.",
+    );
+  if (loaded.some((a) => a.widenedFrom))
+    lines.push(
+      "Where a hero has too few games at one rank, its average covers the ranks either side.",
+    );
+```
+
+7. Replace:
+
+```tsx
+  return lines;
+}
+
+export function PerformanceTab({
+  accountId,
+  history,
+}: {
+  accountId: number;
+  history: AsyncState<HistoryMatch[]>;
+}) {
+  const [range, setRange] = useState<PerformanceRange>(20);
+  const [picked, setPicked] = useState<number | null>(null);
+  const matches = history.data ?? [];
+  const heroes = heroChoices(matches);
+  // All heroes when the picked one has no games (left the history).
+```
+
+with:
+
+```tsx
+  return lines;
+}
+
+// The games the cards show, with their requests.
+interface Loaded {
+  key: string;
+  games: HistoryMatch[];
+  totals: AsyncState<Map<number, PlayerTotals[]>>;
+  averages: AsyncState<GameAverages>;
+}
+
+export function PerformanceTab({
+  accountId,
+  history,
+  range,
+  heroId: picked,
+  onRange,
+  onHero,
+}: {
+  accountId: number;
+  history: AsyncState<HistoryMatch[]>;
+  range: PerformanceRange;
+  // Null for all heroes.
+  heroId: number | null;
+  onRange(range: PerformanceRange): void;
+  onHero(heroId: number | null): void;
+}) {
+  const matches = history.data ?? [];
+  const heroes = heroChoices(matches);
+  // All heroes when the picked one has no games (left the history).
+```
+
+8. Replace:
+
+```tsx
+    games.length ? () => fetchGameAverages(accountId, games) : null,
+    [accountId, key],
+  );
+  const summaries = PERFORMANCE_METRICS.map((metric) =>
+    summarizeMetric(
+      metric,
+      games,
+      (id) => gameTotals(totals.data?.get(id), accountId),
+      (id) => averages.data?.get(id),
+    ),
+  );
+  return (
+```
+
+with:
+
+```tsx
+    games.length ? () => fetchGameAverages(accountId, games) : null,
+    [accountId, key],
+  );
+  // While a new range or hero loads, the cards keep the last games that
+  // finished loading, dimmed, rather than blanking.
+  const [last, setLast] = useState<Loaded | null>(null);
+  const settled = !totals.loading && !averages.loading;
+  if (
+    settled &&
+    games.length &&
+    (last?.key !== key ||
+      last.totals.data !== totals.data ||
+      last.totals.error !== totals.error ||
+      last.averages.data !== averages.data ||
+      last.averages.error !== averages.error)
+  )
+    setLast({ key, games, totals, averages });
+  const shown =
+    !settled && last && games.length ? last : { games, totals, averages };
+  const stale = shown === last;
+  const summaries = PERFORMANCE_METRICS.map((metric) =>
+    summarizeMetric(
+      metric,
+      shown.games,
+      (id) => gameTotals(shown.totals.data?.get(id), accountId),
+      (id) => shown.averages.data?.byMatch.get(id),
+    ),
+  );
+  return (
+```
+
+9. Replace:
+
+```tsx
+              key={value}
+              className={range === value ? "active" : ""}
+              aria-pressed={range === value}
+              onClick={() => setRange(value)}
+            >
+              Last {value}
+            </button>
+```
+
+with:
+
+```tsx
+              key={value}
+              className={range === value ? "active" : ""}
+              aria-pressed={range === value}
+              onClick={() => onRange(value)}
+            >
+              Last {value}
+            </button>
+```
+
+10. Replace:
+
+```tsx
+            <select
+              value={heroId ?? ""}
+              onChange={(event) =>
+                setPicked(
+                  event.target.value ? Number(event.target.value) : null,
+                )
+              }
+            >
+              <option value="">All heroes</option>
+```
+
+with:
+
+```tsx
+            <select
+              value={heroId ?? ""}
+              onChange={(event) =>
+                onHero(event.target.value ? Number(event.target.value) : null)
+              }
+            >
+              <option value="">All heroes</option>
+```
+
+11. Replace:
+
+```tsx
+            </select>
+          </label>
+        )}
+      </div>
+      {history.loading && <p className="muted">Loading match history…</p>}
+      {history.error && (
+```
+
+with:
+
+```tsx
+            </select>
+          </label>
+        )}
+        {stale && (
+          <span className="muted" role="status">
+            Updating to the last {count(games.length)}…
+          </span>
+        )}
+      </div>
+      {history.loading && <p className="muted">Loading match history…</p>}
+      {history.error && (
+```
+
+12. Replace:
+
+```tsx
+              </button>
+            </p>
+          )}
+          <div className="performance-legend" aria-hidden="true">
+            <span>
+              <i className="value" />
+```
+
+with:
+
+```tsx
+              </button>
+            </p>
+          )}
+          {!!averages.data?.failed && (
+            <p className="notice warning" role="status">
+              Rank averages unavailable for {averages.data.failed} of{" "}
+              {count(games.length)}: {averages.data.error}
+              <button type="button" onClick={averages.retry}>
+                Retry
+              </button>
+            </p>
+          )}
+          <div className="performance-legend" aria-hidden="true">
+            <span>
+              <i className="value" />
+```
+
+13. Replace:
+
+```tsx
+              Loss
+            </span>
+          </div>
+          <div className="perf-cards">
+            {summaries.map((summary) => (
+              <PerformanceCard
+                key={summary.metric.id}
+                {...{ summary, totals, averages }}
+              />
+            ))}
+          </div>
+          {notes(accountId, games, totals.data, averages.data).map((line) => (
+            <p key={line} className="data-note">
+              {line}
+            </p>
+```
+
+with:
+
+```tsx
+              Loss
+            </span>
+          </div>
+          <div className="perf-cards" aria-busy={stale}>
+            {summaries.map((summary) => (
+              <PerformanceCard
+                key={summary.metric.id}
+                accountId={accountId}
+                summary={summary}
+                totals={shown.totals}
+                averages={shown.averages}
+              />
+            ))}
+          </div>
+          {notes(
+            accountId,
+            shown.games,
+            shown.totals.data,
+            shown.averages.data,
+          ).map((line) => (
+            <p key={line} className="data-note">
+              {line}
+            </p>
 ```
 
 
@@ -2033,34 +2867,62 @@ In `tests/browser/home.spec.ts`:
 1. Replace:
 
 ```ts
-  heroStats?: unknown[];
-  failTotals?: boolean;
   failCurve?: boolean;
+  // Heroes whose curves fail while they're in the set.
+  failCurveFor?: Set<number>;
+  // One tier's curves come back thin (50 games), so they widen.
+  thinTiers?: boolean;
   unstoredTotals?: number[];
   unlistedPlayer?: number[];
+  // Awaited before each answer, so a test can hold requests back.
+  gate?: (url: URL) => Promise<void>;
 }
+
+async function routeApi(page: Page, fixtures: Fixtures = {}) {
+  let historyRequests = 0;
+  await page.route("https://api.deadlock-api.com/**", async (route) => {
+    const url = new URL(route.request().url());
+    await fixtures.gate?.(url);
+    const json = (body: unknown, status = 200) =>
+      route.fulfill({
+        status,
 ```
 
 with:
 
 ```ts
-  heroStats?: unknown[];
-  failTotals?: boolean;
   failCurve?: boolean;
   // Heroes whose curves fail while they're in the set.
   failCurveFor?: Set<number>;
   unstoredTotals?: number[];
   unlistedPlayer?: number[];
 }
+
+async function routeApi(page: Page, fixtures: Fixtures = {}) {
+  let historyRequests = 0;
+  await page.route("https://api.deadlock-api.com/**", (route) => {
+    const url = new URL(route.request().url());
+    const json = (body: unknown, status = 200) =>
+      route.fulfill({
+        status,
 ```
 
 2. Replace:
 
 ```ts
-              ),
+      return fixtures.failCurve ||
+        fixtures.failCurveFor?.has(Number(url.searchParams.get("hero_ids")))
+        ? json({}, 500)
+        : json(
+            rankCurveRows(
+              fixtures.thinTiers &&
+                Number(url.searchParams.get("max_average_badge")) -
+                  Number(url.searchParams.get("min_average_badge")) ===
+                  5
+                ? 50
+                : 5000,
+            ),
           );
-    if (url.pathname === "/v1/analytics/player-performance-curve")
-      return fixtures.failCurve ? json({}, 500) : json(rankCurveRows());
     if (url.pathname.endsWith("/metadata")) return json(matchMetadata(ACCOUNT));
     return json([]);
   });
@@ -2069,9 +2931,6 @@ with:
 with:
 
 ```ts
-              ),
-          );
-    if (url.pathname === "/v1/analytics/player-performance-curve")
       return fixtures.failCurve ||
         fixtures.failCurveFor?.has(Number(url.searchParams.get("hero_ids")))
         ? json({}, 500)
@@ -2084,7 +2943,246 @@ with:
 3. Replace:
 
 ```ts
+  );
+});
+
+/** Match ids whose report metadata the page asks for. */
+function reportRequests(page: Page) {
+  const ids: number[] = [];
+  page.on("request", (request) => {
+    const id = new URL(request.url()).pathname.match(
+      /^\/v1\/matches\/(\d+)\/metadata$/,
+    )?.[1];
+    if (id) ids.push(Number(id));
+  });
+  return ids;
+}
+
+test("performance tab describes the game under the pointer and a click opens its report", async ({
+  page,
+}) => {
+  const reports = reportRequests(page);
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const souls = card(page, "Souls / min");
+  await expect(dots(page, "Souls / min")).toHaveCount(20);
+  const chart = (await souls.getByRole("slider").boundingBox())!;
+  // The newest game is on the right: 1h ago, lost, 1,200 souls a minute.
+  await page.mouse.move(chart.x + chart.width - 2, chart.y + 40);
+  const tip = souls.locator(".spark-tip span");
+  await expect(tip).toHaveText([
+    `${heroName(heroes[0])} · Loss · 1h ago`,
+    "1,200 rank avg 1,000 · Report →",
+  ]);
+  await expect(souls.locator("circle.picked")).toHaveCount(1);
+  await page.mouse.click(chart.x + chart.width - 2, chart.y + 40);
+  await expect(view(page).locator(".match-report")).toBeVisible();
+  expect(reports).toEqual([3000]);
+});
+
+test("performance tab points can be picked and opened from the keyboard", async ({
+  page,
+}) => {
+  const reports = reportRequests(page);
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(dots(page, "Souls / min")).toHaveCount(20);
+  const chart = card(page, "Souls / min").getByRole("slider");
+  // Focus starts on the newest game.
+  await chart.focus();
+  await expect(chart).toHaveAttribute("aria-valuenow", "20");
+  await expect(chart).toHaveAttribute(
+    "aria-valuetext",
+    `${heroName(heroes[0])} · Loss · 1h ago: 1,200, rank avg 1,000`,
+  );
+  await page.keyboard.press("ArrowLeft");
+  await expect(chart).toHaveAttribute("aria-valuenow", "19");
+  await expect(chart).toHaveAttribute(
+    "aria-valuetext",
+    `${heroName(heroes[1])} · Win · 2h ago: 1,200, rank avg 1,000`,
+  );
+  await page.keyboard.press("Enter");
+  await expect(view(page).locator(".match-report")).toBeVisible();
+  expect(reports).toEqual([3001]);
+});
+
+test("performance tab says so with too few games", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, {
+```
+
+with:
+
+```ts
+  );
+});
+
+test("performance tab says so with too few games", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, {
+```
+
+4. Replace:
+
+```ts
+  await expect(notice).toHaveCount(0);
+});
+
+test("performance tab keeps the last cards, dimmed, while new games load", async ({
+  page,
+}) => {
+  let hold: Promise<void> | null = null;
+  let release = () => {};
+  await storeAccount(page);
+  await routeApi(page, {
+    history: performanceHistory,
+    gate: (url) =>
+      url.pathname === "/v1/matches/metadata" && hold
+        ? hold
+        : Promise.resolve(),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const souls = card(page, "Souls / min").locator(".perf-card-numbers");
+  const cards = view(page).locator(".perf-cards");
+  await expect(souls).toHaveText("1,100 20 games · rank avg 1,000");
+  hold = new Promise((resolve) => (release = resolve));
+  await page.getByRole("button", { name: "Last 50", exact: true }).click();
+  await expect(
+    view(page).getByRole("status").filter({ hasText: "Updating" }),
+  ).toHaveText("Updating to the last 50 games…");
+  await expect(cards).toHaveAttribute("aria-busy", "true");
+  await expect(souls).toHaveText("1,100 20 games · rank avg 1,000");
+  release();
+  await expect(cards).toHaveAttribute("aria-busy", "false");
+  await expect(souls).toContainText("50 games");
+});
+
+test("performance tab says what is still loading", async ({ page }) => {
+  let release = () => {};
+  const hold = new Promise<void>((resolve) => (release = resolve));
+  await storeAccount(page);
+  await routeApi(page, {
+    history: performanceHistory,
+    gate: (url) =>
+      url.pathname === "/v1/matches/metadata" ||
+      url.pathname === "/v1/analytics/player-performance-curve"
+        ? hold
+        : Promise.resolve(),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    card(page, "Souls / min").locator(".perf-card-numbers"),
+  ).toHaveText("1,100 20 games · loading rank average…");
+  await expect(
+    card(page, "Hero damage / min").locator(".perf-card-numbers"),
+  ).toHaveText("— Loading match details…");
   await expect(view(page).locator(".perf-trend")).toHaveCount(0);
+  release();
+  await expect(
+    card(page, "Hero damage / min").locator(".perf-card-numbers"),
+  ).toHaveText("1,000 20 games · rank avg 500");
+});
+
+test("performance tab asks for match details again on Retry", async ({
+  page,
+}) => {
+  const fixtures = { history: performanceHistory, failTotals: true };
+  await storeAccount(page);
+  await routeApi(page, fixtures);
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const notice = view(page).getByText(
+    "Match details unavailable: Deadlock API unavailable (500).",
+  );
+  await expect(notice).toBeVisible();
+  fixtures.failTotals = false;
+  await notice.getByRole("button", { name: "Retry" }).click();
+  await expect(
+    card(page, "Hero damage / min").locator(".perf-card-numbers"),
+  ).toHaveText("1,000 20 games · rank avg 500");
+  await expect(notice).toHaveCount(0);
+});
+
+test("performance tab compares ranked games at their own rank", async ({
+  page,
+}) => {
+  const bands: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/v1/analytics/player-performance-curve")
+      bands.push(url.searchParams.get("min_average_badge")!);
+  });
+  await storeAccount(page);
+  await routeApi(page, {
+    history: performanceHistory.map((row) => ({
+      ...row,
+      ranked_display_badge: 116,
+    })),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    card(page, "Souls / min").locator(".perf-card-numbers"),
+  ).toHaveText("1,100 20 games · rank avg 1,000");
+  // Eternus, not the player's current Mystic.
+  expect(new Set(bands)).toEqual(new Set(["111"]));
+  await expect(
+    view(page).getByText(/^Games without a recorded rank/),
+  ).toHaveCount(0);
+});
+
+test("performance tab notes games compared with all ranks", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory, rank: [] });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    view(page).getByText(
+      "Games without a recorded rank, and no current rank to use, are compared with all ranks.",
+    ),
+  ).toBeVisible();
+});
+
+test("performance tab widens a thin rank's average and says so", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory, thinTiers: true });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    view(page).getByText(
+      "Where a hero has too few games at one rank, its average covers the ranks either side.",
+    ),
+  ).toBeVisible();
+});
+
+test("performance cards sit in four columns, two on a narrower window", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(dots(page, "Souls / min")).toHaveCount(20);
+  const columns = () =>
+    view(page)
+      .locator(".perf-card")
+      .evaluateAll(
+        (cards) =>
+          new Set(cards.map((card) => card.getBoundingClientRect().left)).size,
+      );
+  expect(await columns()).toBe(4);
+  await page.setViewportSize({ width: 850, height: 800 });
+  await expect.poll(columns).toBe(2);
 });
 
 test("performance tab degrades without match history", async ({ page }) => {
@@ -2095,30 +3193,6 @@ test("performance tab degrades without match history", async ({ page }) => {
 with:
 
 ```ts
-  await expect(view(page).locator(".perf-trend")).toHaveCount(0);
-});
-
-test("performance tab keeps the rank averages that loaded, and Retry asks again for the rest", async ({
-  page,
-}) => {
-  const failCurveFor = new Set([heroes[1]]);
-  await storeAccount(page);
-  await routeApi(page, { history: performanceHistory, failCurveFor });
-  await openMyProfile(page);
-  await page.getByRole("tab", { name: "Performance" }).click();
-  const notice = view(page).getByText(
-    "Rank averages unavailable for 10 of 20 games: Deadlock API unavailable (500).",
-  );
-  await expect(notice).toBeVisible();
-  const souls = card(page, "Souls / min");
-  await expect(souls.locator(".perf-card-numbers")).toContainText(
-    "20 games · 10 with a rank average",
-  );
-  failCurveFor.clear();
-  await notice.getByRole("button", { name: "Retry" }).click();
-  await expect(souls.locator(".perf-card-numbers")).toHaveText(
-    "1,100 20 games · rank avg 1,000",
-  );
   await expect(notice).toHaveCount(0);
 });
 
@@ -2285,109 +3359,176 @@ In `src/features/profile/components/PerformanceTab.tsx`:
 1. Replace:
 
 ```tsx
-import {
-  fetchGameAverages,
-  fetchMatchTotals,
-} from "../services/performance-api";
-import type { HistoryMatch } from "../types";
-import { timeAgo } from "../utils/format";
+};
+
+function PerformanceCard({
+  accountId,
+  summary,
+  totals,
+  averages,
+}: {
+  accountId: number;
+  summary: MetricSummary;
+  totals: AsyncState<unknown>;
+  averages: AsyncState<unknown>;
 ```
 
 with:
 
 ```tsx
-import {
-  fetchGameAverages,
-  fetchMatchTotals,
-  type GameAverages,
-} from "../services/performance-api";
-import type { HistoryMatch } from "../types";
-import { timeAgo } from "../utils/format";
+};
+
+function PerformanceCard({
+  summary,
+  totals,
+  averages,
+}: {
+  summary: MetricSummary;
+  totals: AsyncState<unknown>;
+  averages: AsyncState<unknown>;
 ```
 
 2. Replace:
 
 ```tsx
-  gamesInRange,
-  heroChoices,
-  summarizeMetric,
-  type GameAverage,
-  type GamePoint,
-  type MetricSummary,
-  type PerformanceMetric,
+    !failed &&
+    games > 0 &&
+    (!metric.average || average !== null);
+  const describe = (p: GamePoint) => ({
+    game: `${heroName(p.heroId)} · ${p.won ? "Win" : "Loss"} · ${timeAgo(p.startTime * 1000)}`,
+    value: p.value === null ? "—" : format(metric, p.value),
+    average:
+      p.average === null ? undefined : `rank avg ${format(metric, p.average)}`,
+  });
+  return (
+    <section className="perf-card" aria-label={metric.label}>
+      <div className="perf-card-head">
 ```
 
 with:
 
 ```tsx
-  gamesInRange,
-  heroChoices,
-  summarizeMetric,
-  type GamePoint,
-  type MetricSummary,
-  type PerformanceMetric,
+    !failed &&
+    games > 0 &&
+    (!metric.average || average !== null);
+  const title = (p: GamePoint) =>
+    `${heroName(p.heroId)} · ${p.won ? "Win" : "Loss"} · ${timeAgo(p.startTime * 1000)}: ` +
+    format(metric, p.value!) +
+    (p.average === null ? "" : ` (rank avg ${format(metric, p.average)})`);
+  return (
+    <section className="perf-card" aria-label={metric.label}>
+      <div className="perf-card-head">
 ```
 
 3. Replace:
 
 ```tsx
-  accountId: number,
-  games: HistoryMatch[],
-  totals: Map<number, PlayerTotals[]> | undefined,
-  averages: Map<number, GameAverage> | undefined,
-) {
-  const lines = [
-    "Normal and ranked games, oldest on the left. The rank average is the average player on the same hero at the same rank and match length, over the last 30 days.",
-    "Improving or slipping compares the recent half of these games with the earlier half, each against its rank average where there is one. Changes smaller than game-to-game noise show as flat.",
-    "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the three shares of the team's totals have no rank average.",
-  ];
-  const sources = new Set([...(averages?.values() ?? [])].map((a) => a.source));
-  if (sources.has("current"))
-    lines.push("Games without a recorded rank use the player's current rank.");
-  if (sources.has("none"))
-    lines.push(
-      "Games without a recorded rank, and no current rank to use, are compared with all ranks.",
-    );
-  if ([...(averages?.values() ?? [])].some((a) => a.widenedFrom))
-    lines.push(
-      "Where a hero has too few games at one rank, its average covers the ranks either side.",
-    );
+        <Sparkline
+          points={summary.points}
+          label={`${metric.label}, game by game`}
+          describe={describe}
+          route={(p) => ({ page: "match", matchId: p.matchId, accountId })}
+        />
+      )}
+    </section>
 ```
 
 with:
 
 ```tsx
-  accountId: number,
-  games: HistoryMatch[],
-  totals: Map<number, PlayerTotals[]> | undefined,
-  averages: GameAverages | undefined,
-) {
-  const lines = [
-    "Normal and ranked games, oldest on the left. The rank average is the average player on the same hero at the same rank and match length, over the last 30 days.",
-    "Improving or slipping compares the recent half of these games with the earlier half, each against its rank average where there is one. Changes smaller than game-to-game noise show as flat.",
-    "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the three shares of the team's totals have no rank average.",
-  ];
-  const loaded = [...(averages?.byMatch.values() ?? [])];
-  const sources = new Set(loaded.map((a) => a.source));
-  if (sources.has("current"))
-    lines.push("Games without a recorded rank use the player's current rank.");
-  if (sources.has("none"))
-    lines.push(
-      "Games without a recorded rank, and no current rank to use, are compared with all ranks.",
-    );
-  if (loaded.some((a) => a.widenedFrom))
-    lines.push(
-      "Where a hero has too few games at one rank, its average covers the ranks either side.",
-    );
+        <Sparkline
+          points={summary.points}
+          label={`${metric.label}, game by game`}
+          title={title}
+        />
+      )}
+    </section>
 ```
 
 4. Replace:
 
 ```tsx
+  return lines;
+}
+
+// The games the cards show, with their requests.
+interface Loaded {
+  key: string;
+  games: HistoryMatch[];
+  totals: AsyncState<Map<number, PlayerTotals[]>>;
+  averages: AsyncState<GameAverages>;
+}
+
+export function PerformanceTab({
+  accountId,
+  history,
+  range,
+  heroId: picked,
+  onRange,
+  onHero,
+}: {
+  accountId: number;
+  history: AsyncState<HistoryMatch[]>;
+  range: PerformanceRange;
+  // Null for all heroes.
+  heroId: number | null;
+  onRange(range: PerformanceRange): void;
+  onHero(heroId: number | null): void;
+}) {
+  const matches = history.data ?? [];
+  const heroes = heroChoices(matches);
+  // All heroes when the picked one has no games (left the history).
+```
+
+with:
+
+```tsx
+  return lines;
+}
+
+export function PerformanceTab({
+  accountId,
+  history,
+}: {
+  accountId: number;
+  history: AsyncState<HistoryMatch[]>;
+}) {
+  const [range, setRange] = useState<PerformanceRange>(20);
+  const [picked, setPicked] = useState<number | null>(null);
+  const matches = history.data ?? [];
+  const heroes = heroChoices(matches);
+  // All heroes when the picked one has no games (left the history).
+```
+
+5. Replace:
+
+```tsx
+    games.length ? () => fetchGameAverages(accountId, games) : null,
+    [accountId, key],
+  );
+  // While a new range or hero loads, the cards keep the last games that
+  // finished loading, dimmed, rather than blanking.
+  const [last, setLast] = useState<Loaded | null>(null);
+  const settled = !totals.loading && !averages.loading;
+  if (
+    settled &&
+    games.length &&
+    (last?.key !== key ||
+      last.totals.data !== totals.data ||
+      last.totals.error !== totals.error ||
+      last.averages.data !== averages.data ||
+      last.averages.error !== averages.error)
+  )
+    setLast({ key, games, totals, averages });
+  const shown =
+    !settled && last && games.length ? last : { games, totals, averages };
+  const stale = shown === last;
+  const summaries = PERFORMANCE_METRICS.map((metric) =>
+    summarizeMetric(
       metric,
-      games,
-      (id) => gameTotals(totals.data?.get(id), accountId),
-      (id) => averages.data?.get(id),
+      shown.games,
+      (id) => gameTotals(shown.totals.data?.get(id), accountId),
+      (id) => shown.averages.data?.byMatch.get(id),
     ),
   );
   return (
@@ -2396,6 +3537,11 @@ with:
 with:
 
 ```tsx
+    games.length ? () => fetchGameAverages(accountId, games) : null,
+    [accountId, key],
+  );
+  const summaries = PERFORMANCE_METRICS.map((metric) =>
+    summarizeMetric(
       metric,
       games,
       (id) => gameTotals(totals.data?.get(id), accountId),
@@ -2405,35 +3551,129 @@ with:
   return (
 ```
 
-5. Replace:
+6. Replace:
 
 ```tsx
-              </button>
-            </p>
-          )}
-          <div className="performance-legend" aria-hidden="true">
-            <span>
-              <i className="value" />
+              key={value}
+              className={range === value ? "active" : ""}
+              aria-pressed={range === value}
+              onClick={() => onRange(value)}
+            >
+              Last {value}
+            </button>
 ```
 
 with:
 
 ```tsx
-              </button>
+              key={value}
+              className={range === value ? "active" : ""}
+              aria-pressed={range === value}
+              onClick={() => setRange(value)}
+            >
+              Last {value}
+            </button>
+```
+
+7. Replace:
+
+```tsx
+            <select
+              value={heroId ?? ""}
+              onChange={(event) =>
+                onHero(event.target.value ? Number(event.target.value) : null)
+              }
+            >
+              <option value="">All heroes</option>
+```
+
+with:
+
+```tsx
+            <select
+              value={heroId ?? ""}
+              onChange={(event) =>
+                setPicked(
+                  event.target.value ? Number(event.target.value) : null,
+                )
+              }
+            >
+              <option value="">All heroes</option>
+```
+
+8. Replace:
+
+```tsx
+            </select>
+          </label>
+        )}
+        {stale && (
+          <span className="muted" role="status">
+            Updating to the last {count(games.length)}…
+          </span>
+        )}
+      </div>
+      {history.loading && <p className="muted">Loading match history…</p>}
+      {history.error && (
+```
+
+with:
+
+```tsx
+            </select>
+          </label>
+        )}
+      </div>
+      {history.loading && <p className="muted">Loading match history…</p>}
+      {history.error && (
+```
+
+9. Replace:
+
+```tsx
+              Loss
+            </span>
+          </div>
+          <div className="perf-cards" aria-busy={stale}>
+            {summaries.map((summary) => (
+              <PerformanceCard
+                key={summary.metric.id}
+                accountId={accountId}
+                summary={summary}
+                totals={shown.totals}
+                averages={shown.averages}
+              />
+            ))}
+          </div>
+          {notes(
+            accountId,
+            shown.games,
+            shown.totals.data,
+            shown.averages.data,
+          ).map((line) => (
+            <p key={line} className="data-note">
+              {line}
             </p>
-          )}
-          {!!averages.data?.failed && (
-            <p className="notice warning" role="status">
-              Rank averages unavailable for {averages.data.failed} of{" "}
-              {count(games.length)}: {averages.data.error}
-              <button type="button" onClick={averages.retry}>
-                Retry
-              </button>
+```
+
+with:
+
+```tsx
+              Loss
+            </span>
+          </div>
+          <div className="perf-cards">
+            {summaries.map((summary) => (
+              <PerformanceCard
+                key={summary.metric.id}
+                {...{ summary, totals, averages }}
+              />
+            ))}
+          </div>
+          {notes(accountId, games, totals.data, averages.data).map((line) => (
+            <p key={line} className="data-note">
+              {line}
             </p>
-          )}
-          <div className="performance-legend" aria-hidden="true">
-            <span>
-              <i className="value" />
 ```
 
 
