@@ -15,6 +15,9 @@ export const TTL = {
   analytics: 10 * 60_000,
   profile: 5 * 60_000,
   history: 2 * 60_000,
+  // Under the minute between the profile Live tab's checks, so each one
+  // asks again.
+  live: 30_000,
 };
 
 // Requests a minute per IP, from the API's OpenAPI docs, for the groups the
@@ -67,7 +70,7 @@ interface Pending {
 /**
  * Every path is always asked for with the same ttl, so the caller's ttl,
  * which decides whether an entry is fresh, and the one stored with it,
- * which the sweep uses, agree.
+ * which the sweep uses, agree; and always fresh or never.
  */
 export class DeadlockApi {
   private cache = new Map<
@@ -103,9 +106,16 @@ export class DeadlockApi {
   /**
    * The response for `path`, cached for `ttlMs`. A caller whose `signal`
    * aborts stops waiting at once; the request itself is dropped only if it
-   * hasn't claimed its slot yet and no one else still wants it.
+   * hasn't claimed its slot yet and no one else still wants it. `fresh`
+   * asks past the browser's HTTP cache, for answers it would keep longer
+   * than they stay true.
    */
-  get<T>(path: string, ttlMs: number, signal?: AbortSignal): Promise<T> {
+  get<T>(
+    path: string,
+    ttlMs: number,
+    signal?: AbortSignal,
+    { fresh = false } = {},
+  ): Promise<T> {
     if (signal?.aborted) return Promise.reject(signal.reason);
     const saved = this.cache.get(path);
     if (saved && this.now() - saved.fetchedAt < ttlMs)
@@ -114,19 +124,19 @@ export class DeadlockApi {
     if (!pending) {
       const group = endpointGroup(path);
       if (this.cooling(path, group)) return Promise.reject(new Error(BUSY));
-      pending = this.start(path, group, ttlMs);
+      pending = this.start(path, group, ttlMs, fresh);
     }
     return this.follow(path, pending, signal) as Promise<T>;
   }
 
-  private start(path: string, group: string, ttlMs: number) {
+  private start(path: string, group: string, ttlMs: number, fresh: boolean) {
     const pending: Pending = {
       promise: Promise.resolve(),
       callers: 0,
       abandon: new AbortController(),
       queued: true,
     };
-    pending.promise = this.send(path, group, pending)
+    pending.promise = this.send(path, group, pending, fresh)
       .then((data) => {
         this.store(path, data, ttlMs);
         return data;
@@ -172,11 +182,12 @@ export class DeadlockApi {
     path: string,
     group: string,
     pending: Pending,
+    fresh: boolean,
   ): Promise<T> {
     const limit = RATE_LIMITS[group];
     if (limit) await this.throttle(path, group, limit, pending);
     else pending.queued = false;
-    return this.fetchJson<T>(path, group);
+    return this.fetchJson<T>(path, group, fresh);
   }
 
   /**
@@ -267,11 +278,17 @@ export class DeadlockApi {
       : error;
   }
 
-  private async fetchJson<T>(path: string, group: string): Promise<T> {
+  private async fetchJson<T>(
+    path: string,
+    group: string,
+    fresh: boolean,
+  ): Promise<T> {
     let response: Response;
     try {
       response = await this.request(`${BASE}${path}`, {
         signal: AbortSignal.timeout(15_000),
+        // Checked with the API rather than taken from the browser's cache.
+        ...(fresh ? { cache: "no-cache" as const } : {}),
       });
     } catch (error) {
       if (error instanceof TypeError)

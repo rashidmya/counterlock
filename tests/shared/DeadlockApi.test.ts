@@ -527,11 +527,25 @@ describe("DeadlockApi", () => {
     );
   });
 
+  it("asks past the browser's cache for a fresh request only", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => json([]));
+    const api = new DeadlockApi(request, () => 0);
+    await api.get("/v1/matches/active?account_ids=1", 30_000, undefined, {
+      fresh: true,
+    });
+    await api.get("/v1/players/steam?account_ids=1", 30_000);
+    expect(request.mock.calls[0][1]).toMatchObject({ cache: "no-cache" });
+    expect(request.mock.calls[1][1]).not.toHaveProperty("cache");
+  });
+
   it("exposes ttl presets", () => {
     expect(TTL).toEqual({
       analytics: 600_000,
       profile: 300_000,
       history: 120_000,
+      live: 30_000,
     });
   });
 });

@@ -49,7 +49,7 @@ export function parseHistory(rows: unknown): HistoryMatch[] {
 
 export const isWin = (m: HistoryMatch) => m.result === m.team;
 
-export function modeLabel(m: HistoryMatch) {
+export function modeLabel(m: Pick<HistoryMatch, "gameMode" | "matchMode">) {
   if (m.gameMode === STREET_BRAWL) return "Street Brawl";
   if (m.gameMode === NORMAL && m.matchMode === RANKED) return "Ranked";
   if (m.gameMode === NORMAL && m.matchMode === UNRANKED) return "Normal";
