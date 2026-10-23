@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
+import { activeMatch } from "../fixtures/live-match";
 import { FARGO, cors, mockApi } from "./fixtures";
 
 const SCROLLERS = ".hero-table-wrap, .report-table-wrap, .skill-order";
@@ -332,6 +333,41 @@ test.describe("phone width (375px)", () => {
     ).toBe(1);
     expect((await overflow(page)).scroll).toBeLessThanOrEqual(375);
     expect(await clipped(page, 375)).toEqual([]);
+  });
+
+  test("the profile's Live tab stacks the teams, with its five tabs in one row", async ({
+    page,
+  }) => {
+    await mockApi(page);
+    await page.route(
+      "https://api.deadlock-api.com/v1/matches/active**",
+      (route) => route.fulfill({ json: [activeMatch(FARGO)], headers: cors }),
+    );
+    await page.goto(`/players/${FARGO}`);
+    await page.getByRole("tab", { name: "Live" }).click();
+    await expect(page.locator(".live-objectives")).toHaveCount(2);
+    for (const width of [375, 360]) {
+      await page.setViewportSize({ width, height: 812 });
+      expect(
+        await page
+          .getByRole("tab")
+          .evaluateAll(
+            (tabs) =>
+              new Set(tabs.map((tab) => tab.getBoundingClientRect().top)).size,
+          ),
+      ).toBe(1);
+      expect(
+        await page
+          .locator(".live-team")
+          .evaluateAll(
+            (teams) =>
+              new Set(teams.map((team) => team.getBoundingClientRect().left))
+                .size,
+          ),
+      ).toBe(1);
+      expect((await overflow(page)).scroll).toBeLessThanOrEqual(width);
+      expect(await clipped(page, width)).toEqual([]);
+    }
   });
 
   test("match report has no page scroll; the scoreboard scrolls inside its container", async ({

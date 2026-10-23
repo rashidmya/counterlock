@@ -6,16 +6,18 @@ import { useScrollBack } from "@/shared/ui/useScrollBack";
 import type { HistoryFilter, HistoryMatch } from "../types";
 import type { PerformanceRange } from "../utils/performance-metrics";
 import { FIRST_SORT, HeroesTab, type HeroSort } from "./HeroesTab";
+import { LiveTab } from "./LiveTab";
 import { MatchHistory, PAGE_SIZE } from "./MatchHistory";
 import { OverviewTab } from "./OverviewTab";
 import { PerformanceTab } from "./PerformanceTab";
 
-type Subtab = "overview" | "matches" | "performance" | "heroes";
+type Subtab = "overview" | "matches" | "performance" | "heroes" | "live";
 const subtabs: { id: Subtab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "matches", label: "Matches" },
   { id: "performance", label: "Performance" },
   { id: "heroes", label: "Heroes" },
+  { id: "live", label: "Live" },
 ];
 
 interface ViewState {
@@ -143,6 +145,7 @@ export function ProfileView({
             onHero={(next) => update({ heroId: next })}
           />
         )}
+        {subtab === "live" && <LiveTab accountId={accountId} />}
       </section>
     </LinkScope>
   );

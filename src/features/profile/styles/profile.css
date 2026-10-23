@@ -154,7 +154,8 @@
 .overview .section-header,
 .matches-tab .section-header,
 .heroes-tab .section-header,
-.performance .section-header {
+.performance .section-header,
+.live-tab .section-header {
   margin: 22px 0 6px;
 }
 .matches-tab .section-header:first-child {
@@ -708,4 +709,147 @@
   line-height: 16px;
   color: var(--gold);
   cursor: pointer;
+}
+
+/* Live tab. */
+.live-status {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+/* Where Retry leaves focus: a place to read from, not a control. */
+.live-status:focus {
+  outline: none;
+}
+.live-tab > .notice {
+  margin: 12px 0 0;
+}
+.live-empty-tab {
+  margin-top: 22px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.live-empty-tab h2 {
+  margin: 0 0 6px;
+  font: 700 20px var(--font-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.live-empty-tab p {
+  max-width: 62ch;
+  margin: 0;
+}
+.live-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.live-stats .stat-card em {
+  display: block;
+  margin: 3px 0 0;
+}
+.live-stats .team-0,
+.live-team.team-0 h3 {
+  color: var(--ally);
+}
+.live-stats .team-1,
+.live-team.team-1 h3 {
+  color: var(--enemy);
+}
+.live-teams {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.live-team {
+  min-width: 0;
+  padding: 10px 14px 14px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--ally);
+  background: var(--surface);
+}
+.live-team.team-1 {
+  border-left-color: var(--enemy);
+}
+.live-team h3 {
+  margin: 0 0 8px;
+  font: 700 13px var(--font-label);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.live-players {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.live-players li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+}
+.live-players li.current {
+  border-color: var(--gold);
+  background: rgb(from var(--gold) r g b / 0.08);
+}
+.live-players li > span {
+  display: grid;
+  min-width: 0;
+}
+.live-players b {
+  font-weight: 600;
+  color: var(--cream);
+}
+.live-players .live-name {
+  overflow: hidden;
+  padding: 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-players a:hover,
+.live-players button:hover {
+  color: var(--gold);
+}
+.live-team h4 {
+  margin: 14px 0 6px;
+  font: 600 11px var(--font-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.live-objectives {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+.live-objectives div {
+  display: flex;
+  flex-direction: column;
+  /* The value at the foot, where a label takes two lines. */
+  justify-content: space-between;
+  padding: 6px 8px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-2);
+}
+.live-objectives dt {
+  font: 600 10.5px var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.live-objectives dd {
+  margin: 0;
+  font: 700 16px var(--font-label);
+  color: var(--cream);
+}
+.live-tab > .data-note {
+  margin: 10px 0 0;
 }

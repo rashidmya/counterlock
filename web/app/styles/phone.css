@@ -211,8 +211,12 @@
     flex-wrap: wrap;
     gap: 8px;
   }
+  /* Five tabs: spread over the row, and a second row only below about
+     340 px. */
   .app.web .subtabs {
-    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0 10px;
   }
   .app.web .subtabs button {
     min-height: 44px;
@@ -225,6 +229,10 @@
   }
   .app.web .stat-card.rank-card {
     grid-column: 1 / -1;
+  }
+  .app.web .live-stats,
+  .app.web .live-teams {
+    grid-template-columns: minmax(0, 1fr);
   }
   .app.web .stat-card small {
     font-size: 10px;
