@@ -23,11 +23,11 @@
 
 **Every code block in this plan was built and run before the plan was written** (reference commits in a scratch worktree, replayed from this plan's blocks). The full result:
 - `npm test` 382 passed;
-- `npm run test:browser` 145 passed;
+- `npm run test:browser` 147 passed;
 - `npm run test:web` 76 passed;
 - both type checks, `npm run build`, `npm run web:build` and `npm run validate:manifest` passed.
 
-Each task's end state was also checked on its own: type check and unit tests after every task (377, 378, 378, 380, 380, 380, 382 and 382 tests), and both browser suites after every task (desktop 132, 133, 133, 134, 134, 135, 137 and 145; website 74, 74, 74, 74, 75, 75, 76 and 76). Copy the code as given. If something fails, fix the cause rather than the test.
+Each task's end state was also checked on its own: type check and unit tests after every task (377, 378, 378, 380, 380, 380, 382 and 382 tests), and both browser suites after every task (desktop 132, 133, 133, 134, 136, 137, 139 and 147; website 74, 74, 74, 74, 75, 75, 76 and 76). Copy the code as given. If something fails, fix the cause rather than the test.
 
 ## Decisions made while planning (verified against the live API on 2026-10-23)
 
@@ -100,7 +100,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
 2. **One rank rule.** The report and the tab both use the game's rank, then the current rank, then all ranks, and the report asks for every player's current rank in one request. Tests: `a player without a recorded rank is compared at their current rank, and the note says so`, `with no ranks recorded and no current rank, the average covers all ranks and says so`, `the report waits for current ranks only where it needs them, and asks for each curve once`, `Street Brawl reports say rank averages cover normal matches only` (no lookup), `performance tab compares ranked games at their own rank`.
 3. **Partial failure.** A failed curve leaves only its games without an average, cards with such games claim no trend, Retry re-asks only the failed curve and recovers, and a full failure still fails as a whole. Tests: `keeps the games whose curve loaded when another fails`, `fails as a whole when every curve fails, so the tab can offer Retry`, `performance tab keeps the rank averages that loaded, and Retry asks again for the rest`, `performance tab keeps the trends a failed curve doesn't touch`, `performance tab doesn't call failed averages missing`.
 4. **Picking a game.** Pointer, touch and keyboard each work, and a tap never opens a report on its own. Tests: `performance tab describes the game under the pointer and a click opens its report`, `performance tab points can be picked and opened from the keyboard`, `a tap on a Performance chart shows the game; its Report link opens it`.
-5. **No lost state.** Tests: `the profile keeps its tab, range and hero after a match report`, `performance tab keeps the last cards, dimmed, while new games load`.
+5. **No lost state.** Tests: `the profile keeps its tab, range and hero after a match report`, `performance range and hero survive a profile tab switch`, `each profile keeps its own tab and filter for the session`, `performance tab keeps the last cards, dimmed, while new games load`.
 
 ## File structure
 
@@ -114,6 +114,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
 | `src/features/profile/utils/performance-metrics.ts` | Team objective damage and healing; the two new shares |
 | `src/features/profile/services/performance-api.ts` | Averages per hero and rank tier, four at a time, partial failure |
 | `src/features/profile/components/ProfileView.tsx` | The view kept per account for the session |
+| `src/features/profile/components/ProfilePage.tsx` | Keys `ProfileView` by account |
 | `src/features/profile/components/PerformanceTab.tsx` | Controlled range and hero, kept cards while loading, partial-failure notice, point text and routes |
 | `src/features/profile/components/Sparkline.tsx` | Slider, pointer hit area, tip, picked-game cross and ring, `dotRadius()`, `nearestGame()` |
 | `src/features/profile/styles/profile.css` | Busy cards, tip, hit area, dot outline |
@@ -2605,12 +2606,21 @@ Expected: 134 desktop and 74 website tests pass.
 
 **Files:**
 - Modify: `src/features/profile/components/ProfileView.tsx`
+- Modify: `src/features/profile/components/ProfilePage.tsx`
 - Modify: `src/features/profile/components/PerformanceTab.tsx`
-- Test: `tests/web-browser/match-report.spec.ts`
+- Test: `tests/web-browser/match-report.spec.ts`, `tests/browser/home.spec.ts`
 
-`ProfileView` holds one `ViewState` (tab, match filter, range, hero) in state, starting from a session map keyed by account, and writes every change back to the map. `PerformanceTab` loses its own `useState` and takes `range`, `heroId`, `onRange` and `onHero`. The website test covers both cases: switching profile tabs, and the profile remounting after a match report.
+How it works:
+- **`ProfileView`** holds one `ViewState` (tab, match filter, range, hero) in state, starting from a session map keyed by account.
+- **Every change** is merged onto the latest stored view and written back to the map, so two changes in one event both count (Task 5 review).
+- **`ProfilePage`** keys `ProfileView` by account itself, so another account never starts from this one's view, whatever the shell does.
+- **`PerformanceTab`** loses its own `useState` and takes `range`, `heroId`, `onRange` and `onHero`.
 
-- [ ] **Step 1: Write the failing test**
+The tests:
+- **Website:** switching profile tabs, and the profile remounting after a match report.
+- **Desktop (Task 5 review):** the range and hero surviving a tab switch, and each account keeping its own tab and filter. Checked while planning against a map that drops the filter and against one entry shared by every account: both fail.
+
+- [ ] **Step 1: Write the failing tests**
 
 In `tests/web-browser/match-report.spec.ts`:
 
@@ -2656,10 +2666,83 @@ test("the profile keeps its tab, range and hero after a match report", async ({
 ```
 
 
-- [ ] **Step 2: Run it and confirm it fails**
+In `tests/browser/home.spec.ts`:
+
+Replace:
+
+```ts
+  expect(new Set(curves.slice(asked))).toEqual(new Set([String(heroes[1])]));
+});
+
+test("performance tab degrades without match history", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, { history: 403 });
+```
+
+with:
+
+```ts
+  expect(new Set(curves.slice(asked))).toEqual(new Set([String(heroes[1])]));
+});
+
+test("performance range and hero survive a profile tab switch", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await page.getByRole("button", { name: "Last 50", exact: true }).click();
+  const hero = view(page).getByRole("combobox", { name: "Hero" });
+  await hero.selectOption({ label: `${heroName(heroes[1])} · 30 games` });
+  await expect(dots(page, "Souls / min")).toHaveCount(30);
+  await openMatches(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    view(page).getByRole("button", { name: "Last 50", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(hero).toHaveValue(String(heroes[1]));
+  await expect(dots(page, "Souls / min")).toHaveCount(30);
+});
+
+test("each profile keeps its own tab and filter for the session", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page);
+  await openMyProfile(page);
+  await openMatches(page);
+  await view(page).getByRole("button", { name: "Ranked", exact: true }).click();
+  // Another account opens on its own view.
+  await page.getByRole("button", { name: "← Back" }).click();
+  await page.getByLabel("Find a player").fill("76561198060265729");
+  await page.getByRole("button", { name: /Use this ID/ }).click();
+  await expect(
+    view(page).getByRole("tab", { name: "Overview" }),
+  ).toHaveAttribute("aria-selected", "true");
+  // Back on the first, its tab and filter are as they were.
+  await myProfile(page).click();
+  await expect(
+    view(page).getByRole("tab", { name: "Matches" }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(
+    view(page).getByRole("button", { name: "Ranked", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+});
+
+test("performance tab degrades without match history", async ({ page }) => {
+  await storeAccount(page);
+  await routeApi(page, { history: 403 });
+```
+
+
+- [ ] **Step 2: Run them and confirm they fail**
 
 Run: `npx playwright test -c playwright.web.config.ts tests/web-browser/match-report.spec.ts -g "keeps its tab"`
 Expected: FAIL (1 failed: after the report, the Matches tab isn't selected (`aria-selected` is "false")).
+
+Run: `npx playwright test tests/browser/home.spec.ts -g "survive a profile tab switch|keeps its own tab"`
+Expected: FAIL (2 failed: after the tab switch "Last 50" isn't pressed (`aria-pressed` is "false"), and back on the first account the Matches tab isn't selected).
 
 - [ ] **Step 3: Keep the view per account**
 
@@ -2750,7 +2833,8 @@ with:
   const [view, setView] = useState(() => views.get(accountId) ?? FIRST_VIEW);
   const { subtab, filter, range, heroId } = view;
   const update = (change: Partial<ViewState>) => {
-    const next = { ...view, ...change };
+    // Onto the latest stored view, so two changes in one event both count.
+    const next = { ...(views.get(accountId) ?? view), ...change };
     views.set(accountId, next);
     setView(next);
   };
@@ -2787,6 +2871,35 @@ with:
         )}
       </section>
     </LinkScope>
+```
+
+
+In `src/features/profile/components/ProfilePage.tsx`:
+
+Replace:
+
+```tsx
+  const topHeroId = history.data && topHeroes(history.data, 1)[0]?.heroId;
+  const isMe = me.meId === accountId;
+  return (
+    <ProfileView
+      accountId={accountId}
+      history={history}
+      navigate={navigate}
+```
+
+with:
+
+```tsx
+  const topHeroId = history.data && topHeroes(history.data, 1)[0]?.heroId;
+  const isMe = me.meId === accountId;
+  return (
+    // Keyed, so another account never starts from this one's view.
+    <ProfileView
+      key={accountId}
+      accountId={accountId}
+      history={history}
+      navigate={navigate}
 ```
 
 
@@ -2906,6 +3019,9 @@ with:
 Run: `npx playwright test -c playwright.web.config.ts tests/web-browser/match-report.spec.ts`
 Expected: PASS (10 tests).
 
+Run: `npx playwright test tests/browser/home.spec.ts -g "survive a profile tab switch|keeps its own tab"`
+Expected: PASS (2 tests).
+
 Run: `npm test`
 Expected: PASS (380 tests).
 
@@ -2913,13 +3029,13 @@ Expected: PASS (380 tests).
 
 ```bash
 npx tsc --noEmit && npm run web:typecheck
-npx prettier --write src/features/profile/components tests/web-browser/match-report.spec.ts
+npx prettier --write src/features/profile/components tests/web-browser/match-report.spec.ts tests/browser/home.spec.ts
 npm run test:browser && npm run test:web
-git add src/features/profile/components tests/web-browser/match-report.spec.ts
+git add src/features/profile/components tests/web-browser/match-report.spec.ts tests/browser/home.spec.ts
 git commit -m "feat(profile): keep each profile's tab, filter, range and hero for the session"
 ```
 
-Expected: 134 desktop and 75 website tests pass.
+Expected: 136 desktop and 75 website tests pass.
 
 ---
 
@@ -2983,9 +3099,9 @@ async function routeApi(page: Page, fixtures: Fixtures = {}) {
   expect(new Set(curves.slice(asked))).toEqual(new Set([String(heroes[1])]));
 });
 
-test("performance tab degrades without match history", async ({ page }) => {
-  await storeAccount(page);
-  await routeApi(page, { history: 403 });
+test("performance range and hero survive a profile tab switch", async ({
+  page,
+}) => {
 ```
 
 with:
@@ -3024,9 +3140,9 @@ test("performance tab keeps the last cards, dimmed, while new games load", async
   await expect(souls).toContainText("50 games");
 });
 
-test("performance tab degrades without match history", async ({ page }) => {
-  await storeAccount(page);
-  await routeApi(page, { history: 403 });
+test("performance range and hero survive a profile tab switch", async ({
+  page,
+}) => {
 ```
 
 
@@ -3243,7 +3359,7 @@ with:
 - [ ] **Step 4: Run the tests and confirm they pass**
 
 Run: `npx playwright test tests/browser/home.spec.ts`
-Expected: PASS (29 tests).
+Expected: PASS (31 tests).
 
 Run: `npm test`
 Expected: PASS (380 tests).
@@ -3258,7 +3374,7 @@ git add src/features/profile tests/browser/home.spec.ts
 git commit -m "feat(profile): keep the last cards, dimmed, while new games load"
 ```
 
-Expected: 135 desktop and 75 website tests pass.
+Expected: 137 desktop and 75 website tests pass.
 
 ---
 
@@ -4002,7 +4118,7 @@ git add src/features/profile tests/profile/sparkline.test.ts tests/browser/home.
 git commit -m "feat(profile): pick a game on a Performance chart to see it and open its report; readable dots on Last 100"
 ```
 
-Expected: 137 desktop and 76 website tests pass.
+Expected: 139 desktop and 76 website tests pass.
 
 ---
 
@@ -4090,9 +4206,9 @@ with:
   await expect(souls).toContainText("50 games");
 });
 
-test("performance tab degrades without match history", async ({ page }) => {
-  await storeAccount(page);
-  await routeApi(page, { history: 403 });
+test("performance range and hero survive a profile tab switch", async ({
+  page,
+}) => {
 ```
 
 with:
@@ -4268,9 +4384,9 @@ test("performance tab doesn't call failed averages missing", async ({
   await expect(damage.locator(".perf-trend")).toHaveCount(0);
 });
 
-test("performance tab degrades without match history", async ({ page }) => {
-  await storeAccount(page);
-  await routeApi(page, { history: 403 });
+test("performance range and hero survive a profile tab switch", async ({
+  page,
+}) => {
 ```
 
 
@@ -4312,10 +4428,10 @@ with:
 - [ ] **Step 2: Run them**
 
 Run: `npx playwright test tests/browser/home.spec.ts -g "performance"`
-Expected: PASS (19 tests).
+Expected: PASS (20 tests).
 
 Run: `npm run test:browser && npm run test:web`
-Expected: PASS (145 and 76).
+Expected: PASS (147 and 76).
 
 - [ ] **Step 3: Check and commit**
 
@@ -4526,7 +4642,7 @@ Run all of these; every one must pass:
 - `npm test` (382)
 - `npx tsc --noEmit`
 - `npm run web:typecheck`
-- `npm run test:browser` (145)
+- `npm run test:browser` (147)
 - `npm run test:web` (76)
 - `npm run build`
 - `npm run web:build`
