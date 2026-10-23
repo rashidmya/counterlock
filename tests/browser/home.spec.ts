@@ -770,6 +770,29 @@ test("performance tab compares like with like when a game outlasts the rank aver
   ).toHaveText("750 2 games · 1 with a rank average: 1,000 vs 1,000");
 });
 
+test("performance tab shows no trend when no game has a rank average", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, {
+    history: Array.from({ length: 6 }, (_, index) => ({
+      ...historyRow(index + 1, heroes[0], 1, 4, true, now - index * 3600),
+      match_duration_s: 3000,
+    })),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  // Every game outlasts the fixture's average, which stops at 40:00.
+  const souls = card(page, "Souls / min");
+  await expect(souls.locator(".perf-card-numbers")).toHaveText(
+    "600 6 games · no rank average for these games",
+  );
+  await expect(souls.locator(".perf-trend")).toHaveCount(0);
+  await expect(
+    card(page, "Kill participation").locator(".perf-trend"),
+  ).toHaveText("– Flat");
+});
+
 test("performance tab counts games without match details yet", async ({
   page,
 }) => {
