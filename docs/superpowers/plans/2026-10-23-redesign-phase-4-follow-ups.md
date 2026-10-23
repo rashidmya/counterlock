@@ -50,10 +50,10 @@ Each task's end state was also checked on its own: type check and unit tests aft
 - **Rank averages per hero and rank tier, four at a time.** Games that ask for the same curve (`curvePath(hero, rankBand(badge))`) share their requests (the client shares them anyway); grouping lets a limit apply to distinct curves. A group never has more than one request in flight (its base curve, then its wider one), so four groups mean at most four curve requests at once. `CURVE_CONCURRENCY = 4`: an uncached curve takes about 7 s, and Last 100 can need a dozen, which all at once ran past the client's 15 s timeout. Each game's curve is awaited separately (`Promise.allSettled`), so a failure costs only its own games. `fetchGameAverages` fails as a whole only when no game gets an average, so the existing "Rank averages unavailable: {error}" notice and Retry still cover a full failure; a partial one gets "Rank averages unavailable for {n} of {count}: {error}" with Retry. Retry re-asks only the failed curves (the others are cached for 10 minutes).
   - **A card with any game whose curve failed claims no trend (Task 4 review).** Its trend would follow only the games that kept their average: after a rank-up, the recent games form the new, uncached group most likely to fail, and a trend from the older games alone could even point the wrong way. Such a card also shows no "Too few games" and no "no rank average for these games"; its numbers stay like for like ("20 games · 10 with a rank average: … vs …"). `GameAverages.failed` is the set of those games' match ids.
 - **The profile keeps its view for the session.** A module-level map in `ProfileView`, keyed by account, holds the tab, the match filter, the range and the hero. The desktop app keeps the profile mounted while a report is open, but the website opens the report as its own page, so its profile remounts; the map covers both, and switching profile tabs (which unmounts the Performance tab) too. Phase 3 suggested URL state; a session map needs no route changes in either shell. A reload starts at Overview again, and coming back to a profile later in the session finds it as it was left.
-- **Cards stay while new games load.** The tab remembers the last games whose totals and averages both finished, with their requests, and shows those while a new range or hero loads: `aria-busy` on the cards, 85% opacity, and "Updating the cards…" beside the range buttons. It uses React's documented "storing information from previous renders" pattern (`setState` during render, behind a condition that turns false once stored). The first load still shows the loading texts.
-  - **The status doesn't move anything (Task 6 review).** As its own item in the header's `space-between` row it moved the Hero select about 445 px at 1260 px, and at 720 px it pushed every card down a line. It now sits in the range group, always mounted (so screen readers announce its change), with its text laid over the free space beside the buttons. The group keeps its own width (`flex: 1 1 auto`): with `flex: 1` it shrank beside the Hero select at phone width and stacked its buttons, which the rebuilt Task 7 tap test caught. It reads "Updating the cards…", which is also true on Retry and with a hero picked.
+- **Cards stay while new games load.** The tab remembers the last games whose totals and averages both finished, with their requests, and shows those while a new range or hero loads: `aria-busy` on the cards, 85% opacity, and "Updating…" beside the range buttons. It uses React's documented "storing information from previous renders" pattern (`setState` during render, behind a condition that turns false once stored). The first load still shows the loading texts.
+  - **The status doesn't move anything (Task 6 review).** As its own item in the header's `space-between` row it moved the Hero select about 445 px at 1260 px, and at 720 px it pushed every card down a line. It now sits in the range group, always mounted (so screen readers announce its change), with its text laid over the free space beside the buttons. The group keeps its own width (`flex: 1 1 auto`): with `flex: 1` it shrank beside the Hero select at phone width and stacked its buttons, which the rebuilt Task 7 tap test caught. It reads "Updating…": true on Retry and with a hero picked too, and short enough to show where the space beside the buttons is narrow (a longer text was cut to an ellipsis on the website between about 530 and 560 px).
   - **85% opacity** keeps every text on a dimmed card at 4.5:1 or more ("Slipping" 4.91:1, muted 5.38:1); 55% took them below 3:1.
-  - **Live error notices are hidden while older cards are shown:** a fresh "Match details unavailable" above cards from the last range would contradict them. They show once both requests settle.
+  - **Live error notices are hidden while older cards are shown,** the partial-failure one included: a fresh "Match details unavailable" above cards from the last range would contradict them. They show once both requests settle.
 - **Picking a game on a chart.**
   - **Mouse or pen:** hovering picks the nearest game (`nearestGame()`); a click opens its report.
   - **Touch:** a tap only picks it, so the details show first; the tip's "Report →" link opens it; a tap outside the chart clears it (as the match report's Graph does).
@@ -87,7 +87,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
   - **Card titles:** "Objective damage share" and "Healing share" after "Hero damage share".
   - **Notes:** "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the hero damage, objective damage and healing shares have no rank average, as it has no team totals."
   - **Partial failure:** "Rank averages unavailable for {n} of {count}: {error}" with Retry, for example "Rank averages unavailable for 10 of 20 games: Deadlock API unavailable (500)."
-  - **Loading:** "Updating the cards…", beside the range buttons while older cards are shown.
+  - **Loading:** "Updating…", beside the range buttons while older cards are shown.
   - **Tip:** "{Hero} · Win · 3d ago" over "{value} rank avg {x} · Report →" ("—" without a value; no "rank avg" without an average).
   - **Chart label:** "{metric}, game by game. Arrow keys pick a game, Enter opens its match report." with `aria-valuetext` "{Hero} · Win · 3d ago: {value}, rank avg {x}".
   - **Match report notes:** " This player's rank isn't recorded for this match, so the average uses their current rank." and " This player's rank isn't recorded for this match, and there's no current rank to use."
@@ -3052,7 +3052,7 @@ Expected: 136 desktop and 75 website tests pass.
 **How it works:**
 - **What's remembered:** `Loaded` is the key, games, totals and averages of a render whose requests had both finished. It is stored with `setState` during render, behind a condition that is false once stored (React's "storing information from previous renders").
 - **What's shown:** while either request loads and something was stored, the tab shows the stored games, data and request states (`shown`); `stale` is true then.
-- **Display:** the cards get `aria-busy` (85% opacity). A status beside the range buttons reads "Updating the cards…". It is always mounted, and its text is laid over the free space, so it never moves the controls (Task 6 review). The live error notices wait until both requests settle. The first load, with nothing stored, still shows the loading texts.
+- **Display:** the cards get `aria-busy` (85% opacity). A status beside the range buttons reads "Updating…". It is always mounted, and its text is laid over the free space, so it never moves the controls (Task 6 review). The live error notices wait until both requests settle. The first load, with nothing stored, still shows the loading texts.
 - **The range group keeps its own width** (`flex: 1 1 auto`). With `flex: 1` it shrank beside the Hero select at phone width and stacked its three buttons into a column, pushing the cards down; the website test checks they keep one row.
 - **The tests:** the desktop test holds a card that needs match details and checks that the Hero select doesn't move; the website test checks the range buttons' row at 375 px.
 - **The test's `gate` option** holds the bulk requests for Last 50 back until the test releases them. Its route handler becomes `async`.
@@ -3135,12 +3135,12 @@ test("performance tab keeps the last cards, dimmed, while new games load", async
   const cards = view(page).locator(".perf-cards");
   const status = view(page).locator(".perf-status");
   const hero = view(page).getByRole("combobox", { name: "Hero" });
-  const select = (await hero.boundingBox())!;
   await expect(damage).toHaveText("1,000 20 games · rank avg 500");
   await expect(status).toHaveText("");
+  const select = (await hero.boundingBox())!;
   hold = new Promise((resolve) => (release = resolve));
   await page.getByRole("button", { name: "Last 50", exact: true }).click();
-  await expect(status).toHaveText("Updating the cards…");
+  await expect(status).toHaveText("Updating…");
   await expect(cards).toHaveAttribute("aria-busy", "true");
   await expect(damage).toHaveText("1,000 20 games · rank avg 500");
   // The status doesn't move the controls.
@@ -3335,7 +3335,7 @@ with:
           {/* Always there, so screen readers announce it; it takes no space
               of its own, so the controls never move. */}
           <p className="perf-status" role="status">
-            <span>{stale ? "Updating the cards…" : ""}</span>
+            <span>{stale ? "Updating…" : ""}</span>
           </p>
         </div>
         {heroes.length > 1 && (
@@ -3393,6 +3393,30 @@ with:
 ```
 
 6. Replace:
+
+```tsx
+              </button>
+            </p>
+          )}
+          {!!averages.data?.failed.size && (
+            <p className="notice warning" role="status">
+              Rank averages unavailable for {averages.data.failed.size} of{" "}
+              {count(games.length)}: {averages.data.error}
+```
+
+with:
+
+```tsx
+              </button>
+            </p>
+          )}
+          {!stale && !!averages.data?.failed.size && (
+            <p className="notice warning" role="status">
+              Rank averages unavailable for {averages.data.failed.size} of{" "}
+              {count(games.length)}: {averages.data.error}
+```
+
+7. Replace:
 
 ```tsx
               Loss
