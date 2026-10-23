@@ -47,7 +47,8 @@ Each task's end state was also checked on its own: type check and unit tests aft
   - The report asks only for normal-mode matches, and the curve waits for the answer only when the selected player has no recorded rank.
   - A failed lookup, like a player without a current rank, means all ranks, with the note "This player's rank isn't recorded for this match, and there's no current rank to use." The wording doesn't claim which of the two it was (Task 2 review), as on the Performance tab.
 - **All four Impact shares.** Kill participation and the player's share of their team's hero damage, objective damage and healing, as in the match report's Impact. None has a rank average (the curve has no team totals). The test fixture's teammates now have 1,500 objective damage and 3,000 healing each, so the three damage-type shares differ (29%, 44%, 21%) and a test can't pass by reading the wrong team total.
-- **Rank averages per hero and rank tier, four at a time.** Games of one hero and tier share their curve requests (the client shares them anyway); grouping lets a limit apply to distinct curves. `CURVE_CONCURRENCY = 4`: an uncached curve takes about 7 s, and Last 100 can need a dozen, which all at once ran past the client's 15 s timeout. Each game's curve is awaited separately (`Promise.allSettled`), so a failure costs only its own games. `fetchGameAverages` fails as a whole only when no game gets an average, so the existing "Rank averages unavailable: {error}" notice and Retry still cover a full failure; a partial one gets "Rank averages unavailable for {n} of {count}: {error}" with Retry. Retry re-asks only the failed curves (the others are cached for 10 minutes).
+- **Rank averages per hero and rank tier, four at a time.** Games that ask for the same curve (`curvePath(hero, rankBand(badge))`) share their requests (the client shares them anyway); grouping lets a limit apply to distinct curves. A group never has more than one request in flight (its base curve, then its wider one), so four groups mean at most four curve requests at once. `CURVE_CONCURRENCY = 4`: an uncached curve takes about 7 s, and Last 100 can need a dozen, which all at once ran past the client's 15 s timeout. Each game's curve is awaited separately (`Promise.allSettled`), so a failure costs only its own games. `fetchGameAverages` fails as a whole only when no game gets an average, so the existing "Rank averages unavailable: {error}" notice and Retry still cover a full failure; a partial one gets "Rank averages unavailable for {n} of {count}: {error}" with Retry. Retry re-asks only the failed curves (the others are cached for 10 minutes).
+  - **A card with any game whose curve failed claims no trend (Task 4 review).** Its trend would follow only the games that kept their average: after a rank-up, the recent games form the new, uncached group most likely to fail, and a trend from the older games alone could even point the wrong way. Such a card also shows no "Too few games" and no "no rank average for these games"; its numbers stay like for like ("20 games · 10 with a rank average: … vs …"). `GameAverages.failed` is the set of those games' match ids.
 - **The profile keeps its view for the session.** A module-level map in `ProfileView`, keyed by account, holds the tab, the match filter, the range and the hero. The desktop app keeps the profile mounted while a report is open, but the website opens the report as its own page, so its profile remounts; the map covers both, and switching profile tabs (which unmounts the Performance tab) too. Phase 3 suggested URL state; a session map needs no route changes in either shell. A reload starts at Overview again, and coming back to a profile later in the session finds it as it was left.
 - **Cards stay while new games load.** The tab remembers the last games whose totals and averages both finished, with their requests, and shows those while a new range or hero loads: `aria-busy` on the cards, 55% opacity, and "Updating to the last {n} games…" beside the controls. It uses React's documented "storing information from previous renders" pattern (`setState` during render, behind a condition that turns false once stored). The first load still shows the loading texts.
 - **Picking a game on a chart.**
@@ -64,7 +65,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
 - **Checked by eye** on live data (account 400239835) through the website build: Last 20 and Last 100 at 1260 px (tip on both sides), and a tap at 375 px on a touch phone; no horizontal page scroll.
 
 - **Follow-ups for the owner (not built):**
-  - **Abandoned requests still go out:** a range or hero the user has already left keeps its queued bulk requests (no cancellation), so they use up the rate limit.
+  - **Abandoned requests still go out:** a range or hero the user has already left keeps its queued bulk requests and curve groups (no cancellation), so they use up the rate limit, and two quick switches can run two calls' curve groups at once (Task 4 review).
   - **Other tabs:** each browser tab or window has its own limiter, while the API counts per IP.
   - **The tip covers the card's numbers** while a game is picked.
   - **Enter on the slider** opens a report, which the slider pattern doesn't define; screen readers announce it through the label.
@@ -97,7 +98,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
 
 1. **Limits that hold.** The throttle counts a request when it is sent and never more than the limit per window, a waiting request checks for a cooldown before taking a slot, duplicates share one wait, unlimited groups still start synchronously, a 429 pauses only what it refused and a 503 everything. Tests: `cools down a rate-limited group after a 429 with Retry-After`, `cools down only the refused path of other endpoints`, `pauses everything after a 503: the API is shedding load`, `sends a burst a window at a time, never more than the limit`, `fails a waiting request when its group cools down, without using a slot`, `drops responses that outlived their ttl`, `keeps responses still fresh, and sweeps at most once a minute`.
 2. **One rank rule.** The report and the tab both use the game's rank, then the current rank, then all ranks, and the report asks for every player's current rank in one request. Tests: `a player without a recorded rank is compared at their current rank, and the note says so`, `with no ranks recorded and no current rank, the average covers all ranks and says so`, `the report waits for current ranks only where it needs them, and asks for each curve once`, `Street Brawl reports say rank averages cover normal matches only` (no lookup), `performance tab compares ranked games at their own rank`.
-3. **Partial failure.** A failed curve leaves only its games without an average, Retry recovers, and a full failure still fails as a whole. Tests: `keeps the games whose curve loaded when another fails`, `fails as a whole when every curve fails, so the tab can offer Retry`, `performance tab keeps the rank averages that loaded, and Retry asks again for the rest`.
+3. **Partial failure.** A failed curve leaves only its games without an average, cards with such games claim no trend, Retry re-asks only the failed curve and recovers, and a full failure still fails as a whole. Tests: `keeps the games whose curve loaded when another fails`, `fails as a whole when every curve fails, so the tab can offer Retry`, `performance tab keeps the rank averages that loaded, and Retry asks again for the rest`.
 4. **Picking a game.** Pointer, touch and keyboard each work, and a tap never opens a report on its own. Tests: `performance tab describes the game under the pointer and a click opens its report`, `performance tab points can be picked and opened from the keyboard`, `a tap on a Performance chart shows the game; its Report link opens it`.
 5. **No lost state.** Tests: `the profile keeps its tab, range and hero after a match report`, `performance tab keeps the last cards, dimmed, while new games load`.
 
@@ -1870,9 +1871,10 @@ Expected: 133 desktop and 74 website tests pass.
 
 `fetchGameAverages` used to run one `fetchRankCurve` per game, all at once, and fail as a whole when any curve failed. Now:
 - **Groups:** games of one hero and rank tier (`rankBand(badge).label`) form a group; at most `CURVE_CONCURRENCY` groups load at once (`eachLimited`). Within a group every game still calls `fetchRankCurve` with its own length, so widening stays per game; the client shares the requests.
-- **Result:** `GameAverages` is `{ byMatch, failed, error }`: the averages by match id, how many games' curves failed, and the first error.
+- **Result:** `GameAverages` is `{ byMatch, failed, error }`: the averages by match id, the set of match ids whose curve failed, and a failure's message.
 - **Failure:** it throws only when no game got an average, so a full failure keeps the tab's existing notice and Retry.
-- **The tab** reads `averages.data?.byMatch` and shows "Rank averages unavailable for {n} of {count}: {error}" with Retry for a partial failure.
+- **The tab** reads `averages.data?.byMatch` and shows "Rank averages unavailable for {n} of {count}: {error}" with Retry for a partial failure. A card whose metric has a rank average and that has a game with a value in `failed` counts as failed: no trend, no "Too few games", no "no rank average for these games" (Task 4 review).
+- **`eachLimited`'s `run` must not reject;** here each group settles every game with `Promise.allSettled`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2034,7 +2036,7 @@ with:
       api,
     );
     expect([...averages.byMatch.keys()]).toEqual([1]);
-    expect(averages.failed).toBe(2);
+    expect([...averages.failed]).toEqual([2, 3]);
     expect(averages.error).toBe("Deadlock API timed out.");
   });
 
@@ -2058,7 +2060,7 @@ with:
       api,
     );
     expect(averages.byMatch.size).toBe(12);
-    expect(averages.failed).toBe(0);
+    expect(averages.failed.size).toBe(0);
     expect(most).toBe(CURVE_CONCURRENCY);
   });
 
@@ -2144,6 +2146,12 @@ test("performance tab keeps the rank averages that loaded, and Retry asks again 
   page,
 }) => {
   const failCurveFor = new Set([heroes[1]]);
+  const curves: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/v1/analytics/player-performance-curve")
+      curves.push(url.searchParams.get("hero_ids")!);
+  });
   await storeAccount(page);
   await routeApi(page, { history: performanceHistory, failCurveFor });
   await openMyProfile(page);
@@ -2156,12 +2164,21 @@ test("performance tab keeps the rank averages that loaded, and Retry asks again 
   await expect(souls.locator(".perf-card-numbers")).toContainText(
     "20 games · 10 with a rank average",
   );
+  // No trend from the games that kept their average; the shares, which
+  // have none, keep theirs.
+  await expect(souls.locator(".perf-trend")).toHaveCount(0);
+  await expect(
+    card(page, "Kill participation").locator(".perf-trend"),
+  ).toHaveCount(1);
+  const asked = curves.length;
   failCurveFor.clear();
   await notice.getByRole("button", { name: "Retry" }).click();
   await expect(souls.locator(".perf-card-numbers")).toHaveText(
     "1,100 20 games · rank avg 1,000",
   );
   await expect(notice).toHaveCount(0);
+  // Retry asked again only for the curve that failed.
+  expect(new Set(curves.slice(asked))).toEqual(new Set([String(heroes[1])]));
 });
 
 test("performance tab degrades without match history", async ({ page }) => {
@@ -2192,7 +2209,7 @@ with:
 
 ```ts
 import { fetchRankCurve } from "@/features/match-report/services/match-report";
-import { rankBand } from "@/features/match-report/utils/rank-curve";
+import { curvePath, rankBand } from "@/features/match-report/utils/rank-curve";
 import { TTL, deadlockApi, type DeadlockApi } from "@/shared/api/DeadlockApi";
 import type { HistoryMatch } from "../types";
 import {
@@ -2251,12 +2268,13 @@ export const CURVE_CONCURRENCY = 4;
 export interface GameAverages {
   // By match id; games whose curve failed are missing.
   byMatch: Map<number, GameAverage>;
-  failed: number;
-  // The first failure's message.
+  // The games whose curve failed.
+  failed: Set<number>;
+  // A failure's message, for the notice.
   error?: string;
 }
 
-/** Runs `run` over the items, at most `limit` at a time. */
+/** Runs `run` over the items, at most `limit` at a time; `run` must not reject. */
 async function eachLimited<T>(
   items: T[],
   limit: number,
@@ -2288,11 +2306,14 @@ export async function fetchGameAverages(
   const badge = (game: HistoryMatch) => game.badge || current;
   const groups = new Map<string, HistoryMatch[]>();
   for (const game of games) {
-    const key = `${game.heroId} ${rankBand(badge(game)).label}`;
-    groups.set(key, [...(groups.get(key) ?? []), game]);
+    // Games that ask for the same curve form a group.
+    const key = curvePath(game.heroId, rankBand(badge(game)));
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(game);
   }
   const byMatch = new Map<number, GameAverage>();
-  const errors: string[] = [];
+  const failed = new Set<number>();
+  let error: string | undefined;
   await eachLimited([...groups.values()], CURVE_CONCURRENCY, async (group) => {
     const results = await Promise.allSettled(
       group.map(async (game) => {
@@ -2306,16 +2327,17 @@ export async function fetchGameAverages(
         byMatch.set(game.matchId, gameAverage(curve, game.durationS, source));
       }),
     );
-    for (const result of results)
-      if (result.status === "rejected")
-        errors.push(
-          result.reason instanceof Error
-            ? result.reason.message
-            : String(result.reason),
-        );
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") return;
+      failed.add(group[index].matchId);
+      error ??=
+        result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason);
+    });
   });
-  if (errors.length && !byMatch.size) throw new Error(errors[0]);
-  return { byMatch, failed: errors.length, error: errors[0] };
+  if (failed.size && !byMatch.size) throw new Error(error);
+  return { byMatch, failed, error };
 }
 ```
 
@@ -2373,6 +2395,81 @@ with:
 3. Replace:
 
 ```tsx
+}: {
+  summary: MetricSummary;
+  totals: AsyncState<unknown>;
+  averages: AsyncState<unknown>;
+}) {
+  const { metric, value, games, average, comparedValue, compared, trend } =
+    summary;
+  // What the card still waits for, or lacks because a request failed.
+  const waiting =
+    (metric.needsTotals && totals.loading) ||
+    (!!metric.average && averages.loading);
+  const failed =
+    (metric.needsTotals && !!totals.error) ||
+    (!!metric.average && !!averages.error);
+  const detail =
+    metric.needsTotals && totals.loading
+      ? "Loading match details…"
+```
+
+with:
+
+```tsx
+}: {
+  summary: MetricSummary;
+  totals: AsyncState<unknown>;
+  averages: AsyncState<GameAverages>;
+}) {
+  const { metric, value, games, average, comparedValue, compared } = summary;
+  // What the card still waits for, or lacks because a request failed.
+  const waiting =
+    (metric.needsTotals && totals.loading) ||
+    (!!metric.average && averages.loading);
+  // A failed curve leaves some of the card's games without an average: the
+  // card then claims no trend from the rest.
+  const partial =
+    !!metric.average &&
+    summary.points.some(
+      (p) => p.value !== null && !!averages.data?.failed.has(p.matchId),
+    );
+  const failed =
+    (metric.needsTotals && !!totals.error) ||
+    (!!metric.average && (!!averages.error || partial));
+  const trend = failed ? null : summary.trend;
+  const detail =
+    metric.needsTotals && totals.loading
+      ? "Loading match details…"
+```
+
+4. Replace:
+
+```tsx
+            : averages.loading
+              ? " · loading rank average…"
+              : average === null
+                ? averages.error
+                  ? ""
+                  : " · no rank average for these games"
+                : compared < games
+```
+
+with:
+
+```tsx
+            : averages.loading
+              ? " · loading rank average…"
+              : average === null
+                ? failed
+                  ? ""
+                  : " · no rank average for these games"
+                : compared < games
+```
+
+5. Replace:
+
+```tsx
   accountId: number,
   games: HistoryMatch[],
   totals: Map<number, PlayerTotals[]> | undefined,
@@ -2423,7 +2520,7 @@ with:
     );
 ```
 
-4. Replace:
+6. Replace:
 
 ```tsx
       metric,
@@ -2447,7 +2544,7 @@ with:
   return (
 ```
 
-5. Replace:
+7. Replace:
 
 ```tsx
               </button>
@@ -2464,9 +2561,9 @@ with:
               </button>
             </p>
           )}
-          {!!averages.data?.failed && (
+          {!!averages.data?.failed.size && (
             <p className="notice warning" role="status">
-              Rank averages unavailable for {averages.data.failed} of{" "}
+              Rank averages unavailable for {averages.data.failed.size} of{" "}
               {count(games.length)}: {averages.data.error}
               <button type="button" onClick={averages.retry}>
                 Retry
@@ -2883,7 +2980,7 @@ async function routeApi(page: Page, fixtures: Fixtures = {}) {
 2. Replace:
 
 ```ts
-  await expect(notice).toHaveCount(0);
+  expect(new Set(curves.slice(asked))).toEqual(new Set([String(heroes[1])]));
 });
 
 test("performance tab degrades without match history", async ({ page }) => {
@@ -2894,7 +2991,7 @@ test("performance tab degrades without match history", async ({ page }) => {
 with:
 
 ```ts
-  await expect(notice).toHaveCount(0);
+  expect(new Set(curves.slice(asked))).toEqual(new Set([String(heroes[1])]));
 });
 
 test("performance tab keeps the last cards, dimmed, while new games load", async ({
@@ -3650,7 +3747,7 @@ function PerformanceCard({
 }: {
   summary: MetricSummary;
   totals: AsyncState<unknown>;
-  averages: AsyncState<unknown>;
+  averages: AsyncState<GameAverages>;
 ```
 
 with:
@@ -3667,7 +3764,7 @@ function PerformanceCard({
   accountId: number;
   summary: MetricSummary;
   totals: AsyncState<unknown>;
-  averages: AsyncState<unknown>;
+  averages: AsyncState<GameAverages>;
 ```
 
 2. Replace:
@@ -4291,7 +4388,7 @@ Pointing at a chart, or its arrow keys, picks the nearest game and shows its her
 
 - **From match history:** souls / min and the K/D/A ratio, (kills + assists) ÷ deaths, with deaths counted as at least one after adding up the games.
 - **From each game's totals:** hero damage, objective damage, healing and creep kills per minute, and the four shares: kill participation and the player's share of their team's hero damage, objective damage and healing. They come from `GET /v1/matches/metadata?match_ids=…&include_player_kda=true&extra_player_columns=stats.player_damage,stats.boss_damage,stats.player_healing,stats.creep_kills&limit=…` (bulk metadata, every player's stat snapshots; the last one is the final total; `limit` is the number of games asked for), at most 50 games per request and kept per match, so a wider range only asks for the games it adds. Games the API hasn't stored yet are left out and the note says how many. Bulk metadata allows 30 requests per minute per IP; the client holds requests back rather than go over it, so switching heroes quickly on Last 100 slows down rather than stopping.
-- **Rank average:** the match report's curve, read at each game's length: the tier of the game's rank (match history's `ranked_display_badge`), the player's current rank (`/v1/players/rank`, asked only when a game has none) for games without one, such as unranked games, or all ranks when neither is known. Games of one hero and rank tier share their requests (one, plus one when it widens as in the match report); at most four such groups load at once, and a group whose curve fails leaves only its own games without an average, with a notice and Retry. The match report uses the same rank rule. As there, **creep kills** stand in for last hits. The four shares have no rank average: the curve has no team totals.
+- **Rank average:** the match report's curve, read at each game's length: the tier of the game's rank (match history's `ranked_display_badge`), the player's current rank (`/v1/players/rank`, asked only when a game has none) for games without one, such as unranked games, or all ranks when neither is known. Games of one hero and rank tier share their requests (one, plus one when it widens as in the match report); at most four such groups load at once, and a group whose curve fails leaves only its own games without an average, with a notice and Retry, and a card with any of those games claims no trend. The match report uses the same rank rule. As there, **creep kills** stand in for last hits. The four shares have no rank average: the curve has no team totals.
 - **Improving / Flat / Slipping** compares the recent half of the games with the earlier half (at least 6 games with a value and, where the metric has one, a rank average), each game as its value ÷ its rank average, so changing hero or rank doesn't read as a change in form; the four shares use their values. It says improving or slipping only when Welch's t-test finds the halves differ at the 95% level, and flat otherwise. When some games run past the end of the rank average, the card compares the player and the average over the games that have one.
 
 ## Website
