@@ -55,10 +55,13 @@ Each task's end state was also checked on its own: type check and unit tests aft
   - **85% opacity** keeps every text on a dimmed card at 4.5:1 or more ("Slipping" 4.91:1, muted 5.38:1); 55% took them below 3:1.
   - **Live error notices are hidden while older cards are shown,** the partial-failure one included: a fresh "Match details unavailable" above cards from the last range would contradict them. They show once both requests settle.
 - **Picking a game on a chart.**
-  - **Mouse or pen:** hovering picks the nearest game (`nearestGame()`); a click opens its report.
-  - **Touch:** a tap only picks it, so the details show first; the tip's "Report →" link opens it; a tap outside the chart clears it (as the match report's Graph does).
-  - **Keyboard:** the chart is a `role="slider"` (screen readers pass arrow keys to sliders): arrow keys, Home and End pick a game, Enter opens its report, Escape clears, and focus starts on the newest game. Its `aria-valuetext` reads the tip.
-  - **The tip** sits above the chart, over the card's numbers, on the picked game's side, so the whole line stays in sight. Two lines: "{Hero} · Win · 3d ago" and "{value} rank avg {x} · Report →". Rejected while planning: a readout line under the chart (truncated at four columns: "rank avg …") and a tip beside the point (ran off the card on narrow charts). Its link has a 24 px touch target.
+  - **Mouse or pen:** hovering picks the nearest game (`nearestGame()`); a click opens its report. A click with Ctrl, Cmd, Shift or Alt is left to the browser.
+  - **Touch:** a tap only picks it, so the details show first; dragging along the chart moves the pick (`touch-action: pan-y`, as the Graph); the tip's "Report →" link opens it; a tap outside the chart clears it (as the match report's Graph does).
+  - **Keyboard:** the chart is a `role="slider"` (screen readers pass arrow keys to sliders): Left/Down and Right/Up, Home and End pick a game, Enter opens its report, Escape clears (from the chart or the tip's link), and focus starts on the newest game. Keys with Alt, Ctrl or Cmd stay the browser's. Its `aria-valuetext` reads the tip. The focus outline is 2 px gold.
+  - **The pick is a match id, not an index (Task 7 review),** so when new games replace the shown ones (a range switch with kept cards), Enter can't open a game the user didn't pick.
+  - **The tip** sits above the chart, over the card's numbers, on the picked game's side, so the whole line stays in sight. Two lines: "{Hero} · Win · 3d ago" and "{value} rank avg {x} · Report →". Rejected while planning: a readout line under the chart (truncated at four columns: "rank avg …") and a tip beside the point (ran off the card on narrow charts).
+  - **The tip touches the chart and keeps focus where it is (Task 7 review).** A 2 px gap between them dropped the tip as a mouse moved slowly up to its link. And Safari doesn't focus a link on press: the chart's blur cleared the tip before the link's click, the only way to a report on a touch screen. So the tip prevents the default of `mousedown`.
+  - **Its link** is named "Match report" (the arrow isn't read out) and has a real 24 px touch target (`inline-block`, padding with matching negative margin).
   - **Points without a value** can be picked too ("—"); the report is still useful.
   - The old `<title>` tooltips go.
 - **Readable dots on Last 100.** The radius still shrinks with the spacing (`dotRadius()`), but not below 2 px, and every dot has a 1 px outline in `--surface` (the card), which keeps neighbours apart and off the gold line. Checked on live data at 1260 px, Last 100.
@@ -75,6 +78,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
   - **Clients outside the shared one:** the live overlay's statistics client (`src/features/player-stats/`) has its own cache and cooldowns, and `src/features/builds/services/build-analytics.ts` fetches `/v1/analytics/hero-build-stats` directly; neither counts against these limits (Task 1 review).
   - **A waiting request learns of a cooldown only when it wakes,** up to a minute later, even when `Retry-After` is an hour.
   - **A profile reopened later in the session** opens on the tab it was left on, not Overview.
+  - **"Updating…" is cut short** on the website between about 530 and 585 px, where the Hero select squeezes the space beside the range buttons (Task 6 re-review); screen readers still get it.
   - **Share trends on "All heroes" (Task 3 review):** shares have no rank average, so a trend can follow the hero mix (from a healer to a carry, healing share slips) rather than form. Hiding share trends on "All heroes" is an option.
   - **Card rows (Task 3 review):** at full width the ten cards run 4/4/2, so the shares are split across two rows; five columns above about 1100 px would put each share under its per-minute card.
   - **A team total of 0:** the report shows 0% where the tab leaves the game out of that share (copying kill participation); none of 40 live team totals was 0.
@@ -88,7 +92,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
   - **Notes:** "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the hero damage, objective damage and healing shares have no rank average, as it has no team totals."
   - **Partial failure:** "Rank averages unavailable for {n} of {count}: {error}" with Retry, for example "Rank averages unavailable for 10 of 20 games: Deadlock API unavailable (500)."
   - **Loading:** "Updating…", beside the range buttons while older cards are shown.
-  - **Tip:** "{Hero} · Win · 3d ago" over "{value} rank avg {x} · Report →" ("—" without a value; no "rank avg" without an average).
+  - **Tip:** "{Hero} · Win · 3d ago" over "{value} rank avg {x} · Report →" ("—" without a value; "{value} · Report →" without an average). The link's accessible name is "Match report".
   - **Chart label:** "{metric}, game by game. Arrow keys pick a game, Enter opens its match report." with `aria-valuetext` "{Hero} · Win · 3d ago: {value}, rank avg {x}".
   - **Match report notes:** " This player's rank isn't recorded for this match, so the average uses their current rank." and " This player's rank isn't recorded for this match, and there's no current rank to use."
 - One shared copy of the feature code for the app and the website.
@@ -3577,10 +3581,12 @@ Expected: 137 desktop and 75 website tests pass.
 
 **The sparkline's new parts:**
 - **Structure:** a `.sparkline-box` (positioning, outside-tap and leave handling) around the `.sparkline` slider (measured width, keys, focus), whose SVG is `aria-hidden`.
-- **Pointer:** a transparent `.spark-hit` rect over the SVG takes pointer moves and presses (`nearestGame()`), and clicks. A click opens the report unless the last press was a touch.
+- **Pointer:** a transparent `.spark-hit` rect over the SVG takes pointer moves and presses (`nearestGame()`), and clicks. A click opens the report unless the last press was a touch or a modifier is held.
 - **Picked game:** a `.spark-cross` line, a bigger ring on its dot (`.picked`), and the `.spark-tip` above the chart. The tip goes on the right when the game is in the right half. Its "Report →" is a `RouteLink`: a button in the desktop app, a link on the website.
 - **Props:** `describe` (returning `PointText`) and `route` replace `title`. The tab passes `accountId` to each card for the route.
 - **Dots:** `dotRadius()` keeps them at 2 px or more, with an outline in `--surface`.
+- **The pick** is the game's match id; the tip touches the chart and prevents `mousedown`'s default, so focus stays put (Task 7 review).
+- **The tests** pick a game in the middle of the chart (not only the newest, where any mapping lands), and cover the tip's side, leaving the chart, Shift+Tab, Home/End, a press on the tip, Tab into its link, Escape, and a tap outside. Checked against broken code while planning: the pointer offset dropped, no pointer-leave, no blur, the tip's side inverted, Home/End swapped, no Escape, no `mousedown` guard and a gap under the tip each fail a test. (In Chromium a tap focuses the chart, so a tap outside clears it by blur as well as by the document listener; the listener stays for browsers that don't.)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3690,13 +3696,29 @@ test("performance tab describes the game under the pointer and a click opens its
   const souls = card(page, "Souls / min");
   await expect(dots(page, "Souls / min")).toHaveCount(20);
   const chart = (await souls.getByRole("slider").boundingBox())!;
+  const tip = souls.locator(".spark-tip");
+  // The sixth game from the left (oldest first): 15h ago, a win on
+  // heroes[0], 1,000 souls a minute.
+  const step = (chart.width - 12) / 19;
+  await page.mouse.move(chart.x + 6 + 5 * step, chart.y + 40);
+  await expect(tip.locator("span")).toHaveText([
+    `${heroName(heroes[0])} · Win · 15h ago`,
+    "1,000 rank avg 1,000 · Report →",
+  ]);
+  await expect(tip).not.toHaveClass(/right/);
+  // The tip touches the chart, so a pointer moving up into it stays in.
+  const above = (await tip.boundingBox())!;
+  expect(above.y + above.height).toBeGreaterThanOrEqual(chart.y - 0.5);
+  // Leaving the chart clears it.
+  await page.mouse.move(chart.x - 40, chart.y - 150);
+  await expect(tip).toHaveCount(0);
   // The newest game is on the right: 1h ago, lost, 1,200 souls a minute.
   await page.mouse.move(chart.x + chart.width - 2, chart.y + 40);
-  const tip = souls.locator(".spark-tip span");
-  await expect(tip).toHaveText([
+  await expect(tip.locator("span")).toHaveText([
     `${heroName(heroes[0])} · Loss · 1h ago`,
     "1,200 rank avg 1,000 · Report →",
   ]);
+  await expect(tip).toHaveClass(/right/);
   await expect(souls.locator("circle.picked")).toHaveCount(1);
   await page.mouse.click(chart.x + chart.width - 2, chart.y + 40);
   await expect(view(page).locator(".match-report")).toBeVisible();
@@ -3713,6 +3735,7 @@ test("performance tab points can be picked and opened from the keyboard", async 
   await page.getByRole("tab", { name: "Performance" }).click();
   await expect(dots(page, "Souls / min")).toHaveCount(20);
   const chart = card(page, "Souls / min").getByRole("slider");
+  const tip = card(page, "Souls / min").locator(".spark-tip");
   // Focus starts on the newest game.
   await chart.focus();
   await expect(chart).toHaveAttribute("aria-valuenow", "20");
@@ -3720,12 +3743,33 @@ test("performance tab points can be picked and opened from the keyboard", async 
     "aria-valuetext",
     `${heroName(heroes[0])} · Loss · 1h ago: 1,200, rank avg 1,000`,
   );
+  // Focus leaving the chart clears the pick.
+  await expect(tip).toBeVisible();
+  await page.keyboard.press("Shift+Tab");
+  await expect(tip).toHaveCount(0);
+  await chart.focus();
+  await page.keyboard.press("Home");
+  await expect(chart).toHaveAttribute("aria-valuenow", "1");
+  await page.keyboard.press("End");
+  await expect(chart).toHaveAttribute("aria-valuenow", "20");
   await page.keyboard.press("ArrowLeft");
   await expect(chart).toHaveAttribute("aria-valuenow", "19");
   await expect(chart).toHaveAttribute(
     "aria-valuetext",
     `${heroName(heroes[1])} · Win · 2h ago: 1,200, rank avg 1,000`,
   );
+  // A press on the tip leaves the focus, and the tip, where they are.
+  await tip.locator("span").first().click();
+  await expect(chart).toBeFocused();
+  await expect(chart).toHaveAttribute("aria-valuenow", "19");
+  // Tab reaches the tip's link; Escape there clears the tip.
+  await page.keyboard.press("Tab");
+  await expect(tip.getByRole("button", { name: "Match report" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(tip).toHaveCount(0);
+  // Back on the chart, Enter opens the picked game.
+  await chart.focus();
+  await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("Enter");
   await expect(view(page).locator(".match-report")).toBeVisible();
   expect(reports).toEqual([3001]);
@@ -3772,12 +3816,18 @@ test.describe("a touch screen at phone width", () => {
     });
     await expect(souls.locator("circle")).toHaveCount(8);
     const chart = (await souls.getByRole("slider").boundingBox())!;
+    const tip = souls.locator(".spark-tip");
+    // A tap anywhere else clears a picked game.
+    await page.touchscreen.tap(chart.x + chart.width - 2, chart.y + 40);
+    await expect(tip).toBeVisible();
+    const title = (await souls.locator("h3").boundingBox())!;
+    await page.touchscreen.tap(title.x + 5, title.y + 5);
+    await expect(tip).toHaveCount(0);
     // The newest game, on the right, is match 1001.
     await page.touchscreen.tap(chart.x + chart.width - 2, chart.y + 40);
-    const tip = souls.locator(".spark-tip");
     await expect(tip).toBeVisible();
     await expect(page).toHaveURL(`/players/${FARGO}`);
-    await tip.getByRole("link", { name: "Report →" }).tap();
+    await tip.getByRole("link", { name: "Match report" }).tap();
     await expect(page).toHaveURL(`/matches/1001?player=${FARGO}`);
   });
 });
@@ -3869,7 +3919,7 @@ export function nearestGame(px: number, width: number, count: number) {
  * Pointing at it, or the arrow keys, picks the nearest game and describes
  * it above the chart. A click, Enter or the tip's "Report" link opens that
  * game's match report. A tap only picks, so a touch screen shows the
- * details first.
+ * details first; dragging along the chart moves the pick.
  */
 export function Sparkline({
   points,
@@ -3886,9 +3936,13 @@ export function Sparkline({
   const box = useRef<HTMLDivElement>(null);
   const width = useElementWidth(chart);
   const { navigate } = useLinks();
+  // The picked game's match id: when new games replace these, an index
+  // would point at another game.
   const [picked, setPicked] = useState<number | null>(null);
   const pointer = useRef("mouse");
-  const picking = picked !== null;
+  const index = points.findIndex((p) => p.matchId === picked);
+  const game = index < 0 ? undefined : points[index];
+  const picking = !!game;
   // A tapped game stays picked; tapping anywhere outside clears it.
   useEffect(() => {
     if (!picking) return;
@@ -3915,8 +3969,8 @@ export function Sparkline({
     points.length > 1 ? (width - 2 * PAD_X) / (points.length - 1) : width;
   const radius = dotRadius(step);
   const last = points.length - 1;
-  const game = picked === null ? undefined : points[picked];
   const text = describe(game ?? points[last]);
+  const pick = (at: number) => setPicked(points[at].matchId);
   const at = (event: MouseEvent<SVGRectElement>) =>
     nearestGame(
       event.clientX -
@@ -3926,20 +3980,25 @@ export function Sparkline({
     );
   const track = (event: PointerEvent<SVGRectElement>) => {
     pointer.current = event.pointerType;
-    setPicked(at(event));
+    pick(at(event));
   };
   const keys = (event: KeyboardEvent) => {
+    // Browser shortcuts such as Alt+Left stay the browser's.
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const back = Math.max(0, (index < 0 ? last + 1 : index) - 1);
+    const next = Math.min(last, (index < 0 ? last : index) + 1);
     const moves: Record<string, number> = {
-      ArrowLeft: Math.max(0, (picked ?? last + 1) - 1),
-      ArrowRight: Math.min(last, (picked ?? last) + 1),
+      ArrowLeft: back,
+      ArrowDown: back,
+      ArrowRight: next,
+      ArrowUp: next,
       Home: 0,
       End: last,
     };
     if (event.key in moves) {
       event.preventDefault();
-      setPicked(moves[event.key]);
+      pick(moves[event.key]);
     } else if (event.key === "Enter" && game) navigate(route(game));
-    else if (event.key === "Escape") setPicked(null);
   };
   return (
     <div
@@ -3953,6 +4012,10 @@ export function Sparkline({
         if (!box.current?.contains(event.relatedTarget as Node))
           setPicked(null);
       }}
+      // Escape clears the pick, from the chart or the tip's link.
+      onKeyDown={(event) => {
+        if (event.key === "Escape") setPicked(null);
+      }}
     >
       <div
         className="sparkline"
@@ -3962,19 +4025,25 @@ export function Sparkline({
         aria-label={`${label}. Arrow keys pick a game, Enter opens its match report.`}
         aria-valuemin={1}
         aria-valuemax={points.length}
-        aria-valuenow={(picked ?? last) + 1}
+        aria-valuenow={(index < 0 ? last : index) + 1}
         aria-valuetext={`${text.game}: ${text.value}${text.average ? `, ${text.average}` : ""}`}
         onKeyDown={keys}
         // The keyboard starts on the newest game.
-        onFocus={() => setPicked((current) => current ?? last)}
+        onFocus={() =>
+          setPicked((current) =>
+            points.some((p) => p.matchId === current)
+              ? current
+              : points[last].matchId,
+          )
+        }
       >
         {width > 0 && values.length > 0 && (
           <svg width={width} height={HEIGHT} aria-hidden="true">
             {game && (
               <line
                 className="spark-cross"
-                x1={x(picked!)}
-                x2={x(picked!)}
+                x1={x(index)}
+                x2={x(index)}
                 y1={0}
                 y2={HEIGHT}
               />
@@ -3995,14 +4064,14 @@ export function Sparkline({
                 y,
               )}
             />
-            {points.map((p, index) =>
+            {points.map((p, at) =>
               p.value === null ? null : (
                 <circle
                   key={p.matchId}
-                  className={`${p.won ? "win" : "loss"}${index === picked ? " picked" : ""}`}
-                  cx={x(index)}
+                  className={`${p.won ? "win" : "loss"}${at === index ? " picked" : ""}`}
+                  cx={x(at)}
                   cy={y(p.value)}
-                  r={index === picked ? radius + 1.5 : radius}
+                  r={at === index ? radius + 1.5 : radius}
                 />
               ),
             )}
@@ -4013,8 +4082,16 @@ export function Sparkline({
               onPointerMove={track}
               onPointerDown={track}
               onClick={(event) => {
-                if (pointer.current !== "touch")
-                  navigate(route(points[at(event)]));
+                // A tap only picks; a modified click is the browser's.
+                if (
+                  pointer.current === "touch" ||
+                  event.ctrlKey ||
+                  event.metaKey ||
+                  event.shiftKey ||
+                  event.altKey
+                )
+                  return;
+                navigate(route(points[at(event)]));
               }}
             />
           </svg>
@@ -4023,11 +4100,19 @@ export function Sparkline({
       {game && (
         // On the picked game's side, over the card's numbers, so the whole
         // line stays in sight.
-        <div className={`spark-tip${x(picked!) > width / 2 ? " right" : ""}`}>
+        <div
+          className={`spark-tip${x(index) > width / 2 ? " right" : ""}`}
+          // A press here keeps focus where it is: Safari doesn't focus a
+          // link on press, so the chart's blur would clear the tip first.
+          onMouseDown={(event) => event.preventDefault()}
+        >
           <span>{text.game}</span>
           <span>
-            <b>{text.value}</b> {text.average && <>{text.average} · </>}
-            <RouteLink route={route(game)}>Report →</RouteLink>
+            <b>{text.value}</b>
+            {text.average ? ` ${text.average}` : ""} ·{" "}
+            <RouteLink route={route(game)} aria-label="Match report">
+              Report →
+            </RouteLink>
           </span>
         </div>
       )}
@@ -4189,15 +4274,17 @@ with:
   height: 80px;
 }
 .sparkline:focus-visible {
-  outline: 1px solid var(--gold);
+  outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
 .sparkline svg {
   display: block;
 }
+/* A horizontal drag picks games; a vertical one still scrolls the page. */
 .spark-hit {
   fill: transparent;
   cursor: pointer;
+  touch-action: pan-y;
 }
 .spark-cross {
   stroke: rgb(from var(--cream) r g b / 0.35);
@@ -4242,7 +4329,8 @@ with:
 }
 .spark-tip {
   position: absolute;
-  bottom: calc(100% + 2px);
+  /* Touching the chart: a gap would drop the tip as a mouse moves up. */
+  bottom: 100%;
   left: 0;
   z-index: 1;
   display: grid;
@@ -4265,8 +4353,10 @@ with:
 /* A 24 px touch target without making the tip taller. */
 .spark-tip a,
 .spark-tip button {
+  display: inline-block;
   margin: -4px 0;
   padding: 4px 0;
+  line-height: 16px;
   border: 0;
   background: none;
   font: inherit;
