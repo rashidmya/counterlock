@@ -111,8 +111,9 @@ describe("gameAverage", () => {
     ]);
   });
 
-  it("has no values past the curve's end", () => {
+  it("has no values past the curve's end or without a length", () => {
     expect(gameAverage(curve, 9000, "none").values).toEqual({});
+    expect(gameAverage(curve, 0, "game").values).toEqual({});
   });
 });
 

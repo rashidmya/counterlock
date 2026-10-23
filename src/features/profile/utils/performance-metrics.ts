@@ -62,7 +62,7 @@ export interface GameAverage {
   // none), or neither (all ranks).
   source: "game" | "current" | "none";
   // Each stat's rank average at the game's length; missing past the
-  // curve's end.
+  // curve's end or without a length.
   values: Partial<Record<MetricId, number>>;
 }
 
@@ -73,7 +73,8 @@ export function gameAverage(
 ): GameAverage {
   const values: GameAverage["values"] = {};
   for (const id of AVERAGED) {
-    const at = averageAt(curve, metricById.get(id)!, durationS);
+    const at =
+      durationS > 0 && averageAt(curve, metricById.get(id)!, durationS);
     if (at) values[id] = at.avg;
   }
   return { band: curve.band, widenedFrom: curve.widenedFrom, source, values };

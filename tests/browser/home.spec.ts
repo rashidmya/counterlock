@@ -72,6 +72,7 @@ interface Fixtures {
   failTotals?: boolean;
   failCurve?: boolean;
   unstoredTotals?: number[];
+  unlistedPlayer?: number[];
 }
 
 async function routeApi(page: Page, fixtures: Fixtures = {}) {
@@ -129,9 +130,20 @@ async function routeApi(page: Page, fixtures: Fixtures = {}) {
       return fixtures.failTotals
         ? json({}, 500)
         : json(
-            bulkMetadata(url, ACCOUNT).filter(
-              (match) => !fixtures.unstoredTotals?.includes(match.match_id),
-            ),
+            bulkMetadata(url, ACCOUNT)
+              .filter(
+                (match) => !fixtures.unstoredTotals?.includes(match.match_id),
+              )
+              .map((match) =>
+                fixtures.unlistedPlayer?.includes(match.match_id)
+                  ? {
+                      ...match,
+                      players: match.players.filter(
+                        (p) => p.account_id !== ACCOUNT,
+                      ),
+                    }
+                  : match,
+              ),
           );
     if (url.pathname === "/v1/analytics/player-performance-curve")
       return fixtures.failCurve ? json({}, 500) : json(rankCurveRows());
@@ -799,7 +811,9 @@ test("performance tab counts games without match details yet", async ({
   await storeAccount(page);
   await routeApi(page, {
     history: performanceHistory,
-    unstoredTotals: [3005, 3006],
+    // One game not stored yet, one stored without the player.
+    unstoredTotals: [3005],
+    unlistedPlayer: [3006],
   });
   await openMyProfile(page);
   await page.getByRole("tab", { name: "Performance" }).click();

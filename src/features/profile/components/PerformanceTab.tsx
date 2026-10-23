@@ -121,6 +121,7 @@ function PerformanceCard({
 
 /** The one-line notes on how the numbers are made, as they apply. */
 function notes(
+  accountId: number,
   games: HistoryMatch[],
   totals: Map<number, PlayerTotals[]> | undefined,
   averages: Map<number, GameAverage> | undefined,
@@ -135,14 +136,15 @@ function notes(
     lines.push("Games without a recorded rank use the player's current rank.");
   if (sources.has("none"))
     lines.push(
-      "Games without a recorded rank are compared with all ranks: the player's current rank is unknown.",
+      "Games without a recorded rank, and no current rank to use, are compared with all ranks.",
     );
   if ([...(averages?.values() ?? [])].some((a) => a.widenedFrom))
     lines.push(
       "Where a hero has too few games at one rank, its average covers the ranks either side.",
     );
+  // Not stored yet, or stored without the player.
   const missing = totals
-    ? games.filter((g) => !totals.has(g.matchId)).length
+    ? games.filter((g) => !gameTotals(totals.get(g.matchId), accountId)).length
     : 0;
   if (missing)
     lines.push(
@@ -275,7 +277,7 @@ export function PerformanceTab({
               />
             ))}
           </div>
-          {notes(games, totals.data, averages.data).map((line) => (
+          {notes(accountId, games, totals.data, averages.data).map((line) => (
             <p key={line} className="data-note">
               {line}
             </p>
