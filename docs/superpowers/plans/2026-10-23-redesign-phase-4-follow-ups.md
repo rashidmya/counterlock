@@ -78,6 +78,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
   - **Clients outside the shared one:** the live overlay's statistics client (`src/features/player-stats/`) has its own cache and cooldowns, and `src/features/builds/services/build-analytics.ts` fetches `/v1/analytics/hero-build-stats` directly; neither counts against these limits (Task 1 review).
   - **A waiting request learns of a cooldown only when it wakes,** up to a minute later, even when `Retry-After` is an hour.
   - **A profile reopened later in the session** opens on the tab it was left on, not Overview.
+  - **The tip's spacing (Task 7 review):** the tip sits right under the card's title row; with the 24 px link it is 40 px tall and its top meets the trend badge's baseline without covering it.
   - **"Updating…" is cut short** on the website between about 530 and 585 px, where the Hero select squeezes the space beside the range buttons (Task 6 re-review); screen readers still get it.
   - **Share trends on "All heroes" (Task 3 review):** shares have no rank average, so a trend can follow the hero mix (from a healer to a carry, healing share slips) rather than form. Hiding share trends on "All heroes" is an option.
   - **Card rows (Task 3 review):** at full width the ten cards run 4/4/2, so the shares are split across two rows; five columns above about 1100 px would put each share under its per-minute card.
@@ -4380,7 +4381,8 @@ with:
   font-weight: 600;
   color: var(--cream);
 }
-/* A 24 px touch target without making the tip taller. */
+/* A 24 px touch target: a 16 px line and 4 px of padding each side, with
+   negative margins so most of it overlaps the tip's own padding. */
 .spark-tip a,
 .spark-tip button {
   display: inline-block;
