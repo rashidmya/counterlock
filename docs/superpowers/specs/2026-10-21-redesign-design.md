@@ -612,6 +612,8 @@ The prototype implements all of this. Use it as the reference.
   and cache it. The builder decides the default range and how to batch
   requests within limits.
 
+Built in phase 4: eight metrics (souls / min, K/D/A ratio, hero damage, objective damage, healing and creep kills per minute, kill participation and hero damage share) over the last 20, 50 or 100 normal and ranked games, for all heroes or one. Damage, healing, creep kills and shares come from bulk metadata (`GET /v1/matches/metadata`, 50 games per request) rather than one metadata request per game. The rank average is the match report's curve at each game's length, using the game's rank, or the player's current rank for unranked games. As in the match report, creep kills stand in for last hits. The two shares have no rank average. Improving or slipping needs Welch's t-test to find the recent half of the games different from the earlier half at the 95% level, each game against its own rank average.
+
 ### Profile Live tab (app and website)
 
 - **Your own account, in the desktop app:** use GEP. In a match, show the
@@ -678,7 +680,7 @@ Build and ship in this order. Each phase gets its own plan.
 2. **Hero page builds (done):** main build moved and restyled, popular
    builds as authored, counter items with enemy picker / live roster.
 3. **Match report (done).**
-4. **Performance tab.**
+4. **Performance tab (done).**
 5. **Profile Live tab** (app + web).
 6. **Overlay panels** (five windows, settings, removal of the old
    overlays).

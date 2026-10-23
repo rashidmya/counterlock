@@ -41,7 +41,7 @@ For Overwolf development, load the built files. Avoid `debug_url` with this back
 
 - **Live** shows the current match roster, builds and counters, or a "Deadlock isn't running" / "Waiting for a match" state. The app opens on Live when Deadlock is detected running (unless you have already picked a tab); otherwise it opens on Home. It also switches to Live once per match when live data first arrives.
 - **Home** is a search (**Find a player**) followed by a **You** section for the remembered account (rank, recent form and latest match, each number explained) and **Top of the city**, the strongest heroes right now.
-- **Profile** is its own page, opened from search, **You** or the header's **My profile**: rank badge, ranked games, KDA, souls per minute, top heroes, frequent teammates and a filterable match history, in the tabs Overview, Matches, Performance and Heroes. Click a match for its match report. **This is me** remembers the account; **Not you? Switch account** forgets it.
+- **Profile** is its own page, opened from search, **You** or the header's **My profile**: rank badge, ranked games, KDA, souls per minute, top heroes, frequent teammates and a filterable match history, in the tabs Overview, Matches, Performance and Heroes. Click a match for its match report. **Performance** follows the last 20, 50 or 100 normal and ranked games, for all heroes or one, against the average player on the same hero at the same rank. **This is me** remembers the account; **Not you? Switch account** forgets it.
 - **Match report** opens from any match row, from Home's latest match or from a shared link, for any player. **Viewing as** picks whose point of view it takes (any of the 12 players, or the whole match); it opens as you if you played, otherwise as the player you came from. It shows win or loss, verdicts (souls / min, hero damage and creep kills against the average player on that hero at that rank), **the Graph** (nine stat tabs plus "More stats…", player against the rank average, team totals, team lead or everyone, per minute, time ranges, death, item and objective markers, hover and a ranking that switches the point of view), best and worst stretches, impact, permanent buffs and a scoreboard for both teams. **Copy link** copies the website address of the report. See [Match report](#match-report).
 - **Tier list** ranks heroes S to D by win-rate percentile over the last 30 days across all ranks, with a role filter.
 - **Heroes** is the full roster with search and a role filter. A hero page (with a rank filter) shows abilities (hover, focus or tap one for its tooltip), then two tabs: **Build**, the main build (the most-bought items in each phase: Early 0–10 min, Mid 10–20 min and Late 20+ min, up to eight each), and **Popular builds**, the hero's most-favourited community builds, shown exactly as their authors set them up. **Counter items** come next: pick up to six enemy heroes to see the items, not already in the main build, that gain the most win rate against them (during a match, the desktop app uses the live enemy team instead on the pages of heroes on your team). Then come skill order, matchups, best partners, best items and **Items that beat {Hero}**, which compares an item's win rate against this hero with its overall win rate, adjusted for the hero's overall win rate. Both counter lists fall back to hero-trait heuristics, labelled "Based on hero traits", when the data is too thin. See [Hero page builds and counter items](#hero-page-builds-and-counter-items).
@@ -85,6 +85,15 @@ Everything comes from `GET /v1/matches/{id}/metadata`: per-player stat snapshots
 - **Impact** is the player's share of their team's hero damage, objective damage and healing (bars fill at half the team's total; the line marks an even 1/6), plus kill participation.
 - **Permanent buffs** counts permanent pickups against the rank average.
 - **Copy link** copies `{VITE_SITE_URL}/matches/{id}?player={account}`; the desktop app uses Overwolf's clipboard (the manifest's "Clipboard" permission).
+
+### Performance tab
+
+Eight cards, each with one point per game (oldest on the left, dotted by win or loss), the dashed rank average and the value over the range. A range adds up the games rather than averaging each game's value, so longer games count for more.
+
+- **From match history:** souls / min and the K/D/A ratio, (kills + assists) ÷ deaths, with deaths counted as at least one after adding up the games.
+- **From each game's totals:** hero damage, objective damage, healing and creep kills per minute, kill participation and hero damage share. They come from `GET /v1/matches/metadata?match_ids=…&include_player_kda=true&extra_player_columns=stats.player_damage,stats.boss_damage,stats.player_healing,stats.creep_kills` (bulk metadata, every player's stat snapshots; the last one is the final total), at most 50 games per request and kept per match, so a wider range only asks for the games it adds. Bulk metadata allows 30 requests per minute per IP. Games the API hasn't stored yet are left out and the note says how many.
+- **Rank average:** the match report's curve, one request per hero and rank (shared between games), read at each game's length: the tier of the game's rank (match history's `ranked_display_badge`), the player's current rank for games without one, such as unranked games, or all ranks when neither is known. It widens as in the match report. As there, **creep kills** stand in for last hits. Kill participation and hero damage share have no rank average.
+- **Improving / Flat / Slipping** compares the recent half of the games with the earlier half (at least 6 games), each game as its value ÷ its rank average, so changing hero or rank doesn't read as a change in form; the two shares use their values. It says improving or slipping only when Welch's t-test finds the halves differ at the 95% level, and flat otherwise. When some games run past the end of the rank average, the card compares the player and the average over the games that have one.
 
 ## Website
 
@@ -151,7 +160,7 @@ Before a public release, test in Windows with a live match: game startup and shu
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `src/app/`                                        | React window composition and mounting; design tokens, global, shell, and responsive layout styles  |
 | `src/features/live/`                              | Live tab states (not running, waiting, in match) and once-per-match auto-switch                    |
-| `src/features/profile/`                           | Player profile page: account storage, Deadlock API services, overview, history, heroes, charts     |
+| `src/features/profile/`                           | Player profile page: account storage, Deadlock API services, overview, history, heroes, trends     |
 | `src/features/heroes/`                            | Tier list, hero roster, analytics derivations and services, hero detail with ability tooltips      |
 | `src/features/items/`                             | Item shop browser and item detail                                                                  |
 | `src/features/match/`                             | Live match types, event parsing, identity, shared store, match overview                            |
@@ -184,7 +193,8 @@ Live player statistics and the compact overlay's community build use `/v1/player
 
 - `/v1/players/steam`, `/v1/players/rank`, `/v1/players/hero-stats`
 - `/v1/players/{id}/match-history` and `/v1/players/{id}/mate-stats`
-- `/v1/matches/{id}/metadata` and `/v1/analytics/player-performance-curve` (match report)
+- `/v1/matches/{id}/metadata` and `/v1/analytics/player-performance-curve` (match report; the curve also for the Performance tab)
+- `/v1/matches/metadata` (bulk; the Performance tab's per-game totals)
 - `/v1/analytics/hero-stats`, `hero-counter-stats`, `hero-synergy-stats`, `ability-order-stats` and `item-stats` (also per build phase and per picked enemy)
 - `/v1/builds` (popular builds on the hero page)
 
