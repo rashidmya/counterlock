@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { deadlockApi } from "@/shared/api/DeadlockApi";
 import type { AsyncState } from "@/shared/api/useAsync";
 import { useAsync } from "@/shared/api/useAsync";
 import { heroById } from "@/shared/catalog";
@@ -196,12 +197,23 @@ export function PerformanceTab({
   const heroId = heroes.some((h) => h.heroId === picked) ? picked : null;
   const games = gamesInRange(matches, range, heroId);
   const key = games.map((g) => g.matchId).join(",");
+  // A range or hero left before it loads drops the requests it still waits
+  // for, so they don't use up the API's rate limits.
   const totals = useAsync(
-    games.length ? () => fetchMatchTotals(games.map((g) => g.matchId)) : null,
+    games.length
+      ? (signal) =>
+          fetchMatchTotals(
+            games.map((g) => g.matchId),
+            deadlockApi,
+            signal,
+          )
+      : null,
     [key],
   );
   const averages = useAsync(
-    games.length ? () => fetchGameAverages(accountId, games) : null,
+    games.length
+      ? (signal) => fetchGameAverages(accountId, games, deadlockApi, signal)
+      : null,
     [accountId, key],
   );
   // While a new range or hero loads, the cards keep the last games that

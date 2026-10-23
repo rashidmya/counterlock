@@ -7,7 +7,7 @@ import {
 } from "@/features/profile/services/performance-api";
 import type { HistoryMatch } from "@/features/profile/types";
 import { totalsPath } from "@/features/profile/utils/match-totals";
-import { DeadlockApi, TTL } from "@/shared/api/DeadlockApi";
+import { DeadlockApi, RATE_WINDOW, TTL } from "@/shared/api/DeadlockApi";
 import { rankCurveRows } from "../fixtures/match-report";
 import { bulkMatch } from "../fixtures/performance";
 
@@ -74,12 +74,61 @@ describe("fetchMatchTotals", () => {
   });
 
   it("shares a request still in flight", async () => {
-    const { api, calls } = bulkApi();
+    const { api, request } = realBulkApi([1, 2], () => 0);
     await Promise.all([
       fetchMatchTotals([1, 2], api),
       fetchMatchTotals([2, 1], api),
     ]);
-    expect(calls).toHaveLength(1);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops a batch no call waits for any more, and the next asks afresh", async () => {
+    vi.useFakeTimers();
+    try {
+      const { api, request } = realBulkApi([1, 2], Date.now);
+      // Bulk metadata allows 30 requests a minute: fill the window.
+      await Promise.all(
+        range(101, 130).map((id) => fetchMatchTotals([id], api)),
+      );
+      const left = new AbortController();
+      const leaving = fetchMatchTotals([1, 2], api, left.signal);
+      left.abort();
+      await expect(leaving).rejects.toThrow(/abort/i);
+      await vi.advanceTimersByTimeAsync(RATE_WINDOW);
+      expect(request).toHaveBeenCalledTimes(30);
+      // The next call asks for the same batch, and gets it.
+      const later = fetchMatchTotals([1, 2], api);
+      await vi.advanceTimersByTimeAsync(0);
+      expect((await later).size).toBe(2);
+      expect(request).toHaveBeenCalledTimes(31);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a batch another call still waits for", async () => {
+    vi.useFakeTimers();
+    try {
+      const { api, request } = realBulkApi([1, 2, 3], Date.now);
+      await Promise.all(
+        range(101, 130).map((id) => fetchMatchTotals([id], api)),
+      );
+      const left = new AbortController();
+      const leaving = fetchMatchTotals([1, 2], api, left.signal);
+      leaving.catch(() => {});
+      // A wider range waits for the same games, and one more.
+      const staying = fetchMatchTotals([1, 2, 3], api);
+      left.abort();
+      await vi.advanceTimersByTimeAsync(RATE_WINDOW);
+      expect((await staying).size).toBe(3);
+      expect(
+        request.mock.calls
+          .slice(30)
+          .map(([url]) => new URL(String(url)).searchParams.get("match_ids")),
+      ).toEqual(["1,2", "3"]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("leaves out games the API hasn't stored and asks again next time", async () => {
@@ -278,6 +327,33 @@ describe("fetchGameAverages", () => {
     expect(averages.byMatch.size).toBe(12);
     expect(averages.failed.size).toBe(0);
     expect(most).toBe(CURVE_CONCURRENCY);
+  });
+
+  it("starts no more groups once the call is left", async () => {
+    const asked: string[] = [];
+    const left = new AbortController();
+    const api = {
+      get: (path: string, _ttl: number, signal?: AbortSignal) => {
+        asked.push(path);
+        // Held until the caller leaves.
+        return new Promise((_, reject) =>
+          signal?.addEventListener("abort", () => reject(signal.reason)),
+        );
+      },
+    } as unknown as DeadlockApi;
+    const averages = fetchGameAverages(
+      77,
+      Array.from({ length: 12 }, (_, i) =>
+        game({ matchId: i + 1, heroId: i + 1 }),
+      ),
+      api,
+      left.signal,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    expect(asked).toHaveLength(CURVE_CONCURRENCY);
+    left.abort();
+    await expect(averages).rejects.toThrow(/abort/i);
+    expect(asked).toHaveLength(CURVE_CONCURRENCY);
   });
 
   it("doesn't ask for the current rank when every game has one", async () => {

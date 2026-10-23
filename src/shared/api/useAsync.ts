@@ -6,8 +6,13 @@ export type AsyncState<T> = Settled<T> & { retry(): void };
 const same = (a: unknown[], b: unknown[]) =>
   a.length === b.length && a.every((value, i) => Object.is(value, b[i]));
 
+/**
+ * Loads for `deps`. Each load gets a signal, aborted once its result can't
+ * be shown any more (new deps, Retry or unmount), so the requests it still
+ * waits for can be dropped.
+ */
 export function useAsync<T>(
-  load: (() => Promise<T>) | null,
+  load: ((signal: AbortSignal) => Promise<T>) | null,
   deps: unknown[],
 ): AsyncState<T> {
   // Each result remembers the deps it was loaded for.
@@ -22,8 +27,9 @@ export function useAsync<T>(
       return;
     }
     let stale = false;
+    const left = new AbortController();
     setState({ loading: true, key });
-    load().then(
+    load(left.signal).then(
       (data) => {
         if (!stale) setState({ data, loading: false, key });
       },
@@ -38,6 +44,7 @@ export function useAsync<T>(
     );
     return () => {
       stale = true;
+      left.abort();
     };
   }, key);
   const retry = () => setAttempt((count) => count + 1);

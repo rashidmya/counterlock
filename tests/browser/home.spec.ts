@@ -1093,6 +1093,48 @@ test("performance tab keeps the last cards, dimmed, while new games load", async
   await expect(status).toHaveText("");
 });
 
+test("performance tab drops the rank averages of a range it has left", async ({
+  page,
+}) => {
+  // Last 50 adds 20 older games on eight more heroes: eight more curves,
+  // four of which load at a time.
+  const more = catalog.heroes.slice(4, 12).map((hero) => hero.id);
+  const older = Array.from({ length: 20 }, (_, i) =>
+    historyRow(4000 + i, more[i % 8], 1, 4, true, now - 3600 * (30 + i)),
+  );
+  const asked: string[] = [];
+  let hold: Promise<void> | null = null;
+  let release = () => {};
+  await storeAccount(page);
+  await routeApi(page, {
+    history: [...performanceHistory.slice(0, 20), ...older],
+    gate: async (url) => {
+      if (url.pathname !== "/v1/analytics/player-performance-curve") return;
+      asked.push(url.searchParams.get("hero_ids")!);
+      await hold;
+    },
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const souls = card(page, "Souls / min").locator(".perf-card-numbers");
+  await expect(souls).toHaveText("1,100 20 games · rank avg 1,000");
+  asked.length = 0;
+  hold = new Promise((resolve) => (release = resolve));
+  await page.getByRole("button", { name: "Last 50", exact: true }).click();
+  await expect.poll(() => asked.length).toBe(4);
+  // Back to Last 20 before they answer: the four other curves are never
+  // asked for.
+  await page.getByRole("button", { name: "Last 20", exact: true }).click();
+  await expect(view(page).locator(".perf-cards")).toHaveAttribute(
+    "aria-busy",
+    "false",
+  );
+  release();
+  await page.waitForTimeout(300);
+  expect(asked).toHaveLength(4);
+  await expect(souls).toHaveText("1,100 20 games · rank avg 1,000");
+});
+
 test("performance tab says what is still loading", async ({ page }) => {
   let release = () => {};
   const hold = new Promise<void>((resolve) => (release = resolve));

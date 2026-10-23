@@ -49,7 +49,8 @@ export async function fetchPlayerNames(
 export const fetchCurrentBadges = (
   accountIds: number[],
   api: DeadlockApi = deadlockApi,
-): Promise<Map<number, number>> => fetchRankBadges(accountIds, api);
+  signal?: AbortSignal,
+): Promise<Map<number, number>> => fetchRankBadges(accountIds, api, signal);
 
 /**
  * The hero's rank-average curve for the badge's tier, widened one tier each
@@ -61,9 +62,12 @@ export async function fetchRankCurve(
   badge: number,
   durationS = 0,
   api: DeadlockApi = deadlockApi,
+  signal?: AbortSignal,
 ): Promise<RankCurve> {
   const load = (band: RankBand) =>
-    api.get<unknown>(curvePath(heroId, band), TTL.analytics).then(parseCurve);
+    api
+      .get<unknown>(curvePath(heroId, band), TTL.analytics, signal)
+      .then(parseCurve);
   const keep = (points: CurvePoint[]) =>
     points.filter((p) => p.samples >= MIN_STEP_SAMPLES);
   const band = rankBand(badge);

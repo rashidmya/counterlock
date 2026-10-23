@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { RouteLink } from "@/app/links";
+import { deadlockApi } from "@/shared/api/DeadlockApi";
 import { useAsync } from "@/shared/api/useAsync";
 import { SectionHeader } from "@/shared/ui/SectionHeader";
 import {
@@ -50,7 +51,9 @@ function Report({
     .filter((p) => !p.badge)
     .map((p) => p.accountId);
   const current = useAsync(
-    normal && unrecorded.length ? () => fetchCurrentBadges(unrecorded) : null,
+    normal && unrecorded.length
+      ? (signal) => fetchCurrentBadges(unrecorded, deadlockApi, signal)
+      : null,
     [report.matchId],
   );
   const badge = selected
@@ -59,9 +62,17 @@ function Report({
   const rank = selected?.badge ? "match" : badge ? "current" : "none";
   // Without a recorded rank, the curve waits for the current one.
   const waiting = !!selected && !selected.badge && current.loading;
+  // A player left before their curve loads drops its requests.
   const loaded = useAsync(
     selected && normal && !waiting
-      ? () => fetchRankCurve(selected.heroId, badge, report.durationS)
+      ? (signal) =>
+          fetchRankCurve(
+            selected.heroId,
+            badge,
+            report.durationS,
+            deadlockApi,
+            signal,
+          )
       : null,
     [selected?.heroId, badge, report.durationS, waiting],
   );
