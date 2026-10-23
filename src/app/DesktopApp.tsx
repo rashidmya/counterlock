@@ -52,6 +52,10 @@ export function DesktopApp({
   const [route, setRoute] = useState<Route>({ page: "home" });
   const [visited, setVisited] = useState<Page[]>(["home"]);
   const [profileId, setProfileId] = useState<number | null>(null);
+  // Counts the ways into a profile but back from its match report: each
+  // opens it afresh, at Overview, while the way back keeps it as it was.
+  const [profileVisit, setProfileVisit] = useState(0);
+  const [profileBack, setProfileBack] = useState(false);
   const [report, setReport] = useState<{
     matchId: number;
     accountId?: number;
@@ -68,7 +72,11 @@ export function DesktopApp({
       next = { page: "home" };
     if (next.page === "match" && next.matchId === undefined)
       next = { page: "home" };
-    if (next.page === "profile") setProfileId(next.accountId ?? null);
+    if (next.page === "profile") {
+      setProfileId(next.accountId ?? null);
+      setProfileBack(!!next.back);
+      if (!next.back) setProfileVisit((visit) => visit + 1);
+    }
     if (next.page === "match")
       setReport({ matchId: next.matchId!, accountId: next.accountId });
     setRoute(next);
@@ -193,8 +201,9 @@ export function DesktopApp({
         {visited.includes("profile") && profileId !== null && (
           <div className="page" hidden={route.page !== "profile"}>
             <ProfilePage
-              key={profileId}
+              key={`${profileId}-${profileVisit}`}
               accountId={profileId}
+              restore={profileBack}
               me={me}
               navigate={navigate}
               subtitle={

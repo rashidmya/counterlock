@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router";
+import { Link, useLocation, useNavigationType, useParams } from "react-router";
 import { useLinks } from "@/app/links";
 import { accountId as parseAccountId } from "@/features/match/utils/game";
 import { ProfilePage } from "@/features/profile/components/ProfilePage";
@@ -10,6 +10,12 @@ import { playerPath } from "../paths";
 
 function Player({ id }: { id: number }) {
   const { navigate } = useLinks();
+  const location = useLocation();
+  // Browser Back or Forward, or the match report's "Back to profile", find
+  // the profile as it was left; any other way in opens it afresh.
+  const back =
+    useNavigationType() === "POP" ||
+    (location.state as { back?: boolean } | null)?.back === true;
   const me = useRememberedMe();
   const profile = useAsync(() => fetchSteamProfiles([id]), [id]);
   const name = profile.data?.find((p) => p.accountId === id)?.name;
@@ -20,7 +26,14 @@ function Player({ id }: { id: number }) {
         description={`Deadlock profile for ${name ?? `player ${id}`}: rank, match history, heroes and performance.`}
         path={playerPath(id)}
       />
-      <ProfilePage key={id} accountId={id} me={me} navigate={navigate} />
+      {/* A new one for each visit, even to the profile already open. */}
+      <ProfilePage
+        key={location.key}
+        accountId={id}
+        me={me}
+        navigate={navigate}
+        restore={back}
+      />
     </>
   );
 }

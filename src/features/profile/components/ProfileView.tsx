@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LinkScope } from "@/app/links";
 import type { Navigate } from "@/app/navigation";
 import type { AsyncState } from "@/shared/api/useAsync";
@@ -30,9 +30,9 @@ const FIRST_VIEW: ViewState = {
   range: 20,
   heroId: null,
 };
-// Each profile's tab and filters, kept for the session: switching tabs, or
-// coming back from a match report (a page of its own on the website),
-// finds them as they were.
+// Each profile's tab and filters as last left, for the session: coming back
+// from a match report (a page of its own on the website) finds them as they
+// were. Switching tabs keeps them anyway.
 const views = new Map<number, ViewState>();
 
 export function ProfileView({
@@ -40,17 +40,29 @@ export function ProfileView({
   history,
   header,
   navigate,
+  restore,
 }: {
   accountId: number;
   history: AsyncState<HistoryMatch[]>;
   header: React.ReactNode;
   navigate: Navigate;
+  // Coming back (from the profile's match report, or with the browser's
+  // Back): open as it was left. Any other way in starts at Overview.
+  restore: boolean;
 }) {
-  const [view, setView] = useState(() => views.get(accountId) ?? FIRST_VIEW);
+  const [view, setView] = useState(
+    () => (restore && views.get(accountId)) || FIRST_VIEW,
+  );
+  // Onto the latest view, so two changes in one event both count.
+  const latest = useRef(view);
+  // This visit's view is the one to come back to, changed or not.
+  useEffect(() => {
+    views.set(accountId, latest.current);
+  }, [accountId]);
   const { subtab, filter, range, heroId } = view;
   const update = (change: Partial<ViewState>) => {
-    // Onto the latest stored view, so two changes in one event both count.
-    const next = { ...(views.get(accountId) ?? view), ...change };
+    const next = { ...latest.current, ...change };
+    latest.current = next;
     views.set(accountId, next);
     setView(next);
   };

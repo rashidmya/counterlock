@@ -7,5 +7,8 @@ export interface Route {
   // Profile: whose profile. Match: the player the viewer came from.
   accountId?: number;
   matchId?: number;
+  // Profile: back from its match report, so it opens as it was left rather
+  // than at Overview.
+  back?: boolean;
 }
 export type Navigate = (route: Route) => void;

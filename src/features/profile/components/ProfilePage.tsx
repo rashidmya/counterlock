@@ -12,11 +12,14 @@ export function ProfilePage({
   me,
   navigate,
   subtitle = "Deadlock profile",
+  restore = false,
 }: {
   accountId: number;
   me: MeAdapter;
   navigate: Navigate;
   subtitle?: string;
+  // Open as it was left (see ProfileView).
+  restore?: boolean;
 }) {
   const history = useAsync(() => fetchMatchHistory(accountId), [accountId]);
   const topHeroId = history.data && topHeroes(history.data, 1)[0]?.heroId;
@@ -28,6 +31,7 @@ export function ProfilePage({
       accountId={accountId}
       history={history}
       navigate={navigate}
+      restore={restore}
       header={
         <ProfileHeader
           accountId={accountId}

@@ -127,6 +127,34 @@ test("profile match rows link to the report and Back returns", async ({
   await expect(page).toHaveURL(`/players/${FARGO}`);
 });
 
+test("browser Back finds the profile as it was; opened afresh, it starts at Overview", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto(`/players/${FARGO}`);
+  await page.getByRole("tab", { name: "Matches" }).click();
+  await page.locator("a.match-open").first().click();
+  await expect(page).toHaveURL(`/matches/1001?player=${FARGO}`);
+  await page.goBack();
+  await expect(page.getByRole("tab", { name: "Matches" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  // A link to the same profile from the report's scoreboard is a fresh
+  // visit.
+  await page.goForward();
+  await page
+    .locator(".report-table")
+    .first()
+    .getByRole("link", { name: "A Rather Long Persona Name Fixture" })
+    .click();
+  await expect(page).toHaveURL(`/players/${FARGO}`);
+  await expect(page.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+});
+
 test("the profile keeps its tab, range and hero after a match report", async ({
   page,
 }) => {

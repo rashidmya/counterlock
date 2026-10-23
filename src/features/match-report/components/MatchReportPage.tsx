@@ -115,7 +115,7 @@ function Report({
           route={
             fromId === undefined
               ? { page: "home" }
-              : { page: "profile", accountId: fromId }
+              : { page: "profile", accountId: fromId, back: true }
           }
         >
           {fromId === undefined ? "← Home" : "← Back to profile"}

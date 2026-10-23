@@ -43,7 +43,12 @@ export function WebShell({ children }: { children?: React.ReactNode }) {
       <LinkProvider
         value={{
           href: routeToPath,
-          navigate: (route: Route) => navigate(routeToPath(route)),
+          // The way back to a profile says so, for it to open as it was.
+          navigate: (route: Route) =>
+            navigate(
+              routeToPath(route),
+              route.back ? { state: { back: true } } : undefined,
+            ),
         }}
       >
         <main className="page">{children ?? <Outlet />}</main>

@@ -1405,7 +1405,7 @@ test("performance range and hero survive a profile tab switch", async ({
   await expect(dots(page, "Souls / min")).toHaveCount(30);
 });
 
-test("each profile keeps its own tab and filter for the session", async ({
+test("a profile opened afresh starts at Overview; back from its report, it is as it was", async ({
   page,
 }) => {
   await storeAccount(page);
@@ -1413,21 +1413,27 @@ test("each profile keeps its own tab and filter for the session", async ({
   await openMyProfile(page);
   await openMatches(page);
   await view(page).getByRole("button", { name: "Ranked", exact: true }).click();
+  const tab = (name: string) => view(page).getByRole("tab", { name });
+  const filter = (name: string) =>
+    view(page).getByRole("button", { name, exact: true });
+  // Back from a match report: the tab and filter as they were.
+  await view(page).locator(".match-open").first().click();
+  await view(page).getByRole("button", { name: "← Back to profile" }).click();
+  await expect(tab("Matches")).toHaveAttribute("aria-selected", "true");
+  await expect(filter("Ranked")).toHaveAttribute("aria-pressed", "true");
   // Another account opens on its own view.
   await page.getByRole("button", { name: "← Back" }).click();
   await page.getByLabel("Find a player").fill("76561198060265729");
   await page.getByRole("button", { name: /Use this ID/ }).click();
-  await expect(
-    view(page).getByRole("tab", { name: "Overview" }),
-  ).toHaveAttribute("aria-selected", "true");
-  // Back on the first, its tab and filter are as they were.
+  await expect(tab("Overview")).toHaveAttribute("aria-selected", "true");
+  // Opened afresh, the first starts at Overview, with every match shown.
   await myProfile(page).click();
-  await expect(
-    view(page).getByRole("tab", { name: "Matches" }),
-  ).toHaveAttribute("aria-selected", "true");
-  await expect(
-    view(page).getByRole("button", { name: "Ranked", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(tab("Overview")).toHaveAttribute("aria-selected", "true");
+  await openMatches(page);
+  await expect(filter("All")).toHaveAttribute("aria-pressed", "true");
+  // So does opening it again while it's open.
+  await myProfile(page).click();
+  await expect(tab("Overview")).toHaveAttribute("aria-selected", "true");
 });
 
 test("performance tab degrades without match history", async ({ page }) => {
