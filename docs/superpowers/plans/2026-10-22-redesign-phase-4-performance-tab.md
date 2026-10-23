@@ -24,7 +24,7 @@ Each card shows one point per game (win or loss dot) with the dashed rank averag
 
 **Every code block in this plan was built and run before the plan was written.** The full result:
 - `npm test` 369 passed;
-- `npm run test:browser` 130 passed;
+- `npm run test:browser` 132 passed;
 - `npm run test:web` 74 passed;
 - both type checks, `npm run build`, `npm run web:build` and `npm run validate:manifest` passed.
 
@@ -88,6 +88,8 @@ Checked on account 400239835 (Eternus 6, 5,699 games) and three Archon–Arcanis
   - **Rate limit:** switching heroes quickly on Last 100 could pass bulk metadata's 30 requests per minute. The client's cooldown then pauses every request for 30 s.
   - **All-or-nothing averages:** one failed or timed-out curve blanks every card's rank average until Retry (successful curves stay cached). On Last 100 a player with many heroes fires every uncached curve at once (about 7 s each against the client's 15 s timeout); catching per game, or limiting how many run together, would be more forgiving (Task 4 review).
   - **Point details:** they are SVG `<title>` tooltips, which only show on hover.
+  - **Range switch (Task 6 review):** switching range blanks the totals cards ("Loading match details…") until the new set loads, although the games already cached are known; `useAsync` drops the previous result by design. Keeping the previous cards while loading would be smoother.
+  - **Untested (Task 6 review):** Retry recovering after a failure, and the loading texts, have no browser test.
   - **Tab state:** the tab and its range reset when coming back from a match report (the existing profile follow-up).
 
 ## Global Constraints
@@ -99,9 +101,9 @@ Checked on account 400239835 (Eternus 6, 5,699 games) and three Archon–Arcanis
   - **Controls:** buttons "Last 20", "Last 50" and "Last 100"; the select "Hero" with "All heroes" and options like "Haze · 181 games" ("1 game" for one).
   - **Legend:** "Game by game", "Average for that hero at that rank", "Win" and "Loss".
   - **Card titles:** "Souls / min", "K/D/A ratio", "Hero damage / min", "Objective damage / min", "Healing / min", "Creep kills / min", "Kill participation" and "Hero damage share".
-  - **Trends:** "▲ Improving", "– Flat", "▼ Slipping" and "Too few games".
+  - **Trends:** "▲ Improving", "– Flat", "▼ Slipping" (the glyph `aria-hidden`) and "Too few games" (not shown when no game has a rank average).
   - **Card numbers:**
-    - the value (`1,238`, `3.7` below 100, `54%` for shares, "—" without one);
+    - the value (`1,238`, `3.7` below 100, `54%` for shares, "—" without one), then a space;
     - then "{n} games · rank avg {x}", or, when fewer games have an average, "{n} games · {m} with a rank average: {player over those m} vs {x}";
     - otherwise " · no rank average", " · loading rank average…" or " · no rank average for these games";
     - or "Loading match details…" or "No match details" instead.
@@ -130,8 +132,9 @@ Checked on account 400239835 (Eternus 6, 5,699 games) and three Archon–Arcanis
    - **The rank average** covers only games that have both a value and an average; when they are fewer, the card compares the player over the same games.
    - **Trends** follow each game against its own average; the two shares are the only metrics that use raw values.
    - **Notes** cover the current-rank fallback, widening and missing details.
+   - **Contrast and reading order (Task 6 review):** the detail line uses `--muted` (7:1 on the card; `--dim` was 4.1:1), the value and detail are separated by a space (no margin on top), and the trend glyph is `aria-hidden`.
 
-   Tests: `weights games by length, not each game equally`, `compares like with like when some games have no rank average`, `adds up deaths before counting them as at least one`, `follows each game against its own rank average`, `is flat unless Welch's t-test finds the halves differ at 95%`, `performance tab compares each metric with the rank average`, `performance tab compares like with like when a game outlasts the rank average`.
+   Tests: `weights games by length, not each game equally`, `compares like with like when some games have no rank average`, `adds up deaths before counting them as at least one`, `follows each game against its own rank average`, `is flat unless Welch's t-test finds the halves differ at 95%`, `performance tab compares each metric with the rank average`, `performance tab compares like with like when a game outlasts the rank average`, `performance tab shows no trend when no game has a rank average`.
 2. **Requests.**
    - **Bulk metadata:** asked once per new game, in batches of 50, with in-flight requests shared.
    - **Curves:** shared per hero and band.
@@ -1977,6 +1980,7 @@ import { bulkMetadata } from "../fixtures/performance";
 ```ts
   failTotals?: boolean;
   failCurve?: boolean;
+  unstoredTotals?: number[];
 ```
 
 - In `routeApi`, put these lines **before** `if (url.pathname.endsWith("/metadata"))`. Bulk metadata's path also ends in `/metadata`.
@@ -1985,7 +1989,11 @@ import { bulkMetadata } from "../fixtures/performance";
     if (url.pathname === "/v1/matches/metadata")
       return fixtures.failTotals
         ? json({}, 500)
-        : json(bulkMetadata(url, ACCOUNT));
+        : json(
+            bulkMetadata(url, ACCOUNT).filter(
+              (match) => !fixtures.unstoredTotals?.includes(match.match_id),
+            ),
+          );
     if (url.pathname === "/v1/analytics/player-performance-curve")
       return fixtures.failCurve ? json({}, 500) : json(rankCurveRows());
 ```
@@ -2043,24 +2051,24 @@ test("performance tab compares each metric with the rank average", async ({
   // Last 20: ten games at 1,000 souls a minute, then ten at 1,200.
   const souls = card(page, "Souls / min");
   await expect(souls.locator(".perf-card-numbers")).toHaveText(
-    "1,10020 games · rank avg 1,000",
+    "1,100 20 games · rank avg 1,000",
   );
   await expect(souls.locator(".perf-trend")).toHaveText("▲ Improving");
   await expect(
     card(page, "K/D/A ratio").locator(".perf-card-numbers"),
-  ).toHaveText("3.420 games · rank avg 2.7");
+  ).toHaveText("3.4 20 games · rank avg 2.7");
   await expect(card(page, "K/D/A ratio").locator(".perf-trend")).toHaveText(
     "– Flat",
   );
   await expect(
     card(page, "Hero damage / min").locator(".perf-card-numbers"),
-  ).toHaveText("1,00020 games · rank avg 500");
+  ).toHaveText("1,000 20 games · rank avg 500");
   await expect(
     card(page, "Kill participation").locator(".perf-card-numbers"),
-  ).toHaveText("57%20 games · no rank average");
+  ).toHaveText("57% 20 games · no rank average");
   await expect(
     card(page, "Hero damage share").locator(".perf-card-numbers"),
-  ).toHaveText("29%20 games · no rank average");
+  ).toHaveText("29% 20 games · no rank average");
 
   await expect(dots(page, "Souls / min")).toHaveCount(20);
   await expect(
@@ -2089,13 +2097,17 @@ test("performance tab compares each metric with the rank average", async ({
   await page.getByRole("button", { name: "Last 100", exact: true }).click();
   await expect(dots(page, "Souls / min")).toHaveCount(60);
 
-  // One hero: its 30 games, the newest 20 of them.
+  // One hero: its 30 games, then the newest 20 of them (odd indices 1–39,
+  // five of them at 1,200 souls a minute).
   await page
     .getByRole("combobox", { name: "Hero" })
     .selectOption({ label: `${heroName(heroes[1])} · 30 games` });
+  await expect(dots(page, "Souls / min")).toHaveCount(30);
   await page.getByRole("button", { name: "Last 20", exact: true }).click();
   await expect(dots(page, "Souls / min")).toHaveCount(20);
-  await expect(souls.locator(".perf-card-numbers")).toContainText("20 games");
+  await expect(souls.locator(".perf-card-numbers")).toHaveText(
+    "1,050 20 games · rank avg 1,000",
+  );
 });
 
 test("performance tab says so with too few games", async ({ page }) => {
@@ -2136,7 +2148,54 @@ test("performance tab compares like with like when a game outlasts the rank aver
   // one: 60,000 souls over 80 minutes overall, 1,000 a minute in that game.
   await expect(
     card(page, "Souls / min").locator(".perf-card-numbers"),
-  ).toHaveText("7502 games · 1 with a rank average: 1,000 vs 1,000");
+  ).toHaveText("750 2 games · 1 with a rank average: 1,000 vs 1,000");
+});
+
+test("performance tab shows no trend when no game has a rank average", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, {
+    history: Array.from({ length: 6 }, (_, index) => ({
+      ...historyRow(index + 1, heroes[0], 1, 4, true, now - index * 3600),
+      match_duration_s: 3000,
+    })),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  // Every game outlasts the fixture's average, which stops at 40:00.
+  const souls = card(page, "Souls / min");
+  await expect(souls.locator(".perf-card-numbers")).toHaveText(
+    "600 6 games · no rank average for these games",
+  );
+  await expect(souls.locator(".perf-trend")).toHaveCount(0);
+  await expect(
+    card(page, "Kill participation").locator(".perf-trend"),
+  ).toHaveText("– Flat");
+});
+
+test("performance tab counts games without match details yet", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, {
+    history: performanceHistory,
+    unstoredTotals: [3005, 3006],
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    view(page).getByText(
+      "2 of 20 games have no match details yet, so they're missing from damage, healing, creep kills and shares.",
+    ),
+  ).toBeVisible();
+  const damage = card(page, "Hero damage / min");
+  await expect(damage.locator(".perf-card-numbers")).toContainText("18 games");
+  // The line breaks where the two games are missing.
+  await expect(damage.locator(".spark-value")).toHaveAttribute(
+    "d",
+    /^M[^M]+M[^M]+$/,
+  );
 });
 
 test("performance tab keeps history values when details and averages fail", async ({
@@ -2162,11 +2221,11 @@ test("performance tab keeps history values when details and averages fail", asyn
   ).toBeVisible();
   await expect(
     card(page, "Souls / min").locator(".perf-card-numbers"),
-  ).toHaveText("1,10020 games");
+  ).toHaveText("1,100 20 games");
   await expect(dots(page, "Souls / min")).toHaveCount(20);
   await expect(
     card(page, "Hero damage / min").locator(".perf-card-numbers"),
-  ).toHaveText("—No match details");
+  ).toHaveText("— No match details");
   await expect(card(page, "Hero damage / min").locator("svg")).toHaveCount(0);
   await expect(view(page).locator(".perf-trend")).toHaveCount(0);
 });
@@ -2221,7 +2280,8 @@ import { Sparkline } from "./Sparkline";
 const heroName = (heroId: number) =>
   heroById.get(heroId)?.name ?? `Hero ${heroId}`;
 
-const count = (games: number) => `${games} ${games === 1 ? "game" : "games"}`;
+const count = (games: number) =>
+  `${games.toLocaleString("en-US")} ${games === 1 ? "game" : "games"}`;
 
 const format = (metric: PerformanceMetric, value: number) =>
   metric.percent
@@ -2231,9 +2291,9 @@ const format = (metric: PerformanceMetric, value: number) =>
       : value.toFixed(1);
 
 const TRENDS = {
-  improving: "▲ Improving",
-  flat: "– Flat",
-  slipping: "▼ Slipping",
+  improving: ["▲", "Improving"],
+  flat: ["–", "Flat"],
+  slipping: ["▼", "Slipping"],
 };
 
 function PerformanceCard({
@@ -2272,6 +2332,14 @@ function PerformanceCard({
                   ? // Like with like: the player over the same games.
                     ` · ${compared} with a rank average: ${format(metric, comparedValue!)} vs ${format(metric, average)}`
                   : ` · rank avg ${format(metric, average)}`);
+  // No badge while what the trend needs loads or failed, or when no game
+  // has a rank average to follow.
+  const tooFew =
+    !trend &&
+    !waiting &&
+    !failed &&
+    games > 0 &&
+    (!metric.average || average !== null);
   const title = (p: GamePoint) =>
     `${heroName(p.heroId)} · ${p.won ? "Win" : "Loss"} · ${timeAgo(p.startTime * 1000)}: ` +
     format(metric, p.value!) +
@@ -2280,16 +2348,16 @@ function PerformanceCard({
     <section className="perf-card" aria-label={metric.label}>
       <div className="perf-card-head">
         <h3>{metric.label}</h3>
-        {trend ? (
-          <span className={`perf-trend ${trend}`}>{TRENDS[trend]}</span>
-        ) : (
-          !waiting &&
-          !failed &&
-          games > 0 && <span className="perf-trend">Too few games</span>
+        {trend && (
+          <span className={`perf-trend ${trend}`}>
+            <span aria-hidden="true">{TRENDS[trend][0]}</span>{" "}
+            {TRENDS[trend][1]}
+          </span>
         )}
+        {tooFew && <span className="perf-trend">Too few games</span>}
       </div>
       <div className="perf-card-numbers">
-        <b>{value === null ? "—" : format(metric, value)}</b>
+        <b>{value === null ? "—" : format(metric, value)}</b>{" "}
         <span>{detail}</span>
       </div>
       {games > 0 && (
@@ -2343,9 +2411,11 @@ export function PerformanceTab({
   history: AsyncState<HistoryMatch[]>;
 }) {
   const [range, setRange] = useState<PerformanceRange>(20);
-  const [heroId, setHeroId] = useState<number | null>(null);
+  const [picked, setPicked] = useState<number | null>(null);
   const matches = history.data ?? [];
   const heroes = heroChoices(matches);
+  // All heroes when the picked one has no games (left the history).
+  const heroId = heroes.some((h) => h.heroId === picked) ? picked : null;
   const games = gamesInRange(matches, range, heroId);
   const key = games.map((g) => g.matchId).join(",");
   const totals = useAsync(
@@ -2386,7 +2456,7 @@ export function PerformanceTab({
             <select
               value={heroId ?? ""}
               onChange={(event) =>
-                setHeroId(
+                setPicked(
                   event.target.value ? Number(event.target.value) : null,
                 )
               }
@@ -2415,6 +2485,22 @@ export function PerformanceTab({
       )}
       {!!games.length && (
         <>
+          {totals.error && (
+            <p className="notice warning" role="status">
+              Match details unavailable: {totals.error}
+              <button type="button" onClick={totals.retry}>
+                Retry
+              </button>
+            </p>
+          )}
+          {averages.error && (
+            <p className="notice warning" role="status">
+              Rank averages unavailable: {averages.error}
+              <button type="button" onClick={averages.retry}>
+                Retry
+              </button>
+            </p>
+          )}
           <div className="performance-legend" aria-hidden="true">
             <span>
               <i className="value" />
@@ -2441,22 +2527,6 @@ export function PerformanceTab({
               />
             ))}
           </div>
-          {totals.error && (
-            <p className="notice warning" role="status">
-              Match details unavailable: {totals.error}
-              <button type="button" onClick={totals.retry}>
-                Retry
-              </button>
-            </p>
-          )}
-          {averages.error && (
-            <p className="notice warning" role="status">
-              Rank averages unavailable: {averages.error}
-              <button type="button" onClick={averages.retry}>
-                Retry
-              </button>
-            </p>
-          )}
           {notes(games, totals.data, averages.data).map((line) => (
             <p key={line} className="data-note">
               {line}
@@ -2483,7 +2553,8 @@ In `src/features/profile/styles/profile.css`, replace everything from `.performa
   gap: 10px 16px;
   margin-bottom: 0;
 }
-.performance .data-note {
+.performance .data-note,
+.performance > .notice {
   margin: 0;
 }
 .performance-legend {
@@ -2565,12 +2636,11 @@ In `src/features/profile/styles/profile.css`, replace everything from `.performa
   color: var(--bad);
 }
 .perf-card-numbers b {
-  margin-right: 6px;
   font: 700 26px var(--font-label);
 }
 .perf-card-numbers span {
   font-size: 11.5px;
-  color: var(--dim);
+  color: var(--muted);
 }
 .sparkline {
   height: 80px;
@@ -2642,10 +2712,10 @@ with:
 - [ ] **Step 6: Run the tests and confirm they pass**
 
 Run: `npx playwright test tests/browser/home.spec.ts -g "performance"`
-Expected: PASS (5 tests).
+Expected: PASS (7 tests).
 
 Then run `npm test`, `npm run test:browser` and `npm run test:web`.
-Expected: PASS (379, 130 and 74).
+Expected: PASS (379, 132 and 74).
 
 - [ ] **Step 7: Look at it**
 
@@ -2788,7 +2858,7 @@ Run all of these; every one must pass:
 - `npm test` (369)
 - `npx tsc --noEmit`
 - `npm run web:typecheck`
-- `npm run test:browser` (130)
+- `npm run test:browser` (132)
 - `npm run test:web` (74)
 - `npm run build`
 - `npm run web:build`
