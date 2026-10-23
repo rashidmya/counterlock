@@ -245,7 +245,7 @@ export function PerformanceTab({
           {/* Always there, so screen readers announce it; it takes no space
               of its own, so the controls never move. */}
           <p className="perf-status" role="status">
-            <span>{stale ? "Updating the cards…" : ""}</span>
+            <span>{stale ? "Updating…" : ""}</span>
           </p>
         </div>
         {heroes.length > 1 && (
@@ -299,7 +299,7 @@ export function PerformanceTab({
               </button>
             </p>
           )}
-          {!!averages.data?.failed.size && (
+          {!stale && !!averages.data?.failed.size && (
             <p className="notice warning" role="status">
               Rank averages unavailable for {averages.data.failed.size} of{" "}
               {count(games.length)}: {averages.data.error}

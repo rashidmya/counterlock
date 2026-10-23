@@ -943,12 +943,12 @@ test("performance tab keeps the last cards, dimmed, while new games load", async
   const cards = view(page).locator(".perf-cards");
   const status = view(page).locator(".perf-status");
   const hero = view(page).getByRole("combobox", { name: "Hero" });
-  const select = (await hero.boundingBox())!;
   await expect(damage).toHaveText("1,000 20 games · rank avg 500");
   await expect(status).toHaveText("");
+  const select = (await hero.boundingBox())!;
   hold = new Promise((resolve) => (release = resolve));
   await page.getByRole("button", { name: "Last 50", exact: true }).click();
-  await expect(status).toHaveText("Updating the cards…");
+  await expect(status).toHaveText("Updating…");
   await expect(cards).toHaveAttribute("aria-busy", "true");
   await expect(damage).toHaveText("1,000 20 games · rank avg 500");
   // The status doesn't move the controls.
