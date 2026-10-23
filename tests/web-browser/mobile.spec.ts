@@ -285,6 +285,16 @@ test.describe("phone width (375px)", () => {
               .size,
         ),
     ).toBe(1);
+    // One column of cards.
+    expect(
+      await page
+        .locator(".perf-card")
+        .evaluateAll(
+          (cards) =>
+            new Set(cards.map((card) => card.getBoundingClientRect().left))
+              .size,
+        ),
+    ).toBe(1);
     expect((await overflow(page)).scroll).toBeLessThanOrEqual(375);
     expect(await clipped(page, 375)).toEqual([]);
   });

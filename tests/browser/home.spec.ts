@@ -73,6 +73,8 @@ interface Fixtures {
   failCurve?: boolean;
   // Heroes whose curves fail while they're in the set.
   failCurveFor?: Set<number>;
+  // One tier's curves come back thin (50 games), so they widen.
+  thinTiers?: boolean;
   unstoredTotals?: number[];
   unlistedPlayer?: number[];
   // Awaited before each answer, so a test can hold requests back.
@@ -154,7 +156,16 @@ async function routeApi(page: Page, fixtures: Fixtures = {}) {
       return fixtures.failCurve ||
         fixtures.failCurveFor?.has(Number(url.searchParams.get("hero_ids")))
         ? json({}, 500)
-        : json(rankCurveRows());
+        : json(
+            rankCurveRows(
+              fixtures.thinTiers &&
+                Number(url.searchParams.get("max_average_badge")) -
+                  Number(url.searchParams.get("min_average_badge")) ===
+                  5
+                ? 50
+                : 5000,
+            ),
+          );
     if (url.pathname.endsWith("/metadata")) return json(matchMetadata(ACCOUNT));
     return json([]);
   });
@@ -1080,6 +1091,191 @@ test("performance tab keeps the last cards, dimmed, while new games load", async
   await expect(cards).toHaveAttribute("aria-busy", "false");
   await expect(damage).toHaveText("1,000 50 games · rank avg 500");
   await expect(status).toHaveText("");
+});
+
+test("performance tab says what is still loading", async ({ page }) => {
+  let release = () => {};
+  const hold = new Promise<void>((resolve) => (release = resolve));
+  await storeAccount(page);
+  await routeApi(page, {
+    history: performanceHistory,
+    gate: (url) =>
+      url.pathname === "/v1/matches/metadata" ||
+      url.pathname === "/v1/analytics/player-performance-curve"
+        ? hold
+        : Promise.resolve(),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    card(page, "Souls / min").locator(".perf-card-numbers"),
+  ).toHaveText("1,100 20 games · loading rank average…");
+  await expect(
+    card(page, "Hero damage / min").locator(".perf-card-numbers"),
+  ).toHaveText("— Loading match details…");
+  await expect(view(page).locator(".perf-trend")).toHaveCount(0);
+  release();
+  await expect(
+    card(page, "Hero damage / min").locator(".perf-card-numbers"),
+  ).toHaveText("1,000 20 games · rank avg 500");
+});
+
+test("performance tab asks for match details again on Retry", async ({
+  page,
+}) => {
+  let hold: Promise<void> | null = null;
+  let release = () => {};
+  const fixtures = {
+    history: performanceHistory,
+    failTotals: true,
+    gate: (url: URL) =>
+      url.pathname === "/v1/matches/metadata" && hold
+        ? hold
+        : Promise.resolve(),
+  };
+  await storeAccount(page);
+  await routeApi(page, fixtures);
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const notice = view(page).getByText(
+    "Match details unavailable: Deadlock API unavailable (500).",
+  );
+  const damage = card(page, "Hero damage / min").locator(".perf-card-numbers");
+  await expect(notice).toBeVisible();
+  fixtures.failTotals = false;
+  await notice.getByRole("button", { name: "Retry" }).click();
+  await expect(damage).toHaveText("1,000 20 games · rank avg 500");
+  await expect(notice).toHaveCount(0);
+  // The cards kept while Last 50 loads are the ones from after the Retry.
+  hold = new Promise((resolve) => (release = resolve));
+  await page.getByRole("button", { name: "Last 50", exact: true }).click();
+  await expect(view(page).locator(".perf-cards")).toHaveAttribute(
+    "aria-busy",
+    "true",
+  );
+  await expect(damage).toHaveText("1,000 20 games · rank avg 500");
+  release();
+  await expect(damage).toHaveText("1,000 50 games · rank avg 500");
+});
+
+test("performance tab compares ranked games at their own rank", async ({
+  page,
+}) => {
+  const bands: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/v1/analytics/player-performance-curve")
+      bands.push(url.searchParams.get("min_average_badge")!);
+  });
+  await storeAccount(page);
+  await routeApi(page, {
+    history: performanceHistory.map((row) => ({
+      ...row,
+      ranked_display_badge: 116,
+    })),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    card(page, "Souls / min").locator(".perf-card-numbers"),
+  ).toHaveText("1,100 20 games · rank avg 1,000");
+  // Eternus, not the player's current Mystic.
+  expect(new Set(bands)).toEqual(new Set(["111"]));
+  await expect(
+    view(page).getByText(/^Games without a recorded rank/),
+  ).toHaveCount(0);
+});
+
+test("performance tab notes games compared with all ranks", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory, rank: [] });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    view(page).getByText(
+      "Games without a recorded rank, and no current rank to use, are compared with all ranks.",
+    ),
+  ).toBeVisible();
+});
+
+test("performance tab widens a thin rank's average and says so", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory, thinTiers: true });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(
+    view(page).getByText(
+      "Where a hero has too few games at one rank, its average covers the ranks either side.",
+    ),
+  ).toBeVisible();
+});
+
+test("performance cards sit in four columns, two on a narrower window", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(dots(page, "Souls / min")).toHaveCount(20);
+  const columns = () =>
+    view(page)
+      .locator(".perf-card")
+      .evaluateAll(
+        (cards) =>
+          new Set(cards.map((card) => card.getBoundingClientRect().left)).size,
+      );
+  expect(await columns()).toBe(4);
+  await page.setViewportSize({ width: 850, height: 800 });
+  await expect.poll(columns).toBe(2);
+});
+
+// The newest 20 games alternate heroes: heroes[0] on even indices.
+const recent = (hero: 0 | 1) =>
+  Array.from({ length: 10 }, (_, i) => 3000 + 2 * i + hero);
+
+test("performance tab keeps the trends a failed curve doesn't touch", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  // heroes[1]'s curve fails, and its games have no match details either.
+  await routeApi(page, {
+    history: performanceHistory,
+    failCurveFor: new Set([heroes[1]]),
+    unstoredTotals: recent(1),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const damage = card(page, "Hero damage / min");
+  await expect(damage.locator(".perf-card-numbers")).toHaveText(
+    "1,000 10 games · rank avg 500",
+  );
+  await expect(damage.locator(".perf-trend")).toHaveText("– Flat");
+  // Souls has heroes[1]'s games, so it claims no trend.
+  await expect(card(page, "Souls / min").locator(".perf-trend")).toHaveCount(0);
+});
+
+test("performance tab doesn't call failed averages missing", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  // heroes[1]'s curve fails, and heroes[0]'s games have no match details.
+  await routeApi(page, {
+    history: performanceHistory,
+    failCurveFor: new Set([heroes[1]]),
+    unstoredTotals: recent(0),
+  });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const damage = card(page, "Hero damage / min");
+  await expect(damage.locator(".perf-card-numbers")).toHaveText(
+    "1,000 10 games",
+  );
+  await expect(damage.locator(".perf-trend")).toHaveCount(0);
 });
 
 test("performance range and hero survive a profile tab switch", async ({
