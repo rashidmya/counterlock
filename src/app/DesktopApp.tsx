@@ -26,6 +26,7 @@ import { ItemsPage } from "@/features/items/components/ItemsPage";
 import { MatchReportPage } from "@/features/match-report/components/MatchReportPage";
 import type { AnalyticsQuery } from "@/features/heroes/utils/analytics";
 import { LivePage } from "@/features/live/components/LivePage";
+import { OwnLiveTab } from "@/features/live/components/OwnLiveTab";
 import {
   liveStatus,
   matchKey,
@@ -210,6 +211,23 @@ export function DesktopApp({
                 me.account?.accountId === profileId
                   ? accountSubtitle(me.account)
                   : undefined
+              }
+              // Yours: the account Overwolf reports playing on this PC, or
+              // else the remembered one.
+              live={
+                profileId === (state.localAccountId ?? me.meId) ? (
+                  <OwnLiveTab
+                    {...{
+                      state,
+                      status,
+                      showBuild,
+                      showCounters,
+                      counters,
+                      query,
+                    }}
+                    refresh={bridge.refresh}
+                  />
+                ) : undefined
               }
             />
           </div>

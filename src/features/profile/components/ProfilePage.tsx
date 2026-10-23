@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { RouteLink } from "@/app/links";
 import type { Navigate } from "@/app/navigation";
 import { useAsync } from "@/shared/api/useAsync";
@@ -13,6 +14,7 @@ export function ProfilePage({
   navigate,
   subtitle = "Deadlock profile",
   restore = false,
+  live,
 }: {
   accountId: number;
   me: MeAdapter;
@@ -20,6 +22,8 @@ export function ProfilePage({
   subtitle?: string;
   // Open as it was left (see ProfileView).
   restore?: boolean;
+  // The Live tab in place of the Watch list's (see ProfileView).
+  live?: ReactNode;
 }) {
   const history = useAsync(() => fetchMatchHistory(accountId), [accountId]);
   const topHeroId = history.data && topHeroes(history.data, 1)[0]?.heroId;
@@ -32,6 +36,7 @@ export function ProfilePage({
       history={history}
       navigate={navigate}
       restore={restore}
+      live={live}
       header={
         <ProfileHeader
           accountId={accountId}

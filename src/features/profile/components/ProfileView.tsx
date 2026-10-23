@@ -50,6 +50,7 @@ export function ProfileView({
   header,
   navigate,
   restore,
+  live,
 }: {
   accountId: number;
   history: AsyncState<HistoryMatch[]>;
@@ -58,6 +59,9 @@ export function ProfileView({
   // Coming back (from the profile's match report, or with the browser's
   // Back): open as it was left. Any other way in starts at Overview.
   restore: boolean;
+  // The Live tab, when the app has better than the Watch list (your own
+  // account, from Overwolf's live data).
+  live?: React.ReactNode;
 }) {
   const [view, setView] = useState(
     () => (restore && views.get(accountId)) || FIRST_VIEW,
@@ -145,7 +149,7 @@ export function ProfileView({
             onHero={(next) => update({ heroId: next })}
           />
         )}
-        {subtab === "live" && <LiveTab accountId={accountId} />}
+        {subtab === "live" && (live ?? <LiveTab accountId={accountId} />)}
       </section>
     </LinkScope>
   );

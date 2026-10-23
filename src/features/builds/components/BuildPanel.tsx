@@ -84,7 +84,7 @@ export function BuildPanel({
         </div>
       </div>
       {expanded && (
-        <div id="build-content">
+        <div>
           {brawl ? (
             <p className="build-empty" role="status">
               Build statistics for Street Brawl are unavailable.

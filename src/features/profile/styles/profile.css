@@ -853,3 +853,14 @@
 .live-tab > .data-note {
   margin: 10px 0 0;
 }
+/* Your own match, from Overwolf, inside the profile's padding. */
+.live-tab.own .intro {
+  padding: 0 0 14px;
+}
+.live-tab.own .intro .section-header {
+  flex: 1;
+  margin: 22px 0 0;
+}
+.live-tab.own .workspace {
+  padding: 0;
+}

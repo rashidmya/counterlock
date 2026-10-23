@@ -7,6 +7,7 @@ import type { useCounters } from "@/features/counters/hooks/useCounters";
 import { Team } from "@/features/roster/components/Team";
 import { Icon } from "@/shared/ui/Icon";
 import { PageTitle } from "@/shared/ui/PageTitle";
+import { SectionHeader } from "@/shared/ui/SectionHeader";
 
 interface Props {
   state: MatchState;
@@ -15,6 +16,9 @@ interface Props {
   counters: ReturnType<typeof useCounters>;
   refresh: () => void;
   query: AnalyticsQuery;
+  // Inside a page with a title of its own (the profile's Live tab): a
+  // section header rather than the page title.
+  embedded?: boolean;
 }
 export function MatchOverview({
   state,
@@ -23,6 +27,7 @@ export function MatchOverview({
   counters,
   refresh,
   query,
+  embedded = false,
 }: Props) {
   const { teams, selected, setSelected } = counters;
   const missingIds = state.players.filter((p) => !p.accountId).length;
@@ -34,11 +39,17 @@ export function MatchOverview({
   return (
     <>
       <div className="intro">
-        <PageTitle
-          eyebrow="Live match"
-          title="Know the match."
-          ribbon={myHero ? `You're playing ${myHero}` : undefined}
-        />
+        {embedded ? (
+          <SectionHeader
+            title={myHero ? `Live match · ${myHero}` : "Live match"}
+          />
+        ) : (
+          <PageTitle
+            eyebrow="Live match"
+            title="Know the match."
+            ribbon={myHero ? `You're playing ${myHero}` : undefined}
+          />
+        )}
         <div className="match-clock">
           <span>
             {state.phase === "PostGame"
