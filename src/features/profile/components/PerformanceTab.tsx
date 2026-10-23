@@ -45,10 +45,12 @@ const TRENDS = {
 };
 
 function PerformanceCard({
+  accountId,
   summary,
   totals,
   averages,
 }: {
+  accountId: number;
   summary: MetricSummary;
   totals: AsyncState<unknown>;
   averages: AsyncState<GameAverages>;
@@ -95,10 +97,12 @@ function PerformanceCard({
     !failed &&
     games > 0 &&
     (!metric.average || average !== null);
-  const title = (p: GamePoint) =>
-    `${heroName(p.heroId)} · ${p.won ? "Win" : "Loss"} · ${timeAgo(p.startTime * 1000)}: ` +
-    format(metric, p.value!) +
-    (p.average === null ? "" : ` (rank avg ${format(metric, p.average)})`);
+  const describe = (p: GamePoint) => ({
+    game: `${heroName(p.heroId)} · ${p.won ? "Win" : "Loss"} · ${timeAgo(p.startTime * 1000)}`,
+    value: p.value === null ? "—" : format(metric, p.value),
+    average:
+      p.average === null ? undefined : `rank avg ${format(metric, p.average)}`,
+  });
   return (
     <section className="perf-card" aria-label={metric.label}>
       <div className="perf-card-head">
@@ -119,7 +123,8 @@ function PerformanceCard({
         <Sparkline
           points={summary.points}
           label={`${metric.label}, game by game`}
-          title={title}
+          describe={describe}
+          route={(p) => ({ page: "match", matchId: p.matchId, accountId })}
         />
       )}
     </section>
@@ -330,6 +335,7 @@ export function PerformanceTab({
             {summaries.map((summary) => (
               <PerformanceCard
                 key={summary.metric.id}
+                accountId={accountId}
                 summary={summary}
                 totals={shown.totals}
                 averages={shown.averages}

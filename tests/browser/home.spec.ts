@@ -762,6 +762,70 @@ test("performance tab compares each metric with the rank average", async ({
   );
 });
 
+/** Match ids whose report metadata the page asks for. */
+function reportRequests(page: Page) {
+  const ids: number[] = [];
+  page.on("request", (request) => {
+    const id = new URL(request.url()).pathname.match(
+      /^\/v1\/matches\/(\d+)\/metadata$/,
+    )?.[1];
+    if (id) ids.push(Number(id));
+  });
+  return ids;
+}
+
+test("performance tab describes the game under the pointer and a click opens its report", async ({
+  page,
+}) => {
+  const reports = reportRequests(page);
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const souls = card(page, "Souls / min");
+  await expect(dots(page, "Souls / min")).toHaveCount(20);
+  const chart = (await souls.getByRole("slider").boundingBox())!;
+  // The newest game is on the right: 1h ago, lost, 1,200 souls a minute.
+  await page.mouse.move(chart.x + chart.width - 2, chart.y + 40);
+  const tip = souls.locator(".spark-tip span");
+  await expect(tip).toHaveText([
+    `${heroName(heroes[0])} · Loss · 1h ago`,
+    "1,200 rank avg 1,000 · Report →",
+  ]);
+  await expect(souls.locator("circle.picked")).toHaveCount(1);
+  await page.mouse.click(chart.x + chart.width - 2, chart.y + 40);
+  await expect(view(page).locator(".match-report")).toBeVisible();
+  expect(reports).toEqual([3000]);
+});
+
+test("performance tab points can be picked and opened from the keyboard", async ({
+  page,
+}) => {
+  const reports = reportRequests(page);
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory });
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  await expect(dots(page, "Souls / min")).toHaveCount(20);
+  const chart = card(page, "Souls / min").getByRole("slider");
+  // Focus starts on the newest game.
+  await chart.focus();
+  await expect(chart).toHaveAttribute("aria-valuenow", "20");
+  await expect(chart).toHaveAttribute(
+    "aria-valuetext",
+    `${heroName(heroes[0])} · Loss · 1h ago: 1,200, rank avg 1,000`,
+  );
+  await page.keyboard.press("ArrowLeft");
+  await expect(chart).toHaveAttribute("aria-valuenow", "19");
+  await expect(chart).toHaveAttribute(
+    "aria-valuetext",
+    `${heroName(heroes[1])} · Win · 2h ago: 1,200, rank avg 1,000`,
+  );
+  await page.keyboard.press("Enter");
+  await expect(view(page).locator(".match-report")).toBeVisible();
+  expect(reports).toEqual([3001]);
+});
+
 test("performance tab says so with too few games", async ({ page }) => {
   await storeAccount(page);
   await routeApi(page, {

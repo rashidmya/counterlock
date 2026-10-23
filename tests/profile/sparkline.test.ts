@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { linePath } from "@/features/profile/components/Sparkline";
+import {
+  dotRadius,
+  linePath,
+  nearestGame,
+} from "@/features/profile/components/Sparkline";
 
 const x = (index: number) => index * 10;
 const y = (value: number) => value;
@@ -25,5 +29,26 @@ describe("linePath", () => {
 
   it("is empty without values", () => {
     expect(linePath([null, null], x, y)).toBe("");
+  });
+});
+
+describe("dotRadius", () => {
+  it("shrinks dots as games crowd together, down to 2 px", () => {
+    expect(dotRadius(20)).toBe(3);
+    expect(dotRadius(6)).toBeCloseTo(2.4);
+    expect(dotRadius(2.5)).toBe(2);
+  });
+});
+
+describe("nearestGame", () => {
+  it("picks the game nearest the pointer, within the chart", () => {
+    // Five games on a 112 px chart: 6 px padding, games 25 px apart.
+    expect(nearestGame(6, 112, 5)).toBe(0);
+    expect(nearestGame(18, 112, 5)).toBe(0);
+    expect(nearestGame(19, 112, 5)).toBe(1);
+    expect(nearestGame(106, 112, 5)).toBe(4);
+    expect(nearestGame(-20, 112, 5)).toBe(0);
+    expect(nearestGame(500, 112, 5)).toBe(4);
+    expect(nearestGame(50, 112, 1)).toBe(0);
   });
 });

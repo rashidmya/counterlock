@@ -587,12 +587,26 @@
   font-size: 11.5px;
   color: var(--muted);
 }
+.sparkline-box {
+  position: relative;
+  margin-top: 6px;
+}
 .sparkline {
   height: 80px;
-  margin-top: 6px;
+}
+.sparkline:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 2px;
 }
 .sparkline svg {
   display: block;
+}
+.spark-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+.spark-cross {
+  stroke: rgb(from var(--cream) r g b / 0.35);
 }
 .spark-value {
   fill: none;
@@ -606,9 +620,49 @@
   stroke-dasharray: 4 4;
   stroke-width: 1.5;
 }
+.sparkline circle {
+  stroke: var(--surface);
+}
 .sparkline circle.win {
   fill: var(--good);
 }
 .sparkline circle.loss {
   fill: var(--bad);
+}
+.sparkline circle.picked {
+  stroke: var(--cream);
+  stroke-width: 1.5;
+}
+.spark-tip {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 0;
+  z-index: 1;
+  display: grid;
+  gap: 2px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  background: var(--ink);
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.spark-tip.right {
+  right: 0;
+  left: auto;
+}
+.spark-tip b {
+  font-weight: 600;
+  color: var(--cream);
+}
+/* A 24 px touch target without making the tip taller. */
+.spark-tip a,
+.spark-tip button {
+  margin: -4px 0;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--gold);
+  cursor: pointer;
 }

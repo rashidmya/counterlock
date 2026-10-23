@@ -34,6 +34,31 @@ const overflow = (page: Page) =>
     client: document.documentElement.clientWidth,
   }));
 
+test.describe("a touch screen at phone width", () => {
+  test.use({ viewport: { width: 375, height: 812 }, hasTouch: true });
+
+  test("a tap on a Performance chart shows the game; its Report link opens it", async ({
+    page,
+  }) => {
+    await mockApi(page);
+    await page.goto(`/players/${FARGO}`);
+    await page.getByRole("tab", { name: "Performance" }).click();
+    const souls = page.getByRole("region", {
+      name: "Souls / min",
+      exact: true,
+    });
+    await expect(souls.locator("circle")).toHaveCount(8);
+    const chart = (await souls.getByRole("slider").boundingBox())!;
+    // The newest game, on the right, is match 1001.
+    await page.touchscreen.tap(chart.x + chart.width - 2, chart.y + 40);
+    const tip = souls.locator(".spark-tip");
+    await expect(tip).toBeVisible();
+    await expect(page).toHaveURL(`/players/${FARGO}`);
+    await tip.getByRole("link", { name: "Report →" }).tap();
+    await expect(page).toHaveURL(`/matches/1001?player=${FARGO}`);
+  });
+});
+
 test.describe("phone width (375px)", () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
