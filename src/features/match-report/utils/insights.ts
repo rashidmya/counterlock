@@ -61,17 +61,22 @@ export function buffs(
 
 export interface ImpactRow {
   label: string;
-  share: number;
+  // Null when the team's total is 0: there is no share of nothing.
+  share: number | null;
   value: number;
 }
 
-/** The player's share of their team's totals, and their kill participation. */
+/**
+ * The player's share of their team's totals, and their kill participation;
+ * no share where the team's total is 0, as on the Performance tab, which
+ * leaves such a game out.
+ */
 export function impact(player: ReportPlayer, players: ReportPlayer[]) {
   const team = players.filter((p) => p.team === player.team);
   const share = (id: MetricId, label: string): ImpactRow => {
     const value = finalValue(player, id);
     const total = team.reduce((sum, p) => sum + finalValue(p, id), 0);
-    return { label, value, share: total > 0 ? value / total : 0 };
+    return { label, value, share: total > 0 ? value / total : null };
   };
   const teamKills = team.reduce((sum, p) => sum + p.kills, 0);
   return {
@@ -84,7 +89,7 @@ export function impact(player: ReportPlayer, players: ReportPlayer[]) {
       share:
         teamKills > 0
           ? Math.min(1, (player.kills + player.assists) / teamKills)
-          : 0,
+          : null,
       involved: player.kills + player.assists,
       teamKills,
     },

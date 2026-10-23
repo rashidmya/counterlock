@@ -177,6 +177,18 @@ test("stretches, impact and buffs describe the selected player", async ({
   );
 });
 
+test("Impact gives no share of a team total of 0", async ({ page }) => {
+  const metadata = matchMetadata(ACCOUNT);
+  for (const player of metadata.match_info.players)
+    for (const snapshot of player.stats) snapshot.player_healing = 0;
+  await openWith(page, metadata);
+  await expect(report(page).locator(".impact-row b")).toHaveText([
+    "21% 18.0K",
+    "29% 3.0K",
+    "— 0",
+  ]);
+});
+
 test("Viewing as another player switches every perspective-dependent part", async ({
   page,
 }) => {

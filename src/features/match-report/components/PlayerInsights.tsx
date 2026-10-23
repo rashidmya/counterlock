@@ -33,8 +33,10 @@ export function PlayerInsights({
   const pickups = buffs(player, report.durationS, curve);
   const lines = stretches(player, curve);
   const compared = lines.some((s) => s.label === "Strongest");
-  const bar = (share: number) =>
-    `${Math.min(share / BAR_FULL_SHARE, 1) * 100}%`;
+  const bar = (share: number | null) =>
+    `${Math.min((share ?? 0) / BAR_FULL_SHARE, 1) * 100}%`;
+  const shareText = (share: number | null) =>
+    share === null ? "—" : percent(share);
   return (
     <div className="report-cols">
       <div>
@@ -74,13 +76,13 @@ export function PlayerInsights({
                 <u style={{ left: bar(EVEN_SHARE) }} />
               </span>
               <b>
-                {percent(row.share)} <small>{compact(row.value)}</small>
+                {shareText(row.share)} <small>{compact(row.value)}</small>
               </b>
             </div>
           ))}
           <p className="impact-kp">
             <span>Kill participation</span>
-            <b>{percent(killParticipation.share)}</b>
+            <b>{shareText(killParticipation.share)}</b>
             <small>
               {killParticipation.involved} of {killParticipation.teamKills} team
               kills

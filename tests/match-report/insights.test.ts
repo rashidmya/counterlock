@@ -94,6 +94,20 @@ describe("impact", () => {
       teamKills: 28,
     });
   });
+
+  it("gives no share where the team's total is 0", () => {
+    // No one healed and no one killed; the damage is as before.
+    const quiet = report.players.map((p) => ({
+      ...p,
+      kills: 0,
+      assists: 0,
+      values: { ...p.values, healing: p.values.healing.map(() => 0) },
+    }));
+    const { rows, killParticipation } = impact(quiet[0], quiet);
+    expect(rows[0].share).toBeCloseTo(18000 / 87000);
+    expect(rows[2].share).toBeNull();
+    expect(killParticipation.share).toBeNull();
+  });
 });
 
 describe("stretches", () => {
