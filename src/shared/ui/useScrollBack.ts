@@ -18,8 +18,9 @@ export function useScrollBack(key: string, restore: boolean) {
   useLayoutEffect(() => {
     const y = restore ? (positions.get(key) ?? 0) : 0;
     const page = document.documentElement;
+    let pending = y > 0;
     let stop = () => {};
-    if (y > 0) {
+    if (pending) {
       const attempt = () => {
         if (page.scrollHeight - window.innerHeight < y) return;
         window.scrollTo(0, y);
@@ -28,6 +29,7 @@ export function useScrollBack(key: string, restore: boolean) {
       const observer = new ResizeObserver(attempt);
       const timer = setTimeout(() => stop(), 10_000);
       stop = () => {
+        pending = false;
         observer.disconnect();
         clearTimeout(timer);
         for (const event of TAKEOVER) window.removeEventListener(event, stop);
@@ -37,8 +39,11 @@ export function useScrollBack(key: string, restore: boolean) {
       observer.observe(document.body);
     }
     return () => {
+      // A position still to come back stays kept: the window is only where
+      // the page, too short yet, left it (left early, or StrictMode's
+      // remount in development).
+      if (!pending) positions.set(key, window.scrollY);
       stop();
-      positions.set(key, window.scrollY);
     };
     // `restore` only matters as the page mounts.
   }, [key]);

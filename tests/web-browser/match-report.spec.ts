@@ -6,19 +6,25 @@ const viewingAs = (page: Page) =>
   page.getByRole("combobox", { name: "Viewing as" });
 
 // Thirty matches, a page and a half of the Matches tab, each with its
-// report.
-async function mockLongHistory(page: Page) {
+// report. The history is awaited on `held` first, so a test can hold it
+// back.
+async function mockLongHistory(
+  page: Page,
+  held: () => Promise<void> = () => Promise.resolve(),
+) {
   const now = Math.floor(Date.now() / 1000);
   await page.route(
     `https://api.deadlock-api.com/v1/players/${FARGO}/match-history`,
-    (route) =>
-      route.fulfill({
+    async (route) => {
+      await held();
+      return route.fulfill({
         json: Array.from({ length: 30 }, (_, index) => ({
           ...historyRow(2001 + index, index % 2 === 0),
           start_time: now - 3600 * (index + 1),
         })),
         headers: cors,
-      }),
+      });
+    },
   );
   await page.route(/\/v1\/matches\/\d+\/metadata$/, (route) => {
     const matchId = Number(/matches\/(\d+)/.exec(route.request().url())![1]);
@@ -222,6 +228,42 @@ test("coming back from a report finds the profile scrolled as it was", async ({
   await open();
   await page.getByRole("link", { name: "← Back to profile" }).click();
   await expect(page).toHaveURL(`/players/${FARGO}`);
+  await expect.poll(scrolled).toBe(before);
+});
+
+test("a scroll position still waiting to come back is kept", async ({
+  page,
+}) => {
+  let hold: Promise<void> | null = null;
+  let release = () => {};
+  // Time is the test's to move on: the history, cached for two minutes,
+  // then loads again.
+  await page.clock.install();
+  await page.setViewportSize({ width: 1260, height: 600 });
+  await mockApi(page);
+  await mockLongHistory(page, () => hold ?? Promise.resolve());
+  await page.goto(`/players/${FARGO}`);
+  await page.getByRole("tab", { name: "Matches" }).click();
+  const rows = page.locator(".match-row");
+  await rows.nth(15).scrollIntoViewIfNeeded();
+  const scrolled = () => page.evaluate(() => Math.round(window.scrollY));
+  const before = await scrolled();
+  expect(before).toBeGreaterThan(200);
+  await rows.nth(15).locator("a.match-open").click();
+  await expect(page).toHaveURL(`/matches/2016?player=${FARGO}`);
+  // Back while the history loads again, and Forward before it has: the
+  // browser's buttons give the page no sign of the viewer scrolling.
+  hold = new Promise((resolve) => (release = resolve));
+  await page.clock.fastForward("03:00");
+  await page.goBack();
+  await expect(page.getByText("Loading match history…")).toBeVisible();
+  await page.goForward();
+  await expect(page).toHaveURL(`/matches/2016?player=${FARGO}`);
+  release();
+  hold = null;
+  // Back again, the history loads and the position comes back.
+  await page.goBack();
+  await expect(rows).toHaveCount(20);
   await expect.poll(scrolled).toBe(before);
 });
 
