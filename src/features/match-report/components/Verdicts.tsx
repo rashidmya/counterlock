@@ -2,12 +2,8 @@ import type { AsyncState } from "@/shared/api/useAsync";
 import { clock, percent } from "../utils/format";
 import { verdicts } from "../utils/insights";
 import { heroName } from "../utils/perspective";
-import type { RankCurve } from "../utils/rank-curve";
+import type { RankCurve, RankSource } from "../utils/rank-curve";
 import type { ReportPlayer } from "../utils/report";
-
-// Where the player's rank came from: the match, their current rank (the
-// match recorded none), or neither (all ranks).
-export type RankSource = "match" | "current" | "none";
 
 export function curveNote(
   hero: string,
@@ -15,6 +11,8 @@ export function curveNote(
   normal: boolean,
   durationS: number,
   rank: RankSource,
+  // The player's current rank was needed but didn't load.
+  rankFailed = false,
 ) {
   if (!normal) return "Rank averages cover normal matches only.";
   if (curve.loading) return "Loading the rank average…";
@@ -27,7 +25,9 @@ export function curveNote(
     (rank === "current"
       ? " This player's rank isn't recorded for this match, so the average uses their current rank."
       : rank === "none"
-        ? " This player's rank isn't recorded for this match, and there's no current rank to use."
+        ? rankFailed
+          ? " This player's rank isn't recorded for this match, and their current rank didn't load."
+          : " This player's rank isn't recorded for this match, and there's no current rank to use."
         : "");
   if (!points.length)
     return `Too few ${hero} games at ${band.label} in the last 30 days.${notes}`;
@@ -43,11 +43,13 @@ export function Verdicts({
   curve,
   normal,
   rank,
+  rankFailed,
 }: {
   player: ReportPlayer;
   durationS: number;
   curve: AsyncState<RankCurve>;
   rank: RankSource;
+  rankFailed: boolean;
   normal: boolean;
 }) {
   const hero = heroName(player.heroId);
@@ -77,8 +79,9 @@ export function Verdicts({
         ))}
       </div>
       <p className="data-note">
-        {curveNote(hero, curve, normal, durationS, rank)}
-        {curve.error && (
+        {curveNote(hero, curve, normal, durationS, rank, rankFailed)}
+        {/* The curve's Retry also asks again for the current rank. */}
+        {(curve.error || (rankFailed && !curve.loading)) && (
           <>
             {" "}
             <button type="button" className="retry" onClick={curve.retry}>

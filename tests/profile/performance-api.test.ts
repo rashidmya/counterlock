@@ -265,7 +265,7 @@ describe("fetchGameAverages", () => {
     expect(averages.byMatch.get(1)!.source).toBe("none");
   });
 
-  it("falls back to all ranks when the current rank fails to load", async () => {
+  it("falls back to all ranks when the current rank fails to load, and says why", async () => {
     const { api, calls } = curveApi(new Error("Deadlock API timed out."));
     const averages = await fetchGameAverages(
       77,
@@ -274,6 +274,14 @@ describe("fetchGameAverages", () => {
     );
     expect(calls).toContain(curvePath(6, rankBand(0)));
     expect(averages.byMatch.get(1)!.source).toBe("none");
+    expect(averages.rankError).toBe("Deadlock API timed out.");
+    // A current rank that loaded leaves nothing to say.
+    const loaded = await fetchGameAverages(
+      77,
+      [game({ matchId: 1, badge: 0 })],
+      curveApi(116).api,
+    );
+    expect(loaded.rankError).toBeUndefined();
   });
 
   it("fails as a whole when every curve fails, so the tab can offer Retry", async () => {

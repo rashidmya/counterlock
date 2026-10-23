@@ -325,6 +325,16 @@ export function PerformanceTab({
               </button>
             </p>
           )}
+          {/* Games without a recorded rank are meanwhile compared with all
+              ranks; Retry asks for the current rank again. */}
+          {!stale && averages.data?.rankError && (
+            <p className="notice warning" role="status">
+              Current rank unavailable: {averages.data.rankError}
+              <button type="button" onClick={averages.retry}>
+                Retry
+              </button>
+            </p>
+          )}
           <div className="performance-legend" aria-hidden="true">
             <span>
               <i className="value" />

@@ -6,6 +6,7 @@ import {
   averageAt,
   type RankBand,
   type RankCurve,
+  type RankSource,
 } from "@/features/match-report/utils/rank-curve";
 import type { HistoryMatch } from "../types";
 import { isSummaryMatch, isWin } from "./match-history";
@@ -58,9 +59,7 @@ export interface GameAverage {
   band: RankBand;
   // The tier the game was in, when the band had to be widened.
   widenedFrom?: string;
-  // The game's own rank, the player's current rank (the game recorded
-  // none), or neither (all ranks).
-  source: "game" | "current" | "none";
+  source: RankSource;
   // Each stat's rank average at the game's length; missing past the
   // curve's end or without a length.
   values: Partial<Record<MetricId, number>>;

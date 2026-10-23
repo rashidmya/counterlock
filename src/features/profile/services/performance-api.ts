@@ -1,5 +1,9 @@
 import { fetchRankCurve } from "@/features/match-report/services/match-report";
-import { curvePath, rankBand } from "@/features/match-report/utils/rank-curve";
+import {
+  comparedRank,
+  curvePath,
+  rankBand,
+} from "@/features/match-report/utils/rank-curve";
 import { TTL, deadlockApi, type DeadlockApi } from "@/shared/api/DeadlockApi";
 import type { HistoryMatch } from "../types";
 import {
@@ -82,6 +86,9 @@ export interface GameAverages {
   failed: Set<number>;
   // A failure's message, for the notice.
   error?: string;
+  // Why the player's current rank didn't load: games without a recorded
+  // rank are then compared with all ranks.
+  rankError?: string;
 }
 
 /**
@@ -116,14 +123,21 @@ export async function fetchGameAverages(
   api: DeadlockApi = deadlockApi,
   signal?: AbortSignal,
 ): Promise<GameAverages> {
+  let rankError: string | undefined;
   const current = games.some((game) => !game.badge)
-    ? ((await fetchRank(accountId, api, signal).catch(() => null))?.badge ?? 0)
+    ? await fetchRank(accountId, api, signal).then(
+        (rank) => rank?.badge ?? 0,
+        (error: unknown) => {
+          rankError = error instanceof Error ? error.message : String(error);
+          return 0;
+        },
+      )
     : 0;
-  const badge = (game: HistoryMatch) => game.badge || current;
+  const rank = (game: HistoryMatch) => comparedRank(game.badge, current);
   const groups = new Map<string, HistoryMatch[]>();
   for (const game of games) {
     // Games that ask for the same curve form a group.
-    const key = curvePath(game.heroId, rankBand(badge(game)));
+    const key = curvePath(game.heroId, rankBand(rank(game).badge));
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(game);
   }
@@ -133,14 +147,14 @@ export async function fetchGameAverages(
   const load = async (group: HistoryMatch[]) => {
     const results = await Promise.allSettled(
       group.map(async (game) => {
+        const { badge, source } = rank(game);
         const curve = await fetchRankCurve(
           game.heroId,
-          badge(game),
+          badge,
           game.durationS,
           api,
           signal,
         );
-        const source = game.badge ? "game" : badge(game) ? "current" : "none";
         byMatch.set(game.matchId, gameAverage(curve, game.durationS, source));
       }),
     );
@@ -156,5 +170,5 @@ export async function fetchGameAverages(
   await eachLimited([...groups.values()], CURVE_CONCURRENCY, load, signal);
   signal?.throwIfAborted();
   if (failed.size && !byMatch.size) throw new Error(error);
-  return { byMatch, failed, error };
+  return { byMatch, failed, error, rankError };
 }

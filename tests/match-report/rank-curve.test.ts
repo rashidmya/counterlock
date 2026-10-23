@@ -5,6 +5,7 @@ import { metricById } from "@/features/match-report/utils/metrics";
 import {
   MIN_STEP_SAMPLES,
   averageAt,
+  comparedRank,
   curvePath,
   lobbyBadge,
   parseCurve,
@@ -15,6 +16,14 @@ import { matchMetadata, rankCurveRows } from "../fixtures/match-report";
 
 const souls = metricById.get("souls")!;
 const curve = { band: rankBand(73), points: parseCurve(rankCurveRows()) };
+
+describe("compared rank", () => {
+  it("is the game's own, else the player's current rank, else all ranks", () => {
+    expect(comparedRank(73, 116)).toEqual({ badge: 73, source: "game" });
+    expect(comparedRank(0, 116)).toEqual({ badge: 116, source: "current" });
+    expect(comparedRank(0, 0)).toEqual({ badge: 0, source: "none" });
+  });
+});
 
 describe("rank band", () => {
   it("covers the badge's whole tier, wider on request, clamped to real tiers", () => {

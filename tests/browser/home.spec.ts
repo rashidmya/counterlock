@@ -68,6 +68,8 @@ interface Fixtures {
   history?: number | unknown[];
   failFirstHistory?: boolean;
   rank?: unknown;
+  // Rank lookups fail while it's set.
+  failRank?: boolean;
   heroStats?: unknown[];
   failTotals?: boolean;
   failCurve?: boolean;
@@ -113,11 +115,13 @@ async function routeApi(page: Page, fixtures: Fixtures = {}) {
       );
     }
     if (url.pathname === "/v1/players/rank")
-      return json(
-        fixtures.rank ?? [
-          { account_id: ACCOUNT, badge: 53, rank: 5, subrank: 3 },
-        ],
-      );
+      return fixtures.failRank
+        ? json({}, 500)
+        : json(
+            fixtures.rank ?? [
+              { account_id: ACCOUNT, badge: 53, rank: 5, subrank: 3 },
+            ],
+          );
     if (url.pathname.endsWith("/match-history")) {
       if (fixtures.failFirstHistory && historyRequests++ === 0)
         return json({}, 500);
@@ -1240,6 +1244,34 @@ test("performance tab notes games compared with all ranks", async ({
       "Games without a recorded rank, and no current rank to use, are compared with all ranks.",
     ),
   ).toBeVisible();
+});
+
+test("performance tab says when the current rank didn't load, and Retry asks again", async ({
+  page,
+}) => {
+  const fixtures = { history: performanceHistory, failRank: true };
+  await storeAccount(page);
+  await routeApi(page, fixtures);
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const notice = view(page).getByText(
+    "Current rank unavailable: Deadlock API unavailable (500).",
+  );
+  await expect(notice).toBeVisible();
+  // Meanwhile, all ranks.
+  await expect(
+    view(page).getByText(
+      "Games without a recorded rank, and no current rank to use, are compared with all ranks.",
+    ),
+  ).toBeVisible();
+  fixtures.failRank = false;
+  await notice.getByRole("button", { name: "Retry" }).click();
+  await expect(
+    view(page).getByText(
+      "Games without a recorded rank use the player's current rank.",
+    ),
+  ).toBeVisible();
+  await expect(notice).toHaveCount(0);
 });
 
 test("performance tab widens a thin rank's average and says so", async ({

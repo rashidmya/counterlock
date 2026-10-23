@@ -14,6 +14,7 @@ import {
   optionLabel,
   viewNote,
 } from "../utils/perspective";
+import { comparedRank } from "../utils/rank-curve";
 import { NORMAL_MODE, type MatchReport } from "../utils/report";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { PlayerInsights } from "./PlayerInsights";
@@ -56,12 +57,14 @@ function Report({
       : null,
     [report.matchId],
   );
-  const badge = selected
-    ? selected.badge || (current.data?.get(selected.accountId) ?? 0)
-    : 0;
-  const rank = selected?.badge ? "match" : badge ? "current" : "none";
+  const { badge, source: rank } = comparedRank(
+    selected?.badge ?? 0,
+    (selected && current.data?.get(selected.accountId)) ?? 0,
+  );
   // Without a recorded rank, the curve waits for the current one.
   const waiting = !!selected && !selected.badge && current.loading;
+  // ...and a lookup that failed leaves all ranks, with Retry.
+  const rankFailed = !!selected && !selected.badge && !!current.error;
   // A player left before their curve loads drops its requests.
   const loaded = useAsync(
     selected && normal && !waiting
@@ -152,6 +155,7 @@ function Report({
           curve={curve}
           normal={normal}
           rank={rank}
+          rankFailed={rankFailed}
         />
       )}
       <SectionHeader title="Graph" />

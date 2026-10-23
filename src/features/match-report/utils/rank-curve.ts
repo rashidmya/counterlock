@@ -27,6 +27,24 @@ export interface RankCurve {
   points: CurvePoint[];
 }
 
+// Where a rank average's rank came from: the game's own, the player's
+// current rank (the game recorded none), or neither (all ranks).
+export type RankSource = "game" | "current" | "none";
+
+/**
+ * The rank a game is compared at, in the match report as on the
+ * Performance tab: the game's own, else the player's current rank, else all
+ * ranks (badge 0).
+ */
+export function comparedRank(
+  recorded: number,
+  current: number,
+): { badge: number; source: RankSource } {
+  if (recorded) return { badge: recorded, source: "game" };
+  if (current) return { badge: current, source: "current" };
+  return { badge: 0, source: "none" };
+}
+
 const tierName = (tier: number, ranks: Rank[]) =>
   ranks.find((rank) => rank.tier === tier)?.name ?? `Tier ${tier}`;
 
