@@ -268,7 +268,7 @@ export interface MetricSummary {
   // `heroMix`.
   trend: Trend | null;
   // A metric without a rank average over games on more than one hero: a
-  // change of hero moves it as much as form does, so it claims no trend.
+  // change of hero moves it more than form does, so it claims no trend.
   heroMix: boolean;
 }
 
@@ -342,7 +342,8 @@ export function trend(values: number[]): Trend | null {
 /**
  * One metric over the games in range. The trend follows each game against
  * its rank average when the metric has one, so changing hero or rank
- * doesn't read as a change in form; otherwise the values themselves.
+ * doesn't read as a change in form; otherwise the values themselves, and
+ * only over one hero's games (`heroMix`).
  */
 export function summarizeMetric(
   metric: PerformanceMetric,
