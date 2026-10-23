@@ -227,6 +227,10 @@
 .report-verdicts + .data-note {
   margin-top: 8px;
 }
+/* Where Retry leaves focus: a note to read, not a control, so no ring. */
+.report-verdicts + .data-note:focus {
+  outline: none;
+}
 .report-pick {
   margin-top: 16px;
 }

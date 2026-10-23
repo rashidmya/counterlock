@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { deadlockApi } from "@/shared/api/DeadlockApi";
 import type { AsyncState } from "@/shared/api/useAsync";
 import { useAsync } from "@/shared/api/useAsync";
@@ -240,6 +240,14 @@ export function PerformanceTab({
   const shown =
     !settled && last && games.length ? last : { games, totals, averages };
   const stale = shown === last;
+  // A notice's Retry goes with the notice as soon as it's pressed: focus
+  // moves to the status, which then says "Updating…", rather than falling
+  // to the page.
+  const status = useRef<HTMLParagraphElement>(null);
+  const retry = (again: () => void) => () => {
+    status.current?.focus();
+    again();
+  };
   const summaries = PERFORMANCE_METRICS.map((metric) =>
     summarizeMetric(
       metric,
@@ -267,7 +275,7 @@ export function PerformanceTab({
           </div>
           {/* Always there, so screen readers announce it; it takes no space
               of its own, so the controls never move. */}
-          <p className="perf-status" role="status">
+          <p className="perf-status" role="status" ref={status} tabIndex={-1}>
             <span>{stale ? "Updating…" : ""}</span>
           </p>
         </div>
@@ -309,7 +317,7 @@ export function PerformanceTab({
           {!stale && totals.error && (
             <p className="notice warning" role="status">
               Match details unavailable: {totals.error}
-              <button type="button" onClick={totals.retry}>
+              <button type="button" onClick={retry(totals.retry)}>
                 Retry
               </button>
             </p>
@@ -317,7 +325,7 @@ export function PerformanceTab({
           {!stale && averages.error && (
             <p className="notice warning" role="status">
               Rank averages unavailable: {averages.error}
-              <button type="button" onClick={averages.retry}>
+              <button type="button" onClick={retry(averages.retry)}>
                 Retry
               </button>
             </p>
@@ -326,7 +334,7 @@ export function PerformanceTab({
             <p className="notice warning" role="status">
               Rank averages unavailable for {averages.data.failed.size} of{" "}
               {count(games.length)}: {averages.data.error}
-              <button type="button" onClick={averages.retry}>
+              <button type="button" onClick={retry(averages.retry)}>
                 Retry
               </button>
             </p>
@@ -336,7 +344,7 @@ export function PerformanceTab({
           {!stale && averages.data?.rankError && (
             <p className="notice warning" role="status">
               Current rank unavailable: {averages.data.rankError}
-              <button type="button" onClick={averages.retry}>
+              <button type="button" onClick={retry(averages.retry)}>
                 Retry
               </button>
             </p>

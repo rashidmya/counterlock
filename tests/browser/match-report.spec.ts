@@ -578,7 +578,10 @@ test("Retry asks again for current ranks that failed to load", async ({
     /^Rank average unavailable: Deadlock API unavailable \(500\)\./,
   );
   healthy = true;
-  await note.getByRole("button", { name: "Retry" }).click();
+  // From the keyboard: focus stays on the note, which says what loads.
+  await note.getByRole("button", { name: "Retry" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(note).toBeFocused();
   // The player's current rank, looked up again, not all ranks.
   await expect(note).toHaveText(
     `Compared with the average ${lead.name} at Eternus at the same match length, over the last 30 days. This player's rank isn't recorded for this match, so the average uses their current rank.`,

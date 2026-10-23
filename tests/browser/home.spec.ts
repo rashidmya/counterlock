@@ -1197,7 +1197,11 @@ test("performance tab asks for match details again on Retry", async ({
   const damage = card(page, "Hero damage / min").locator(".perf-card-numbers");
   await expect(notice).toBeVisible();
   fixtures.failTotals = false;
-  await notice.getByRole("button", { name: "Retry" }).click();
+  // From the keyboard: the notice goes, and focus moves to the status
+  // rather than falling to the page.
+  await notice.getByRole("button", { name: "Retry" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(view(page).locator(".perf-status")).toBeFocused();
   await expect(damage).toHaveText("1,000 20 games · rank avg 500");
   await expect(notice).toHaveCount(0);
   // The cards kept while Last 50 loads are the ones from after the Retry.

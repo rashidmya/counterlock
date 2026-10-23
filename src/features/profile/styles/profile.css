@@ -494,6 +494,11 @@
     min-width: 5.25em;
   }
 }
+/* Where Retry leaves focus: a place to read from, not a control, so no
+   ring. */
+.perf-status:focus {
+  outline: none;
+}
 .perf-status span {
   position: absolute;
   top: 50%;
