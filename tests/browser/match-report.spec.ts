@@ -394,6 +394,18 @@ test("a match row opens the report; Back returns to the profile", async ({
   );
 });
 
+/** The report's current-rank lookups; the home page asks for one account, without a comma. */
+function rankLookups(page: Page) {
+  const asked: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    const ids = url.searchParams.get("account_ids");
+    if (url.pathname === "/v1/players/rank" && ids?.includes(","))
+      asked.push(ids);
+  });
+  return asked;
+}
+
 async function openWith(page: Page, metadata: unknown, ranks?: unknown[]) {
   await storeAccount(page);
   await routeApi(page);
@@ -431,12 +443,7 @@ test("a player without a recorded rank is compared at their current rank, and th
 test("with no ranks recorded and no current rank, the average covers all ranks and says so", async ({
   page,
 }) => {
-  const asked: string[] = [];
-  page.on("request", (request) => {
-    const url = new URL(request.url());
-    if (url.pathname === "/v1/players/rank")
-      asked.push(url.searchParams.get("account_ids")!);
-  });
+  const asked = rankLookups(page);
   const unranked = matchMetadata(ACCOUNT);
   for (const player of unranked.match_info.players)
     delete (player as Record<string, unknown>).player_rank_data;
@@ -444,22 +451,95 @@ test("with no ranks recorded and no current rank, the average covers all ranks a
   await expect(
     report(page).locator(".report-verdicts + .data-note"),
   ).toHaveText(
-    `Compared with the average ${lead.name} at all ranks at the same match length, over the last 30 days. This player's rank isn't recorded for this match and their current rank is unknown, so the average covers all ranks.`,
+    `Compared with the average ${lead.name} at all ranks at the same match length, over the last 30 days. This player's rank isn't recorded for this match, and there's no current rank to use.`,
   );
-  // One request covers every player's current rank (the home page asks for
-  // the stored account's alone).
+  // One request covers every player's current rank.
   const players = [
     ...Array.from({ length: 11 }, (_, i) => 5001 + i),
     ACCOUNT,
   ].join(",");
-  expect(asked.filter((ids) => ids.includes(","))).toEqual([players]);
+  expect(asked).toEqual([players]);
+});
+
+test("the report waits for current ranks only where it needs them, and asks for each curve once", async ({
+  page,
+}) => {
+  const curves: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/v1/analytics/player-performance-curve")
+      curves.push(
+        `${url.searchParams.get("hero_ids")} at ${url.searchParams.get("min_average_badge") ?? "all ranks"}`,
+      );
+  });
+  // Slots 1 and 3 have no recorded rank; both players are Eternus now.
+  const metadata = matchMetadata(ACCOUNT);
+  for (const index of [0, 2])
+    delete (metadata.match_info.players[index] as Record<string, unknown>)
+      .player_rank_data;
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await storeAccount(page);
+  await routeApi(page);
+  await page.route(
+    `https://api.deadlock-api.com/v1/matches/${MATCH_ID}/metadata`,
+    (route) => route.fulfill({ json: metadata, headers: cors }),
+  );
+  await page.route(
+    "https://api.deadlock-api.com/v1/players/rank**",
+    async (route) => {
+      const ids = new URL(route.request().url()).searchParams.get(
+        "account_ids",
+      )!;
+      // Hold the report's lookup back (the home page's has no comma).
+      if (ids.includes(",")) await held;
+      return route.fulfill({
+        json: [ACCOUNT, 5002].map((account_id) => ({
+          account_id,
+          badge: 116,
+          rank: 11,
+          subrank: 6,
+        })),
+        headers: cors,
+      });
+    },
+  );
+  await page.goto("/");
+  await view(page).getByRole("button", { name: "Open match report →" }).click();
+  const note = report(page).locator(".report-verdicts + .data-note");
+  // The lead waits for the lookup...
+  await expect(note).toHaveText("Loading the rank average…");
+  // ...a player with a recorded rank doesn't.
+  await viewingAs(page).selectOption("2");
+  await expect(note).toHaveText(
+    new RegExp(`^Compared with the average ${second.name} at Emissary`),
+  );
+  release();
+  await viewingAs(page).selectOption("3");
+  await expect(note).toHaveText(/at Eternus .* uses their current rank\.$/);
+  await viewingAs(page).selectOption("1");
+  await expect(note).toHaveText(/at Eternus .* uses their current rank\.$/);
+  // Each curve was asked for once, at the rank it needed: none at all
+  // ranks while the lookup was held.
+  expect(curves.sort()).toEqual(
+    [
+      `${lead.id} at 111`,
+      `${second.id} at 71`,
+      `${heroes[2].id} at 111`,
+    ].sort(),
+  );
 });
 
 test("Street Brawl reports say rank averages cover normal matches only", async ({
   page,
 }) => {
+  const asked = rankLookups(page);
   const brawl = matchMetadata(ACCOUNT);
   brawl.match_info.game_mode = 4;
+  // Even without recorded ranks: Street Brawl has no rank averages to look
+  // a current rank up for.
+  for (const player of brawl.match_info.players)
+    delete (player as Record<string, unknown>).player_rank_data;
   await openWith(page, brawl);
   const r = report(page);
   await expect(r.locator(".report-banner .eyebrow")).toHaveText(
@@ -471,6 +551,7 @@ test("Street Brawl reports say rank averages cover normal matches only", async (
   await expect(r.locator(".graph-foot")).toHaveText(
     "You · rank averages cover normal matches only. Snapshots every 3 min until 15:00, then every 5 min; lines connect them.",
   );
+  expect(asked).toEqual([]);
 });
 
 test("when the average stops before the match ends, there are no verdicts and the notes say why", async ({

@@ -27,7 +27,7 @@ export function curveNote(
     (rank === "current"
       ? " This player's rank isn't recorded for this match, so the average uses their current rank."
       : rank === "none"
-        ? " This player's rank isn't recorded for this match and their current rank is unknown, so the average covers all ranks."
+        ? " This player's rank isn't recorded for this match, and there's no current rank to use."
         : "");
   if (!points.length)
     return `Too few ${hero} games at ${band.label} in the last 30 days.${notes}`;
