@@ -1,3 +1,7 @@
+import { RATE_WINDOW, defaultRateStore, type RateStore } from "./rate-store";
+
+export { RATE_WINDOW };
+
 const BASE = "https://api.deadlock-api.com";
 const BUSY = "API busy. Retry after the cooldown.";
 const MINUTE = 60_000;
@@ -15,10 +19,6 @@ export const RATE_LIMITS: Record<string, number> = {
   "/v1/matches/metadata": 30,
   "/v1/players/rank": 20,
 };
-// A second's margin, so latency can't put a minute's last request into the
-// API's next window early.
-export const RATE_WINDOW = MINUTE + 1000;
-
 /**
  * The group a path's rate limit belongs to: the analytics endpoints share
  * one limit; any other endpoint has its own.
@@ -38,6 +38,12 @@ const EVERYTHING = "*";
 // comes from (a match from the API's cache, or from Steam).
 const refused = (path: string, group: string) =>
   RATE_LIMITS[group] ? group : path;
+
+// The cooldowns that hold a group back, shared with the app's other tabs and
+// windows, as the API counts per IP: everything's, and the group's own when
+// the API limits it as a whole. A refused path's stays with this tab.
+const sharedKeys = (group: string) =>
+  RATE_LIMITS[group] ? [EVERYTHING, group] : [EVERYTHING];
 
 // A request on its way: shared by everyone who asks for its path while it
 // is out.
@@ -61,8 +67,8 @@ export class DeadlockApi {
     { data: unknown; fetchedAt: number; ttl: number }
   >();
   private inFlight = new Map<string, Pending>();
+  // Refused paths' cooldowns.
   private cooldowns = new Map<string, number>();
-  private sent = new Map<string, number[]>();
   // Requests waiting for room: a cooldown wakes them to fail at once.
   private sleepers = new Set<() => void>();
   private sweptAt = 0;
@@ -80,7 +86,11 @@ export class DeadlockApi {
           resolve();
         });
       }),
-  ) {}
+    private limits: RateStore = defaultRateStore(now),
+  ) {
+    // A cooldown another tab started holds back this one's waiting requests.
+    limits.watch(() => this.wake());
+  }
 
   /**
    * The response for `path`, cached for `ttlMs`. A caller whose `signal`
@@ -143,9 +153,9 @@ export class DeadlockApi {
   }
 
   private cooling(path: string, group: string) {
-    const now = this.now();
-    return [EVERYTHING, refused(path, group)].some(
-      (key) => now < (this.cooldowns.get(key) ?? 0),
+    return (
+      this.now() < (this.cooldowns.get(path) ?? 0) ||
+      this.limits.cooling(sharedKeys(group))
     );
   }
 
@@ -162,9 +172,10 @@ export class DeadlockApi {
   }
 
   /**
-   * Waits until the group has had fewer than `limit` requests in the window,
-   * then counts this one. A cooldown that starts while it waits fails it at
-   * once, before it takes a slot, as does every caller leaving.
+   * Waits until the group has had fewer than `limit` requests in the window
+   * (in every tab), then counts this one. A cooldown that starts while it
+   * waits fails it at once, before it takes a slot, as does every caller
+   * leaving.
    */
   private async throttle(
     path: string,
@@ -172,28 +183,30 @@ export class DeadlockApi {
     limit: number,
     abandoned: AbortSignal,
   ) {
-    const sent = this.sent.get(group) ?? [];
-    this.sent.set(group, sent);
     for (;;) {
       abandoned.throwIfAborted();
-      if (this.cooling(path, group)) throw new Error(BUSY);
-      const now = this.now();
-      while (sent.length && now - sent[0] >= RATE_WINDOW) sent.shift();
-      if (sent.length < limit) {
-        sent.push(now);
-        return;
-      }
-      await this.pause(sent[0] + RATE_WINDOW - now, abandoned);
+      const wait = await this.limits.take(group, limit, sharedKeys(group));
+      if (wait === null) throw new Error(BUSY);
+      if (!wait) return;
+      await this.pause(wait, abandoned, () => this.cooling(path, group));
     }
   }
 
-  /** Waits `ms`, or less when a cooldown starts or every caller leaves. */
-  private async pause(ms: number, abandoned: AbortSignal) {
+  /**
+   * Waits `ms`, or less when a cooldown starts or every caller leaves;
+   * at once if either happened while the slot was asked for.
+   */
+  private async pause(
+    ms: number,
+    abandoned: AbortSignal,
+    cooling: () => boolean,
+  ) {
     const woken = new AbortController();
     const wake = () => woken.abort();
     this.sleepers.add(wake);
     abandoned.addEventListener("abort", wake);
     try {
+      if (abandoned.aborted || cooling()) return;
       await Promise.race([
         this.wait(ms, woken.signal),
         new Promise((resolve) =>
@@ -208,9 +221,14 @@ export class DeadlockApi {
     }
   }
 
-  private cool(key: string, until: number) {
-    this.cooldowns.set(key, until);
+  private wake() {
     for (const wake of [...this.sleepers]) wake();
+  }
+
+  private cool(key: string, until: number) {
+    if (key === EVERYTHING || RATE_LIMITS[key]) this.limits.cool(key, until);
+    else this.cooldowns.set(key, until);
+    this.wake();
   }
 
   // Responses that have outlived their ttl are dropped, at most once a

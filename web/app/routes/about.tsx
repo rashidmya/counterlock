@@ -28,7 +28,9 @@ export default function AboutRoute() {
         If you pick your Steam account, it is remembered only in this browser
         (in <code>localStorage</code>). Use "Switch account" to clear it.
         Nothing about it is kept on a Counterlock server, because there isn't
-        one.
+        one. The site also keeps the times of its recent requests to Deadlock
+        API in <code>localStorage</code>, and any wait the API asked for, so
+        that all its open tabs together keep to the API&apos;s rate limits.
       </p>
       <p>
         Searches and player IDs you enter are sent to Deadlock API to fetch

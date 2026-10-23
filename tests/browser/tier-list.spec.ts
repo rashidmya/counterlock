@@ -179,3 +179,39 @@ test("clicking a tile opens the hero on the Heroes tab", async ({ page }) => {
     page.getByRole("button", { name: "Heroes", exact: true }),
   ).toHaveClass(/active/);
 });
+
+test("a cooldown one tab was given holds the app's other tabs back", async ({
+  context,
+}) => {
+  const asked: string[] = [];
+  await context.route("https://api.deadlock-api.com/**", (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname !== "/v1/analytics/hero-stats")
+      return route.fulfill({ json: [], headers: cors });
+    asked.push(url.pathname);
+    return route.fulfill({
+      status: 429,
+      json: {},
+      headers: {
+        ...cors,
+        "access-control-expose-headers": "Retry-After",
+        "retry-after": "3600",
+      },
+    });
+  });
+  const first = await context.newPage();
+  await first.goto("/");
+  await first.getByRole("button", { name: "Tier list", exact: true }).click();
+  await expect(first.getByRole("status")).toHaveText(
+    /^Hero stats unavailable: API busy\. Retry after the cooldown\./,
+  );
+  expect(asked).toHaveLength(1);
+  // Another tab of the app waits the cooldown out too, without asking.
+  const second = await context.newPage();
+  await second.goto("/");
+  await second.getByRole("button", { name: "Tier list", exact: true }).click();
+  await expect(second.getByRole("status")).toHaveText(
+    /^Hero stats unavailable: API busy\. Retry after the cooldown\./,
+  );
+  expect(asked).toHaveLength(1);
+});

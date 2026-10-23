@@ -78,6 +78,7 @@ test("about page covers attribution and privacy", async ({ page }) => {
   await expect(main).toContainText("not affiliated with Valve");
   await expect(main).toContainText("localStorage");
   await expect(main).toContainText("Switch account");
+  await expect(main).toContainText("keep to the API's rate limits");
   await expect(main).toContainText("Google Fonts");
 });
 
