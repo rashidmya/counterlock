@@ -49,12 +49,18 @@ test.describe("a touch screen at phone width", () => {
     });
     await expect(souls.locator("circle")).toHaveCount(8);
     const chart = (await souls.getByRole("slider").boundingBox())!;
+    const tip = souls.locator(".spark-tip");
+    // A tap anywhere else clears a picked game.
+    await page.touchscreen.tap(chart.x + chart.width - 2, chart.y + 40);
+    await expect(tip).toBeVisible();
+    const title = (await souls.locator("h3").boundingBox())!;
+    await page.touchscreen.tap(title.x + 5, title.y + 5);
+    await expect(tip).toHaveCount(0);
     // The newest game, on the right, is match 1001.
     await page.touchscreen.tap(chart.x + chart.width - 2, chart.y + 40);
-    const tip = souls.locator(".spark-tip");
     await expect(tip).toBeVisible();
     await expect(page).toHaveURL(`/players/${FARGO}`);
-    await tip.getByRole("link", { name: "Report →" }).tap();
+    await tip.getByRole("link", { name: "Match report" }).tap();
     await expect(page).toHaveURL(`/matches/1001?player=${FARGO}`);
   });
 });

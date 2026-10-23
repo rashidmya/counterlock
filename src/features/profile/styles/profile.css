@@ -595,15 +595,17 @@
   height: 80px;
 }
 .sparkline:focus-visible {
-  outline: 1px solid var(--gold);
+  outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
 .sparkline svg {
   display: block;
 }
+/* A horizontal drag picks games; a vertical one still scrolls the page. */
 .spark-hit {
   fill: transparent;
   cursor: pointer;
+  touch-action: pan-y;
 }
 .spark-cross {
   stroke: rgb(from var(--cream) r g b / 0.35);
@@ -635,7 +637,8 @@
 }
 .spark-tip {
   position: absolute;
-  bottom: calc(100% + 2px);
+  /* Touching the chart: a gap would drop the tip as a mouse moves up. */
+  bottom: 100%;
   left: 0;
   z-index: 1;
   display: grid;
@@ -658,8 +661,10 @@
 /* A 24 px touch target without making the tip taller. */
 .spark-tip a,
 .spark-tip button {
+  display: inline-block;
   margin: -4px 0;
   padding: 4px 0;
+  line-height: 16px;
   border: 0;
   background: none;
   font: inherit;

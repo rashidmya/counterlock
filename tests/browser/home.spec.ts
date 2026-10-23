@@ -785,13 +785,29 @@ test("performance tab describes the game under the pointer and a click opens its
   const souls = card(page, "Souls / min");
   await expect(dots(page, "Souls / min")).toHaveCount(20);
   const chart = (await souls.getByRole("slider").boundingBox())!;
+  const tip = souls.locator(".spark-tip");
+  // The sixth game from the left (oldest first): 15h ago, a win on
+  // heroes[0], 1,000 souls a minute.
+  const step = (chart.width - 12) / 19;
+  await page.mouse.move(chart.x + 6 + 5 * step, chart.y + 40);
+  await expect(tip.locator("span")).toHaveText([
+    `${heroName(heroes[0])} · Win · 15h ago`,
+    "1,000 rank avg 1,000 · Report →",
+  ]);
+  await expect(tip).not.toHaveClass(/right/);
+  // The tip touches the chart, so a pointer moving up into it stays in.
+  const above = (await tip.boundingBox())!;
+  expect(above.y + above.height).toBeGreaterThanOrEqual(chart.y - 0.5);
+  // Leaving the chart clears it.
+  await page.mouse.move(chart.x - 40, chart.y - 150);
+  await expect(tip).toHaveCount(0);
   // The newest game is on the right: 1h ago, lost, 1,200 souls a minute.
   await page.mouse.move(chart.x + chart.width - 2, chart.y + 40);
-  const tip = souls.locator(".spark-tip span");
-  await expect(tip).toHaveText([
+  await expect(tip.locator("span")).toHaveText([
     `${heroName(heroes[0])} · Loss · 1h ago`,
     "1,200 rank avg 1,000 · Report →",
   ]);
+  await expect(tip).toHaveClass(/right/);
   await expect(souls.locator("circle.picked")).toHaveCount(1);
   await page.mouse.click(chart.x + chart.width - 2, chart.y + 40);
   await expect(view(page).locator(".match-report")).toBeVisible();
@@ -808,6 +824,7 @@ test("performance tab points can be picked and opened from the keyboard", async 
   await page.getByRole("tab", { name: "Performance" }).click();
   await expect(dots(page, "Souls / min")).toHaveCount(20);
   const chart = card(page, "Souls / min").getByRole("slider");
+  const tip = card(page, "Souls / min").locator(".spark-tip");
   // Focus starts on the newest game.
   await chart.focus();
   await expect(chart).toHaveAttribute("aria-valuenow", "20");
@@ -815,12 +832,33 @@ test("performance tab points can be picked and opened from the keyboard", async 
     "aria-valuetext",
     `${heroName(heroes[0])} · Loss · 1h ago: 1,200, rank avg 1,000`,
   );
+  // Focus leaving the chart clears the pick.
+  await expect(tip).toBeVisible();
+  await page.keyboard.press("Shift+Tab");
+  await expect(tip).toHaveCount(0);
+  await chart.focus();
+  await page.keyboard.press("Home");
+  await expect(chart).toHaveAttribute("aria-valuenow", "1");
+  await page.keyboard.press("End");
+  await expect(chart).toHaveAttribute("aria-valuenow", "20");
   await page.keyboard.press("ArrowLeft");
   await expect(chart).toHaveAttribute("aria-valuenow", "19");
   await expect(chart).toHaveAttribute(
     "aria-valuetext",
     `${heroName(heroes[1])} · Win · 2h ago: 1,200, rank avg 1,000`,
   );
+  // A press on the tip leaves the focus, and the tip, where they are.
+  await tip.locator("span").first().click();
+  await expect(chart).toBeFocused();
+  await expect(chart).toHaveAttribute("aria-valuenow", "19");
+  // Tab reaches the tip's link; Escape there clears the tip.
+  await page.keyboard.press("Tab");
+  await expect(tip.getByRole("button", { name: "Match report" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(tip).toHaveCount(0);
+  // Back on the chart, Enter opens the picked game.
+  await chart.focus();
+  await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("Enter");
   await expect(view(page).locator(".match-report")).toBeVisible();
   expect(reports).toEqual([3001]);

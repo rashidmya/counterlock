@@ -65,7 +65,7 @@ export function nearestGame(px: number, width: number, count: number) {
  * Pointing at it, or the arrow keys, picks the nearest game and describes
  * it above the chart. A click, Enter or the tip's "Report" link opens that
  * game's match report. A tap only picks, so a touch screen shows the
- * details first.
+ * details first; dragging along the chart moves the pick.
  */
 export function Sparkline({
   points,
@@ -82,9 +82,13 @@ export function Sparkline({
   const box = useRef<HTMLDivElement>(null);
   const width = useElementWidth(chart);
   const { navigate } = useLinks();
+  // The picked game's match id: when new games replace these, an index
+  // would point at another game.
   const [picked, setPicked] = useState<number | null>(null);
   const pointer = useRef("mouse");
-  const picking = picked !== null;
+  const index = points.findIndex((p) => p.matchId === picked);
+  const game = index < 0 ? undefined : points[index];
+  const picking = !!game;
   // A tapped game stays picked; tapping anywhere outside clears it.
   useEffect(() => {
     if (!picking) return;
@@ -111,8 +115,8 @@ export function Sparkline({
     points.length > 1 ? (width - 2 * PAD_X) / (points.length - 1) : width;
   const radius = dotRadius(step);
   const last = points.length - 1;
-  const game = picked === null ? undefined : points[picked];
   const text = describe(game ?? points[last]);
+  const pick = (at: number) => setPicked(points[at].matchId);
   const at = (event: MouseEvent<SVGRectElement>) =>
     nearestGame(
       event.clientX -
@@ -122,20 +126,25 @@ export function Sparkline({
     );
   const track = (event: PointerEvent<SVGRectElement>) => {
     pointer.current = event.pointerType;
-    setPicked(at(event));
+    pick(at(event));
   };
   const keys = (event: KeyboardEvent) => {
+    // Browser shortcuts such as Alt+Left stay the browser's.
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const back = Math.max(0, (index < 0 ? last + 1 : index) - 1);
+    const next = Math.min(last, (index < 0 ? last : index) + 1);
     const moves: Record<string, number> = {
-      ArrowLeft: Math.max(0, (picked ?? last + 1) - 1),
-      ArrowRight: Math.min(last, (picked ?? last) + 1),
+      ArrowLeft: back,
+      ArrowDown: back,
+      ArrowRight: next,
+      ArrowUp: next,
       Home: 0,
       End: last,
     };
     if (event.key in moves) {
       event.preventDefault();
-      setPicked(moves[event.key]);
+      pick(moves[event.key]);
     } else if (event.key === "Enter" && game) navigate(route(game));
-    else if (event.key === "Escape") setPicked(null);
   };
   return (
     <div
@@ -149,6 +158,10 @@ export function Sparkline({
         if (!box.current?.contains(event.relatedTarget as Node))
           setPicked(null);
       }}
+      // Escape clears the pick, from the chart or the tip's link.
+      onKeyDown={(event) => {
+        if (event.key === "Escape") setPicked(null);
+      }}
     >
       <div
         className="sparkline"
@@ -158,19 +171,25 @@ export function Sparkline({
         aria-label={`${label}. Arrow keys pick a game, Enter opens its match report.`}
         aria-valuemin={1}
         aria-valuemax={points.length}
-        aria-valuenow={(picked ?? last) + 1}
+        aria-valuenow={(index < 0 ? last : index) + 1}
         aria-valuetext={`${text.game}: ${text.value}${text.average ? `, ${text.average}` : ""}`}
         onKeyDown={keys}
         // The keyboard starts on the newest game.
-        onFocus={() => setPicked((current) => current ?? last)}
+        onFocus={() =>
+          setPicked((current) =>
+            points.some((p) => p.matchId === current)
+              ? current
+              : points[last].matchId,
+          )
+        }
       >
         {width > 0 && values.length > 0 && (
           <svg width={width} height={HEIGHT} aria-hidden="true">
             {game && (
               <line
                 className="spark-cross"
-                x1={x(picked!)}
-                x2={x(picked!)}
+                x1={x(index)}
+                x2={x(index)}
                 y1={0}
                 y2={HEIGHT}
               />
@@ -191,14 +210,14 @@ export function Sparkline({
                 y,
               )}
             />
-            {points.map((p, index) =>
+            {points.map((p, at) =>
               p.value === null ? null : (
                 <circle
                   key={p.matchId}
-                  className={`${p.won ? "win" : "loss"}${index === picked ? " picked" : ""}`}
-                  cx={x(index)}
+                  className={`${p.won ? "win" : "loss"}${at === index ? " picked" : ""}`}
+                  cx={x(at)}
                   cy={y(p.value)}
-                  r={index === picked ? radius + 1.5 : radius}
+                  r={at === index ? radius + 1.5 : radius}
                 />
               ),
             )}
@@ -209,8 +228,16 @@ export function Sparkline({
               onPointerMove={track}
               onPointerDown={track}
               onClick={(event) => {
-                if (pointer.current !== "touch")
-                  navigate(route(points[at(event)]));
+                // A tap only picks; a modified click is the browser's.
+                if (
+                  pointer.current === "touch" ||
+                  event.ctrlKey ||
+                  event.metaKey ||
+                  event.shiftKey ||
+                  event.altKey
+                )
+                  return;
+                navigate(route(points[at(event)]));
               }}
             />
           </svg>
@@ -219,11 +246,19 @@ export function Sparkline({
       {game && (
         // On the picked game's side, over the card's numbers, so the whole
         // line stays in sight.
-        <div className={`spark-tip${x(picked!) > width / 2 ? " right" : ""}`}>
+        <div
+          className={`spark-tip${x(index) > width / 2 ? " right" : ""}`}
+          // A press here keeps focus where it is: Safari doesn't focus a
+          // link on press, so the chart's blur would clear the tip first.
+          onMouseDown={(event) => event.preventDefault()}
+        >
           <span>{text.game}</span>
           <span>
-            <b>{text.value}</b> {text.average && <>{text.average} · </>}
-            <RouteLink route={route(game)}>Report →</RouteLink>
+            <b>{text.value}</b>
+            {text.average ? ` ${text.average}` : ""} ·{" "}
+            <RouteLink route={route(game)} aria-label="Match report">
+              Report →
+            </RouteLink>
           </span>
         </div>
       )}
