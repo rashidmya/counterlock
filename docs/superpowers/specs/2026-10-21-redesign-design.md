@@ -632,6 +632,8 @@ Changed after phase 4 (second follow-up pass): the ten cards run five a row wher
   explanation.
 - Refresh while the tab is open (e.g. every 30–60s; builder's call).
 
+Built in phase 5: the website's tab, and the app's for anyone but your own account, asks `GET /v1/matches/active?account_ids=…` for the player alone. It shows each team's heroes and players (linked to their profiles), the souls lead (rounds won in Street Brawl), the mode, the minutes since `start_time` (the API's `duration_s` has always been empty) and each team's objectives still standing, read from its `objectives_mask` (the game's `ECitadelObjective` bits: the Guardians, Walkers and Base Guardians of lanes 1, 3 and 4, the two Shrines and the Patron, "Weakened" once its first phase is down; Street Brawl has none); a value the API leaves out shows "—". It checks again every minute while it is on screen, past the browser's HTTP cache (which would keep an answer for up to four minutes); a check that falls due while it is hidden waits until it is back, and the API's own copy of the list can be a few minutes old. A check that fails keeps the last answer and says so, with Retry; focus stays in place through Retry and the minute's checks. Your own account in the app (the account Overwolf reports playing on this PC, or else the remembered one) shows the Live page's match overview under a section header, or "Not in a game" with whether Deadlock is running. On phones the teams stack and the five profile tabs spread over one row.
+
 ### Live tab (desktop app)
 
 Same behaviour and content as today (states, rosters, ranks, build panel,
@@ -685,7 +687,7 @@ Build and ship in this order. Each phase gets its own plan.
    builds as authored, counter items with enemy picker / live roster.
 3. **Match report (done).**
 4. **Performance tab (done).**
-5. **Profile Live tab** (app + web).
+5. **Profile Live tab (done)** (app + web).
 6. **Overlay panels** (five windows, settings, removal of the old
    overlays).
 
