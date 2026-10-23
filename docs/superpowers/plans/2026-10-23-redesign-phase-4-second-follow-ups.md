@@ -9,6 +9,7 @@
 - **The profile:** opened afresh, it starts at Overview. Coming back (the report's "Back to profile", or the browser's Back) finds it as it was left, on the website with its scroll position.
 - **The match report:** no Impact share of a team total of 0.
 - **Tests:** a partial failure, and its Retry, while older cards are kept.
+- **The final review's fixes (Tasks 14–20):** a request every caller left before it claimed its slot is never sent; a stored cooldown lasts at most ten minutes; the Live roster asks again for stats that failed; coming back on the website keeps Matches' "Show more" and the Heroes sort; a scroll position still waiting to come back is kept; the chart's tip covers a shorter card's numbers, which sit with the chart at the foot.
 
 **Architecture:**
 - **`src/shared/api/rate-store.ts`** (new) holds the request counts and cooldowns behind a `RateStore`: `memoryRateStore` (one tab's own), `sharedRateStore` (in `localStorage`, taken under a lock, other tabs told through `storage` events) and `defaultRateStore`, which picks the shared one wherever the browser has storage.
@@ -23,13 +24,13 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-redesign-design.md` ("Performance tab", "Match report", "Profile") and the follow-ups listed in `docs/superpowers/plans/2026-10-23-redesign-phase-4-follow-ups.md`. Owner decisions on 2026-10-23 ("do the follow ups"): all four behaviour changes offered (hide share trends on several heroes, five card columns when wide, fresh opens start at Overview, "—" for a team total of 0); keep the three chart trade-offs as decided; one limit everywhere (shared across tabs and windows, and the two outside clients on the shared one).
 
-**Every code block in this plan was built and run before the plan was written** (reference commits in a scratch worktree, replayed from this plan's blocks). The full result:
-- `npm test` 397 passed;
+**Every code block in this plan was built and run before the plan was written** (reference commits in a scratch worktree, replayed from this plan's blocks). Tasks 14–20, the final review's fixes, were built and checked the same way after Tasks 1–13 ran. The full result:
+- `npm test` 405 passed;
 - `npm run test:browser` 154 passed;
-- `npm run test:web` 79 passed;
+- `npm run test:web` 82 passed;
 - both type checks, `npm run build`, `npm run web:build` and `npm run validate:manifest` passed.
 
-Each task's end state was also checked on its own: type check and unit tests after every task (385, 390, 391, 394, 395, 396, 397, 397, 397, 397, 397 and 397 tests), and both browser suites after every task (desktop 148, 149, 149, 150, 152, 153, 153, 153, 153, 153, 153 and 154; website 76, 76, 76, 76, 76, 76, 76, 77, 78, 79, 79 and 79). Copy the code as given. If something fails, fix the cause rather than the test.
+Each task's end state was also checked on its own: type check and unit tests after every task (385, 390, 391, 394, 395, 396, 397, 397, 397, 397, 397 and 397 tests for Tasks 1–12, then 401, 403, 405, 405, 405, 405 and 405 for Tasks 14–20), and both browser suites after every task (desktop 148, 149, 149, 150, 152, 153, 153, 153, 153, 153, 153 and 154, then 154, 154, 154, 154, 154, 154 and 154; website 76, 76, 76, 76, 76, 76, 76, 77, 78, 79, 79 and 79, then 79, 79, 79, 81, 82, 82 and 82). Copy the code as given. If something fails, fix the cause rather than the test.
 
 ## Decisions made while planning (checked in the browser on 2026-10-23)
 
@@ -43,7 +44,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
 - **The two outside clients go through the shared one (owner's choice).**
   - **`StatsClient`** (the Live roster's hero stats and ranks) takes a `DeadlockApi` instead of `fetch`. Its own cooldown goes: the client's apply. Its errors are now the client's ("Data unavailable or profile protected.", "Deadlock API unavailable (500).", "API busy. Retry after the cooldown."), shown in the roster's tooltips. A 429 on one roster's hero stats now holds back only that request, as for every endpoint the API doesn't limit as a whole; rank lookups pause as a group.
   - **`loadBuild`** (the compact overlay's build) asks through the client with `TTL.analytics` and the hook's signal; its own five-minute cache goes, as the client caches both responses. A hook that times out or unmounts stops waiting at once; a request already sent completes and is cached.
-- **Leaving drops only what hasn't gone out.** A request in a group's queue is dropped once every caller has left; one already sent completes, and its answer is cached for whoever asks next. A caller that leaves hears so at once (its promise rejects with the signal's reason).
+- **Leaving drops only what hasn't claimed its slot.** A request in a group's queue is dropped once every caller has left. Once it claims its slot, in the same step as the count (Task 14), it goes out: it completes, and its answer is cached for whoever asks next. A caller that leaves hears so at once (its promise rejects with the signal's reason).
 - **The totals cache keeps batches, not promises.** Each match maps to its totals, or to the batch request still out for it. A call that needs a batch another asked for asks for that path again: the client shares the request and counts both callers, so one leaving doesn't take the other's games. (React aborts a load before starting the next, but a promise tied to the first caller's signal would reject for both.) A batch that fails or was dropped is asked for again as the same batch.
 - **Groups stop at the signal.** `fetchGameAverages` starts no more hero-and-rank groups once its signal aborts, and fails rather than answer.
 - **One rank rule.** `comparedRank(recorded, current)` gives `{ badge, source }`: the game's own rank (`"game"`), else the current rank (`"current"`), else all ranks (`"none"`). The report's `"match"` is now `"game"`, as on the tab.
@@ -64,30 +65,49 @@ Each task's end state was also checked on its own: type check and unit tests aft
 - **The scroll position comes back on the website.** The profile loads again on Back, so the router's own restore finds the page too short and stops at the top or partway.
   - **Kept:** when the profile unmounts, in a layout effect's cleanup, before the next page resets the scroll.
   - **Restored:** once the page is tall enough (a `ResizeObserver` on the body), unless the viewer scrolls first (wheel, touch, key or pointer), within 10 seconds.
-  - **The desktop** keeps the profile mounted, so it only restores when coming back to another profile than the one mounted.
+  - **The desktop** keeps the profile mounted while a report shows, so coming back has nothing to restore. It would restore only on a way back to another profile than the one mounted, which no way in reaches today: a report offers the way back only when opened from the mounted profile. `restore` is kept there as a safety net.
 - **Retry keeps focus in place.** The notice holding Retry unmounts as soon as Retry is pressed. Focus now moves to the tab's status (which reads "Updating…") or to the report's rank note (which says what loads). Both take `tabIndex={-1}` and show no ring: they are places to read from, not controls.
 - **A team total of 0** gives an Impact share of `null`: "—" and an empty bar, as the tab leaves such a game out of the share.
-- **Kept as decided (owner's choice):** the chart's tip covers the card's numbers, so the whole line stays in sight; it sits right under the title row (its top meets the trend's baseline, a wrapped title's second line too); and Enter on the chart opens the picked game's report, which the slider pattern doesn't define but the chart's label announces.
+- **Kept as decided (owner's choice):** the chart's tip covers the card's numbers, so the whole line stays in sight; in a row's tallest card it sits right under the title row (its top meets the trend's baseline, a wrapped title's second line too), and a shorter card's numbers sit with its chart at the foot, under a gap (Task 19); and Enter on the chart opens the picked game's report, which the slider pattern doesn't define but the chart's label announces.
 - **Checked by eye** in the desktop app at 1260 px (five columns, the tip on a wrapped title), and on the website build at 375 to 800 px ("Updating…" beside the buttons, or the select below).
+- **Final review fixes (2026-10-23), Tasks 14–20,** from the final review and the review of its fixes, after Tasks 1–13 ran:
+  - **A request claims its slot in the same step as the count.** `RateStore.take(group, limit, keys, claim)` runs `claim` just before counting: inside the shared store's lock callback, synchronously in the memory store. The client's `claim` throws if every caller has left (nothing is counted, `take` rejects, the lock is released), else marks the request claimed, which no leave can drop. Before, a request every caller left while `take` waited for the lock, or just after a memory-store `take`, was still sent and spent its slot, and the next caller sent it again: under StrictMode (the website's dev build) every Performance and report request went out twice. A signal alone would not do: the memory store counts inside `get()`, before StrictMode's abort. `Locks` is unchanged.
+  - **A cooldown lasts at most ten minutes** (`MAX_COOLDOWN`), as it outlives a reload: a far-off `Retry-After` date, a clock moved back or a long 503 wait locked every tab, reload and app restart out, and Overwolf gives no way to clear it. The client caps a cooldown at 30 seconds to ten minutes. The shared store ignores a stored end more than ten minutes ahead (rather than clamp it, which would let it slide), and the next `cool` replaces it.
+  - **The Live roster asks again for stats that failed:** an entry with an error is never fresh. Cooldowns from any tab or window fail the roster's requests at once, and the error was then cached for five minutes, which Refresh served. A half that fails again keeps the half that loaded while it is fresh, with its saved `fetchedAt`, so nothing outlives its ttl. A lasting failure (a 403) is asked for again on each `load`, which runs only on a roster change or Refresh: not polling.
+  - **Coming back keeps Matches' "Show more" and the Heroes sort (owner: fix both).** The website mounts the profile again, so the count went back to 20 (and a scroll position past row 20 never came back) and the sort to Games. The view holds `shown` and `sort`; another filter resets `shown`, in the same update. Both now survive a tab switch too, in both apps, as "Switching tabs keeps them anyway" says.
+  - **A scroll position still waiting to come back stays kept.** The cleanup saved `scrollY` even then: StrictMode's first cleanup (`npm run web:dev`) saved the router's clamped 0, and in production leaving before the page had grown lost the position (the browser's Back and Forward fire no takeover event). Its test is the first to use Playwright's clock, to expire the history's two-minute cache. `match-report.spec.ts` also passes against `npm run web:dev`, checked by hand.
+  - **Numbers at the foot, with the chart (owner's choice).** With only the chart at the foot, a card shorter than its row's tallest had its spare height between numbers and chart, and the top of the big number showed above the tip (K/D/A at 1260 px). The numbers now take `margin-top: auto`: the charts still line up, the tip covers the numbers, and a shorter card has a gap under its title. A card without a chart keeps its numbers under its title.
+  - **The docs** say a cooldown lasts at most ten minutes. The spec says which Retry buttons keep focus (the tab's match-details and rank notices, and the report's rank note), and that the tip sits right under the title row only in a row's tallest card.
 
 - **Follow-ups for the owner (not built):**
   - **Other Retry buttons** (tier list, Heroes, items, hero page, the match history notices) still drop focus to the page when their notice unmounts.
+  - **Focus after Retry:** on a first load, a fast match-details failure shows its notice before any cards, and Retry then focuses an empty status. A double "Updating…" announcement (focus and live region) is unchecked with a screen reader. The report's rank note has no live region, so a second failure after Retry isn't announced. Only the match-details notice's Retry is tested from the keyboard.
   - **Web Locks in Overwolf** are unchecked. Without them the windows still share their counts, but two could claim a group's last slot at the same moment.
-  - **A request already sent still uses its slot** when everyone has left it; it completes and is cached.
+  - **A request that has claimed its slot still uses it** when everyone has left it; it goes out, completes and is cached.
+  - **API tests not written:** a refused path's cooldown staying in its tab (shared store); `pause()`'s early return; a 503's `"*"` being shared; `watch` on a cleared storage, and ignoring `sent.*`; `defaultRateStore` falling back to memory when storage refuses a write.
   - **A batch that failed or was dropped is asked for again as it was:** Last 50 after a failed Last 20 makes two bulk requests (20 and 30 games), not one of 50.
+  - **A batch that fails for a reason tied to its contents** is asked for again, as the same batch, by every range that touches it.
+  - **Performance tests not written:** nothing pins `fetchGameAverages`'s `throwIfAborted` (it matters only when some groups finished before the abort), and no test covers the report's signals.
   - **The Live roster's errors** read as the shared client's ("Deadlock API unavailable (500).", "API busy. Retry after the cooldown.") rather than "Stats API unavailable (…)".
   - **During a 429 on one roster's hero stats**, another roster's are still asked for (a refused path only holds back itself).
+  - **`StatsClient` passes no signal:** a roster's queued rank lookup can't be dropped, and `LiveStore`'s `running` gate makes a new roster wait behind it (up to about a minute when the rank budget is spent).
+  - **The Live roster's re-asked half:** on an unchanged roster, a half that loaded comes again from the shared client's cache with a new `fetchedAt`, so it can show up to about twice `TTL.profile` after it loaded.
+  - **Impact:** no browser test of kill participation's "—".
   - **"Updating…" can still be cut short** on phones narrower than 375 px (360 px leaves 48 px of its 60).
   - **Five columns wrap more titles** beside "▲ Improving" or "▼ Slipping"; the charts still line up.
+  - **With the fallback font,** Souls / min's numbers wrap to two lines at 1260 px, and the 40 px tip doesn't reach the top of its big number (so before Task 19 too; unchecked with the real font).
   - **The desktop app's scroll position** is the window's, shared by every page, as before; only the website brings a profile's back.
-  - **A report opened from Home's latest match** offers "← Back to profile", which finds that profile as it was last left this session, if it was opened before.
+  - **Website tests not written:** none pins keying the profile by `location.key` (the header's My profile on one's own open profile, a `replace`, should open at Overview), nor the mount effect writing Overview for an unchanged fresh visit; none tests the scroll restore giving up when the viewer scrolls first.
+  - **macOS trackpads:** a swipe back may leave wheel events that count as the viewer taking over and cancel the scroll restore (unchecked).
+  - **`useScrollBack` in development:** with a kept position of 0, StrictMode's first cleanup saves whatever `scrollY` is then.
 
 ## Global Constraints
 
 - Every colour comes from `src/app/styles/tokens.css` (`var(--token)` or `rgb(from var(--token) r g b / a)`). `tests/app/theme.test.ts` fails on any hex literal in `src/**/*.css`, `web/app/**/*.css` or `src/**/*.tsx`.
 - **Exported, and imported by tests:** `RATE_WINDOW` moves to `src/shared/api/rate-store.ts` and `DeadlockApi.ts` re-exports it; `memoryRateStore`, `sharedRateStore`, `serialLocks` and `defaultRateStore` from `rate-store.ts`; `comparedRank` and `RankSource` from `rank-curve.ts`; `loadBuild(heroId, signal, api)`.
+- **Exported or changed in Tasks 14–19:** `RateStore.take(group, limit, keys, claim)` takes a fourth argument, which the store tests pass (`() => {}`); they also import `type Locks` from `rate-store.ts`, and the stats tests import `TTL` from `DeadlockApi.ts`. `MAX_COOLDOWN` is exported from `rate-store.ts` (the client imports it). `PAGE_SIZE` is exported from `MatchHistory.tsx`, and `FIRST_SORT` and `type HeroSort` from `HeroesTab.tsx` (the profile's view imports them). `MatchHistory` takes `shown` and `onShowMore`; `HeroesTab` takes `sort` and `onSort`.
 - **Storage keys:** `counterlock.api.sent.{group}`, `counterlock.api.cooldown.{key}` and `counterlock.api.probe`; the lock is `counterlock.api.lock`.
-- **New or changed copy strings (tests assert them):**
+- **New or changed copy strings (tests assert them; Tasks 14–20 add none):**
   - **Tab notice:** "Current rank unavailable: {error}" with Retry.
   - **Tab note:** "Kill participation and the shares show no trend over games on more than one hero: a change of hero moves them more than form does."
   - **Report note:** " This player's rank isn't recorded for this match, and their current rank didn't load." with Retry.
@@ -106,15 +126,16 @@ Each task's end state was also checked on its own: type check and unit tests aft
 3. **One rank rule.** The report and the tab both use `comparedRank`, and both say when the current rank didn't load and offer Retry. Tests: `is the game's own, else the player's current rank, else all ranks`, `falls back to all ranks when the current rank fails to load, and says why`, `a current rank that didn't load leaves all ranks, with Retry`, `performance tab says when the current rank didn't load, and Retry asks again`.
 4. **Coming back.** Fresh opens start at Overview; the report's link and the browser's Back restore the view, and the website's scroll. Tests: `a profile opened afresh starts at Overview; back from its report, it is as it was`, `browser Back finds the profile as it was; opened afresh, it starts at Overview`, `coming back from a report finds the profile scrolled as it was`, `the profile keeps its tab, range and hero after a match report`.
 5. **Cards.** Five columns with shares under their per-minute cards and the charts lined up; "Updating…" uncut from 375 px; no share trends over several heroes. Tests: `performance cards sit in five columns when wide, then four, then two`, `Updating… is never cut short beside the Performance range buttons`, `has no share trend over games on more than one hero`, `performance tab compares each metric with the rank average`.
+6. **The final review's fixes.** A request every caller left before it claimed its slot is never sent, nor counted, and one claimed goes out whoever leaves; a cooldown ends within ten minutes, however far ahead it was set or stored; the Live roster asks again for what failed and keeps what loaded, never past its ttl; coming back keeps Matches' rows shown and the Heroes sort, and a fresh visit or another filter resets them; a position still waiting to come back survives leaving early; in a shorter card the tip covers the numbers, and a card without a chart keeps them under its title. Tests: `keeps a waiting request one of its two callers still wants`, `sends a request asked for again just after its caller left once, using one slot`, `neither sends nor counts a request every caller left before the lock was granted`, `sends a request whose callers left once its slot was claimed, for whoever asks next`, `ends a cooldown within ten minutes, however far ahead Retry-After is`, `holds nothing back for a stored cooldown further ahead than any is set for`, `fails at once during a cooldown, as the app's other requests do`, `asks again for stats that failed, and keeps those that loaded`, `keeps the stats that loaded when the roster changes during a cooldown`, `coming back keeps the matches shown, and the scroll past the first page`, `coming back keeps the Heroes tab's sort; opened afresh, it sorts by games`, `a scroll position still waiting to come back is kept`, `performance cards sit in five columns when wide, then four, then two`, `performance tab says what is still loading`.
 
 ## File structure
 
 | File | Responsibility |
 |---|---|
-| `src/shared/api/rate-store.ts` | Request counts and cooldowns: a tab's own, or shared by every tab in `localStorage` under a lock |
-| `src/shared/api/DeadlockApi.ts` | Callers per request, dropping a queued one no one wants, waking waiting requests on a cooldown; counts and shared cooldowns in the store |
+| `src/shared/api/rate-store.ts` | Request counts and cooldowns: a tab's own, or shared by every tab in `localStorage` under a lock; a request claimed in the same step as its count; stored cooldowns of ten minutes at most (`MAX_COOLDOWN`) |
+| `src/shared/api/DeadlockApi.ts` | Callers per request, dropping one no one wants before it claims its slot, waking waiting requests on a cooldown; counts and shared cooldowns in the store; cooldowns capped at ten minutes |
 | `src/shared/api/useAsync.ts` | A signal per load, aborted when its result can't be shown any more |
-| `src/features/player-stats/services/StatsClient.ts` | The Live roster's stats through the shared client |
+| `src/features/player-stats/services/StatsClient.ts` | The Live roster's stats through the shared client; stats that failed asked for again, what loaded kept while fresh |
 | `src/features/builds/services/build-analytics.ts` | The compact overlay's build through the shared client |
 | `src/features/profile/services/profile-api.ts` | Rank lookups take a signal |
 | `src/features/match-report/services/match-report.ts` | Current ranks and curves take a signal |
@@ -126,14 +147,16 @@ Each task's end state was also checked on its own: type check and unit tests aft
 | `src/features/match-report/components/Verdicts.tsx` | The failed-lookup note, its Retry and the focus it keeps |
 | `src/features/match-report/components/PlayerInsights.tsx` | "—" for no share |
 | `src/features/profile/components/PerformanceTab.tsx` | Signals; the current-rank notice; the hero-mix note; focus after Retry |
-| `src/features/profile/components/ProfileView.tsx` | `restore`; the view and scroll position to come back to |
+| `src/features/profile/components/ProfileView.tsx` | `restore`; the view (with Matches' rows shown and the Heroes sort) and scroll position to come back to |
+| `src/features/profile/components/MatchHistory.tsx` | The rows shown, from the view (`shown`, `onShowMore`); `PAGE_SIZE` |
+| `src/features/profile/components/HeroesTab.tsx` | The sort, from the view (`sort`, `onSort`); `HeroSort` and `FIRST_SORT` |
 | `src/features/profile/components/ProfilePage.tsx` | Passes `restore` on |
-| `src/shared/ui/useScrollBack.ts` | The window's scroll position, kept on unmount and brought back once the page is tall enough |
+| `src/shared/ui/useScrollBack.ts` | The window's scroll position, kept on unmount (unless still waiting to come back) and brought back once the page is tall enough |
 | `src/app/navigation.ts` | `Route.back` |
 | `src/app/DesktopApp.tsx` | The profile keyed by visit |
 | `web/app/WebShell.tsx`, `web/app/routes/player.tsx` | The way back as history state; the profile keyed by history entry |
 | `web/app/routes/about.tsx` | What the request budget keeps in `localStorage` |
-| `src/features/profile/styles/profile.css` | Five columns, charts at the foot, room for "Updating…", no ring on the status |
+| `src/features/profile/styles/profile.css` | Five columns, numbers and charts at the foot, room for "Updating…", no ring on the status |
 | `src/features/match-report/styles/match-report.css` | No ring on the rank note |
 
 ### Task 1: A queued request no one wants is dropped; a cooldown fails waiting ones at once
@@ -4621,7 +4644,7 @@ Expected: 153 desktop and 77 website tests pass.
 What changes (owner's choice):
 - **`Route.back`** marks the way back to a profile; the report's "← Back to profile" sets it.
 - **`ProfileView` takes `restore`:** with it, the view kept for the account; without it, Overview. Each visit writes its view into the map on mount, so coming back later finds the latest one. `update()` merges onto a ref of the latest view.
-- **The desktop app** keeps the profile mounted. `show()` counts every way into a profile but the way back (`profileVisit`) and keys the profile by `${profileId}-${profileVisit}`: a fresh way in, even to the profile already open, mounts it again at Overview. Coming back keeps the key, so nothing remounts. `restore` is passed for the rare way back to another profile than the one mounted.
+- **The desktop app** keeps the profile mounted. `show()` counts every way into a profile but the way back (`profileVisit`) and keys the profile by `${profileId}-${profileVisit}`: a fresh way in, even to the profile already open, mounts it again at Overview. Coming back keeps the key, so nothing remounts. `restore` is passed as a safety net for a way back to another profile than the one mounted, which no way in reaches today (a report offers the way back only when opened from the mounted profile).
 - **The website** keys the profile by history entry (`location.key`), so every visit mounts it. The shell's `navigate` passes `{ back: true }` as history state for `Route.back`. `restore` is a `POP` (Back, Forward, or a reload, which finds nothing kept) or that state.
 - **Tests:**
   - **Desktop:** the test that kept each profile's view for the session becomes: Matches and Ranked survive the report's Back link; another account opens at Overview; the first, opened afresh from My profile, starts at Overview with All, and so does My profile again while it is open.
@@ -6220,4 +6243,1980 @@ Check only the README with prettier; the spec has never been prettier-formatted,
 npx prettier --check README.md
 git add README.md docs/superpowers/specs/2026-10-21-redesign-design.md
 git commit -m "docs: Performance tab and API follow-ups, second pass"
+```
+
+---
+
+### Task 14: A request every caller left before its slot is never sent
+
+**Files:**
+- Modify: `src/shared/api/rate-store.ts`
+- Modify: `src/shared/api/DeadlockApi.ts`
+- Test: `tests/shared/DeadlockApi.test.ts`, `tests/shared/rate-store.test.ts`
+
+What changes:
+- **`RateStore.take(group, limit, keys, claim)`:** `claim` runs just before the request is counted, in the same step: inside the shared store's lock callback, synchronously in the memory store. If it throws, nothing is counted and `take` rejects with its error; the lock is released (`navigator.locks` and `serialLocks` both release on a throw).
+- **The client's `claim`** throws if every caller has left, else marks the request claimed (`queued = false`). From then on a leave can't drop it: it goes out, stays shared and is cached. A group without a limit claims at once, as before.
+- **Why:** `send()` checked the abandon signal only before `take`. A request every caller left while `take` waited for the lock, or in the microtasks after a memory-store `take`, had left `inFlight` yet was sent and spent its slot, and the next caller sent it again. Under React's StrictMode (the website's dev build) every Performance and report request went out twice. Passing a signal to `take` would not do: in the memory store the count happens inside `get()`, before StrictMode's abort. The signal isn't passed to `navigator.locks.request`; `Locks` is unchanged.
+- **`pause()`** loses its `woken.abort()` in `finally`, which cleared nothing, and the comment that said it did.
+- **Tests:**
+  - **Client (memory store):** a waiting lookup with two callers that have signals, one leaving, goes when the window has room (a gap in coverage; it passed before too). A lookup left and asked for again at once, as StrictMode does, goes out once and uses one slot: the limit's other 19 go without waiting.
+  - **Shared store:** the same while the lock is still to be granted: one request, one count in storage. A caller that leaves once the slot is claimed (inside the lock) doesn't stop the request: a new caller shares it, and its answer is cached.
+  - The two store tests that call `take` themselves pass a `claim`.
+
+- [ ] **Step 1: Write the failing tests**
+
+In `tests/shared/DeadlockApi.test.ts`:
+
+Replace:
+
+```ts
+      expect(request).toHaveBeenCalledTimes(22);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a sent request's answer when its caller has left", async () => {
+```
+
+with:
+
+```ts
+      expect(request).toHaveBeenCalledTimes(22);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a waiting request one of its two callers still wants", async () => {
+    vi.useFakeTimers();
+    try {
+      const request = vi
+        .fn<typeof fetch>()
+        .mockImplementation(async () => json([]));
+      const api = new DeadlockApi(request);
+      const rank = (id: number, signal?: AbortSignal) =>
+        api.get(`/v1/players/rank?account_ids=${id}`, 1, signal);
+      await Promise.all(Array.from({ length: 20 }, (_, i) => rank(i)));
+      const leaves = new AbortController();
+      const goes = rank(20, leaves.signal);
+      const stays = rank(20, new AbortController().signal);
+      leaves.abort();
+      await expect(goes).rejects.toThrow(/abort/i);
+      await vi.advanceTimersByTimeAsync(RATE_WINDOW);
+      await expect(stays).resolves.toEqual([]);
+      expect(request).toHaveBeenCalledTimes(21);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("sends a request asked for again just after its caller left once, using one slot", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => json([]));
+    let now = 0;
+    const waits: number[] = [];
+    const api = new DeadlockApi(
+      request,
+      () => now,
+      async (ms) => {
+        waits.push(ms);
+        now += ms;
+      },
+    );
+    const rank = (id: number, signal?: AbortSignal) =>
+      api.get(`/v1/players/rank?account_ids=${id}`, 1, signal);
+    // As React's StrictMode does: a load, its cleanup, the load again.
+    const first = new AbortController();
+    const left = rank(0, first.signal);
+    first.abort();
+    const again = rank(0, new AbortController().signal);
+    await expect(left).rejects.toThrow(/abort/i);
+    await expect(again).resolves.toEqual([]);
+    expect(request).toHaveBeenCalledTimes(1);
+    // The window still has room for the limit's other 19.
+    await Promise.all(Array.from({ length: 19 }, (_, i) => rank(1 + i)));
+    expect(waits).toEqual([]);
+    expect(request).toHaveBeenCalledTimes(20);
+  });
+
+  it("keeps a sent request's answer when its caller has left", async () => {
+```
+
+In `tests/shared/rate-store.test.ts`:
+
+1. Replace:
+
+```ts
+  sharedRateStore,
+  type RateStore,
+} from "@/shared/api/rate-store";
+```
+
+with:
+
+```ts
+  sharedRateStore,
+  type Locks,
+  type RateStore,
+} from "@/shared/api/rate-store";
+```
+
+2. Replace:
+
+```ts
+      expect(request).toHaveBeenCalledTimes(20);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reads damaged entries as empty", async () => {
+```
+
+with:
+
+```ts
+      expect(request).toHaveBeenCalledTimes(20);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("neither sends nor counts a request every caller left before the lock was granted", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => json([]));
+    const { items, a } = twoTabs(request);
+    const rank = (signal: AbortSignal) =>
+      a.api.get("/v1/players/rank?account_ids=1", 1, signal);
+    const first = new AbortController();
+    const left = rank(first.signal);
+    first.abort();
+    // Asked for again at once, as React's StrictMode does.
+    const again = rank(new AbortController().signal);
+    await expect(left).rejects.toThrow(/abort/i);
+    await expect(again).resolves.toEqual([]);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(
+      JSON.parse(items.get("counterlock.api.sent./v1/players/rank")!),
+    ).toHaveLength(1);
+  });
+
+  it("sends a request whose callers left once its slot was claimed, for whoever asks next", async () => {
+    const answers: (() => void)[] = [];
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(
+        () =>
+          new Promise<Response>((resolve) =>
+            answers.push(() => resolve(json([{ account_id: 1 }]))),
+          ),
+      );
+    const { items, storage } = sharedStorage();
+    const serial = serialLocks();
+    const caller = new AbortController();
+    const locks: Locks = {
+      request: (name, callback) =>
+        serial.request(name, () => {
+          const taken = callback();
+          // The caller leaves after the slot is claimed, before the
+          // request is sent.
+          caller.abort();
+          return taken;
+        }),
+    };
+    const store = sharedRateStore(storage, locks, Date.now, new EventTarget());
+    const api = new DeadlockApi(request, Date.now, undefined, store);
+    const path = "/v1/players/rank?account_ids=1";
+    await expect(api.get(path, 60_000, caller.signal)).rejects.toThrow(
+      /abort/i,
+    );
+    // A new caller shares it while it is out...
+    const again = api.get(path, 60_000);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(request).toHaveBeenCalledTimes(1);
+    for (const answer of answers) answer();
+    await expect(again).resolves.toEqual([{ account_id: 1 }]);
+    // ...and its answer is kept.
+    await expect(api.get(path, 60_000)).resolves.toEqual([{ account_id: 1 }]);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(
+      JSON.parse(items.get("counterlock.api.sent./v1/players/rank")!),
+    ).toHaveLength(1);
+  });
+
+  it("reads damaged entries as empty", async () => {
+```
+
+3. Replace:
+
+```ts
+    expect(store.cooling(["*"])).toBe(false);
+    await expect(store.take("/v1/players/rank", 20, ["*"])).resolves.toBe(0);
+```
+
+with:
+
+```ts
+    expect(store.cooling(["*"])).toBe(false);
+    await expect(
+      store.take("/v1/players/rank", 20, ["*"], () => {}),
+    ).resolves.toBe(0);
+```
+
+4. Replace:
+
+```ts
+    const store = defaultRateStore(() => 0);
+    await expect(store.take("/v1/players/rank", 1, [])).resolves.toBe(0);
+    await expect(store.take("/v1/players/rank", 1, [])).resolves.toBe(
+      RATE_WINDOW,
+    );
+```
+
+with:
+
+```ts
+    const store = defaultRateStore(() => 0);
+    await expect(store.take("/v1/players/rank", 1, [], () => {})).resolves.toBe(
+      0,
+    );
+    await expect(store.take("/v1/players/rank", 1, [], () => {})).resolves.toBe(
+      RATE_WINDOW,
+    );
+```
+
+- [ ] **Step 2: Run them and confirm they fail**
+
+Run: `npx vitest run tests/shared/DeadlockApi.test.ts tests/shared/rate-store.test.ts`
+Expected: FAIL (3 failed, 28 passed: a request every caller left goes out beside the one asked for again, or the one shared after the slot was claimed (`expected "vi.fn()" to be called 1 times, but got 2 times` in each)).
+
+- [ ] **Step 3: Claim the slot with the count**
+
+In `src/shared/api/rate-store.ts`:
+
+1. Replace:
+
+```ts
+   * Otherwise null while cooling down, or how long until the oldest
+   * request leaves the window.
+   */
+  take(group: string, limit: number, keys: string[]): Promise<number | null>;
+```
+
+with:
+
+```ts
+   * Otherwise null while cooling down, or how long until the oldest
+   * request leaves the window. `claim` runs just before the request is
+   * counted, in the same step: if it throws, as for a request no one wants
+   * any more, nothing is counted and the promise rejects with its error.
+   */
+  take(
+    group: string,
+    limit: number,
+    keys: string[],
+    claim: () => void,
+  ): Promise<number | null>;
+```
+
+2. Replace:
+
+```ts
+    async take(group, limit, keys) {
+      if (cooling(keys)) return null;
+      const at = now();
+      const times = recent(sent.get(group) ?? [], at);
+      sent.set(group, times);
+      if (times.length >= limit) return times[0] + RATE_WINDOW - at;
+      times.push(at);
+```
+
+with:
+
+```ts
+    async take(group, limit, keys, claim) {
+      if (cooling(keys)) return null;
+      const at = now();
+      const times = recent(sent.get(group) ?? [], at);
+      sent.set(group, times);
+      if (times.length >= limit) return times[0] + RATE_WINDOW - at;
+      claim();
+      times.push(at);
+```
+
+3. Replace:
+
+```ts
+    take: (group, limit, keys) =>
+```
+
+with:
+
+```ts
+    take: (group, limit, keys, claim) =>
+```
+
+4. Replace:
+
+```ts
+          at,
+        );
+        if (times.length >= limit) return times[0] + RATE_WINDOW - at;
+        storage.setItem(
+```
+
+with:
+
+```ts
+          at,
+        );
+        if (times.length >= limit) return times[0] + RATE_WINDOW - at;
+        claim();
+        storage.setItem(
+```
+
+In `src/shared/api/DeadlockApi.ts`:
+
+1. Replace:
+
+```ts
+  // Aborted when every caller has left while it still waits for room.
+  abandon: AbortController;
+  queued: boolean;
+}
+```
+
+with:
+
+```ts
+  // Aborted when every caller has left before it claimed its slot.
+  abandon: AbortController;
+  // Until it claims its slot in the group's rate limit (at once where the
+  // group has none): every caller leaving before then drops it, and once
+  // claimed it goes out.
+  queued: boolean;
+}
+```
+
+2. Replace:
+
+```ts
+   * hasn't gone out yet and no one else still wants it.
+```
+
+with:
+
+```ts
+   * hasn't claimed its slot yet and no one else still wants it.
+```
+
+3. Replace:
+
+```ts
+        // No one wants it any more, and it hasn't gone out.
+```
+
+with:
+
+```ts
+        // No one wants it any more, and it hasn't claimed its slot.
+```
+
+4. Replace:
+
+```ts
+    const limit = RATE_LIMITS[group];
+    if (limit) await this.throttle(path, group, limit, pending.abandon.signal);
+    pending.queued = false;
+    return this.fetchJson<T>(path, group);
+  }
+
+  /**
+   * Waits until the group has had fewer than `limit` requests in the window
+   * (in every tab), then counts this one. A cooldown that starts while it
+   * waits fails it at once, before it takes a slot, as does every caller
+   * leaving.
+   */
+  private async throttle(
+    path: string,
+    group: string,
+    limit: number,
+    abandoned: AbortSignal,
+  ) {
+    for (;;) {
+      abandoned.throwIfAborted();
+      const wait = await this.limits.take(group, limit, sharedKeys(group));
+```
+
+with:
+
+```ts
+    const limit = RATE_LIMITS[group];
+    if (limit) await this.throttle(path, group, limit, pending);
+    else pending.queued = false;
+    return this.fetchJson<T>(path, group);
+  }
+
+  /**
+   * Waits until the group has had fewer than `limit` requests in the window
+   * (in every tab), then counts this one: from then on it goes out, even
+   * if every caller leaves. A cooldown that starts while it waits fails it
+   * at once, before it takes a slot, as does every caller leaving.
+   */
+  private async throttle(
+    path: string,
+    group: string,
+    limit: number,
+    pending: Pending,
+  ) {
+    const abandoned = pending.abandon.signal;
+    // In the same step as the count, so no caller can leave between the two.
+    const claim = () => {
+      abandoned.throwIfAborted();
+      pending.queued = false;
+    };
+    for (;;) {
+      abandoned.throwIfAborted();
+      const wait = await this.limits.take(
+        group,
+        limit,
+        sharedKeys(group),
+        claim,
+      );
+```
+
+5. Replace:
+
+```ts
+      abandoned.removeEventListener("abort", wake);
+      // Clears the timer of a wait cut short.
+      woken.abort();
+    }
+```
+
+with:
+
+```ts
+      abandoned.removeEventListener("abort", wake);
+    }
+```
+
+- [ ] **Step 4: Run the tests and confirm they pass**
+
+Run: `npx vitest run tests/shared/DeadlockApi.test.ts tests/shared/rate-store.test.ts`
+Expected: PASS (31 tests).
+
+Run: `npm test`
+Expected: PASS (401 tests).
+
+- [ ] **Step 5: Check and commit**
+
+```bash
+npx tsc --noEmit && npm run web:typecheck
+npx prettier --write src/shared/api tests/shared/DeadlockApi.test.ts tests/shared/rate-store.test.ts
+npm run test:browser && npm run test:web
+git add src/shared/api tests/shared/DeadlockApi.test.ts tests/shared/rate-store.test.ts
+git commit -m "fix(api): a request every caller left before its slot is never sent"
+```
+
+Expected: 154 desktop and 79 website tests pass.
+
+---
+
+### Task 15: A stored cooldown lasts at most ten minutes
+
+**Files:**
+- Modify: `src/shared/api/rate-store.ts`
+- Modify: `src/shared/api/DeadlockApi.ts`
+- Test: `tests/shared/DeadlockApi.test.ts`, `tests/shared/rate-store.test.ts`
+
+What changes:
+- **`MAX_COOLDOWN`** (ten minutes) is exported from `rate-store.ts`.
+- **The client** caps a cooldown's end: at least 30 seconds, at most `MAX_COOLDOWN`, whatever `Retry-After` says.
+- **The shared store** ignores a stored end more than `MAX_COOLDOWN` ahead: it reads as not cooling, rather than clamped, so it can't slide, and the next `cool` replaces it. `RateStore.cool`'s doc says it keeps the later end.
+- **Why:** cooldowns persist in `localStorage`, so a far-off `Retry-After` date, a clock moved back or a long 503 wait locked every tab, reload and app restart out. Overwolf gives no way to clear it.
+- **Tests:** a 503 with a `Retry-After` date in 2031 holds requests back for ten minutes, not longer. A stored cooldown an hour ahead holds nothing back; one five minutes ahead still does.
+
+- [ ] **Step 1: Write the failing tests**
+
+In `tests/shared/DeadlockApi.test.ts`:
+
+Replace:
+
+```ts
+    await expect(api.get("/v1/x", 1000)).rejects.toThrow("API busy");
+  });
+
+  it("maps 403 and other errors, and does not cache failures", async () => {
+```
+
+with:
+
+```ts
+    await expect(api.get("/v1/x", 1000)).rejects.toThrow("API busy");
+  });
+
+  it("ends a cooldown within ten minutes, however far ahead Retry-After is", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response("", {
+          status: 503,
+          headers: { "Retry-After": "Wed, 01 Jan 2031 00:00:00 GMT" },
+        }),
+      )
+      .mockImplementation(async () => json([]));
+    let now = Date.parse("2026-10-23T12:00:00Z");
+    const api = new DeadlockApi(request, () => now);
+    await expect(api.get("/v1/x", 1000)).rejects.toThrow(
+      "API busy. Retry after the cooldown.",
+    );
+    now += 10 * 60_000 - 1;
+    await expect(api.get("/v1/x", 1000)).rejects.toThrow("API busy");
+    now += 1;
+    await expect(api.get("/v1/x", 1000)).resolves.toEqual([]);
+  });
+
+  it("maps 403 and other errors, and does not cache failures", async () => {
+```
+
+In `tests/shared/rate-store.test.ts`:
+
+Replace:
+
+```ts
+    ).toHaveLength(1);
+  });
+
+  it("reads damaged entries as empty", async () => {
+```
+
+with:
+
+```ts
+    ).toHaveLength(1);
+  });
+
+  it("holds nothing back for a stored cooldown further ahead than any is set for", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => json([]));
+    const { storage } = sharedStorage();
+    const now = 1_000_000;
+    const store = sharedRateStore(
+      storage,
+      serialLocks(),
+      () => now,
+      new EventTarget(),
+    );
+    const api = new DeadlockApi(request, () => now, undefined, store);
+    // An hour ahead, as after the clock was moved back, or written by hand.
+    storage.setItem("counterlock.api.cooldown.*", String(now + 60 * 60_000));
+    await expect(api.get("/v1/players/rank?account_ids=1", 1)).resolves.toEqual(
+      [],
+    );
+    // An ordinary cooldown still holds every request back.
+    storage.setItem("counterlock.api.cooldown.*", String(now + 5 * 60_000));
+    await expect(api.get("/v1/players/rank?account_ids=2", 1)).rejects.toThrow(
+      "API busy",
+    );
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads damaged entries as empty", async () => {
+```
+
+- [ ] **Step 2: Run them and confirm they fail**
+
+Run: `npx vitest run tests/shared/DeadlockApi.test.ts tests/shared/rate-store.test.ts`
+Expected: FAIL (2 failed, 31 passed: both cooldowns still hold requests back (`promise rejected "Error: API busy. Retry after the cooldown." instead of resolving`)).
+
+- [ ] **Step 3: Cap the cooldown**
+
+In `src/shared/api/rate-store.ts`:
+
+1. Replace:
+
+```ts
+export const RATE_WINDOW = 61_000;
+
+```
+
+with:
+
+```ts
+export const RATE_WINDOW = 61_000;
+
+// The longest a cooldown lasts. It outlives a reload, so one set from a date
+// far ahead, or by a clock that was wrong, mustn't lock the app out.
+export const MAX_COOLDOWN = 10 * 60_000;
+
+```
+
+2. Replace:
+
+```ts
+  cooling(keys: string[]): boolean;
+  cool(key: string, until: number): void;
+```
+
+with:
+
+```ts
+  cooling(keys: string[]): boolean;
+  /** Cools `key` down until `until`, or keeps a later end it already has. */
+  cool(key: string, until: number): void;
+```
+
+3. Replace:
+
+```ts
+  const until = (key: string) => {
+    const value = read(`cooldown.${key}`);
+    return typeof value === "number" ? value : 0;
+  };
+```
+
+with:
+
+```ts
+  // An end further ahead than any cooldown is set for (the clock was moved
+  // back, or it was written by hand) is ignored rather than waited out.
+  const until = (key: string) => {
+    const value = read(`cooldown.${key}`);
+    return typeof value === "number" && value - now() <= MAX_COOLDOWN
+      ? value
+      : 0;
+  };
+```
+
+In `src/shared/api/DeadlockApi.ts`:
+
+1. Replace:
+
+```ts
+import { RATE_WINDOW, defaultRateStore, type RateStore } from "./rate-store";
+```
+
+with:
+
+```ts
+import {
+  MAX_COOLDOWN,
+  RATE_WINDOW,
+  defaultRateStore,
+  type RateStore,
+} from "./rate-store";
+```
+
+2. Replace:
+
+```ts
+    if (response.status === 429 || response.status === 503) {
+      const header = response.headers.get("Retry-After");
+      const seconds = header ? Number(header) : NaN;
+      const until = Number.isFinite(seconds)
+        ? this.now() + seconds * 1000
+        : Date.parse(header ?? "");
+      this.cool(
+        response.status === 503 ? EVERYTHING : refused(path, group),
+        Math.max(this.now() + 30_000, Number.isFinite(until) ? until : 0),
+      );
+```
+
+with:
+
+```ts
+    if (response.status === 429 || response.status === 503) {
+      const now = this.now();
+      const header = response.headers.get("Retry-After");
+      const seconds = header ? Number(header) : NaN;
+      const until = Number.isFinite(seconds)
+        ? now + seconds * 1000
+        : Date.parse(header ?? "");
+      // At least 30 seconds, and at most MAX_COOLDOWN, whatever the header
+      // says: the cooldown outlives a reload.
+      this.cool(
+        response.status === 503 ? EVERYTHING : refused(path, group),
+        Math.min(
+          now + MAX_COOLDOWN,
+          Math.max(now + 30_000, Number.isFinite(until) ? until : 0),
+        ),
+      );
+```
+
+- [ ] **Step 4: Run the tests and confirm they pass**
+
+Run: `npx vitest run tests/shared/DeadlockApi.test.ts tests/shared/rate-store.test.ts`
+Expected: PASS (33 tests).
+
+Run: `npm test`
+Expected: PASS (403 tests).
+
+- [ ] **Step 5: Check and commit**
+
+```bash
+npx tsc --noEmit && npm run web:typecheck
+npx prettier --write src/shared/api tests/shared/DeadlockApi.test.ts tests/shared/rate-store.test.ts
+npm run test:browser && npm run test:web
+git add src/shared/api tests/shared/DeadlockApi.test.ts tests/shared/rate-store.test.ts
+git commit -m "fix(api): a stored cooldown lasts at most ten minutes"
+```
+
+Expected: 154 desktop and 79 website tests pass.
+
+---
+
+### Task 16: The Live roster asks again for stats that failed
+
+**Files:**
+- Modify: `src/features/player-stats/services/StatsClient.ts`
+- Test: `tests/player-stats/StatsClient.test.ts`
+
+What changes:
+- **An entry with an error is never fresh:** `load` asks again for stats that failed. Cooldowns from any tab or window now fail the roster's requests at once, so a cached error stood for five minutes, and Refresh served it.
+- **A half that fails again keeps the half that had loaded**, while it is fresh: a changed roster asks for other paths, which the shared client hasn't cached, so a failure during a cooldown overwrote loaded hero stats. Kept data keeps its saved `fetchedAt`, so nothing outlives its ttl. A rank that loaded may be none.
+- A lasting failure (a 403) is asked for again on each `load`. `load` runs only on a roster change and on Refresh, so this is not polling.
+- The comment and the cooldown test's name no longer say the requests "wait out" cooldowns: they fail at once.
+- **Tests:**
+  - **Asked again:** another view's rank lookup is refused; the roster's rank fails at once and its hero stats load. Once the cooldown is over only the rank lookup goes out again, and what loaded is kept for `TTL.profile`.
+  - **Kept through a roster change:** during a 503's cooldown, player 10's hero stats stay when player 11 joins; they last `TTL.profile` from when they loaded, not longer. This one passes before the fix too: it pins the kept stats' ttl.
+
+- [ ] **Step 1: Write the failing tests**
+
+In `tests/player-stats/StatsClient.test.ts`:
+
+1. Replace:
+
+```ts
+import { DeadlockApi } from "@/shared/api/DeadlockApi";
+```
+
+with:
+
+```ts
+import { DeadlockApi, TTL } from "@/shared/api/DeadlockApi";
+```
+
+2. Replace:
+
+```ts
+  it("waits out cooldowns as the app's other requests do", async () => {
+```
+
+with:
+
+```ts
+  it("fails at once during a cooldown, as the app's other requests do", async () => {
+```
+
+3. Replace:
+
+```ts
+    await stats.load([3], "normal");
+    expect(request).toHaveBeenCalledTimes(5);
+  });
+```
+
+with:
+
+```ts
+    await stats.load([3], "normal");
+    expect(request).toHaveBeenCalledTimes(5);
+  });
+  it("asks again for stats that failed, and keeps those that loaded", async () => {
+    let now = 0;
+    const heroes = [
+      { account_id: 10, hero_id: 13, wins: 5, matches_played: 10 },
+    ];
+    const ranks = [{ account_id: 10, badge: 81, rank: 8, subrank: 1 }];
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (url) =>
+        String(url).includes("account_ids=99")
+          ? new Response("Busy", { status: 429 })
+          : new Response(
+              JSON.stringify(
+                String(url).includes("hero-stats") ? heroes : ranks,
+              ),
+            ),
+      );
+    const api = new DeadlockApi(request, () => now);
+    const stats = new StatsClient(api, () => now);
+    // Another view's rank lookup is refused: rank lookups pause for all.
+    await expect(
+      api.get("/v1/players/rank?account_ids=99", TTL.profile),
+    ).rejects.toThrow("API busy");
+    const busy = await stats.load([10], "normal");
+    expect(busy[10].heroes?.[0].wins).toBe(5);
+    expect(busy[10].rankError).toBe("API busy. Retry after the cooldown.");
+    expect(request).toHaveBeenCalledTimes(2);
+    // Once the cooldown is over, only the rank lookup goes out again.
+    now = 30_000;
+    const loaded = await stats.load([10], "normal");
+    expect(loaded[10].rank?.badge).toBe(81);
+    expect(loaded[10].rankError).toBeUndefined();
+    expect(loaded[10].heroes?.[0].wins).toBe(5);
+    expect(request).toHaveBeenCalledTimes(3);
+    expect(String(request.mock.calls[2][0])).toContain("/players/rank?");
+    // Stats that loaded are kept for TTL.profile.
+    now += TTL.profile - 1;
+    await stats.load([10], "normal");
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+  it("keeps the stats that loaded when the roster changes during a cooldown", async () => {
+    let now = 0;
+    const heroes = [
+      { account_id: 10, hero_id: 13, wins: 5, matches_played: 10 },
+    ];
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (url) =>
+        String(url).includes("/players/rank")
+          ? new Response("Busy", { status: 503 })
+          : new Response(JSON.stringify(heroes)),
+      );
+    const stats = client(request, () => now);
+    await stats.load([10], "normal");
+    // A player joins during the 503's cooldown: the new roster's requests
+    // fail at once, and player 10's hero stats stay.
+    now = 1_000;
+    const joined = await stats.load([10, 11], "normal");
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(joined[10].heroes?.[0].wins).toBe(5);
+    expect(joined[10].heroError).toBeUndefined();
+    expect(joined[10].rankError).toBe("API busy. Retry after the cooldown.");
+    expect(joined[11].heroError).toBe("API busy. Retry after the cooldown.");
+    // Kept for TTL.profile from when they loaded, not longer: in a later
+    // cooldown (player 12's rank lookup starts one), they are gone.
+    now = TTL.profile;
+    await stats.load([12], "normal");
+    const stale = await stats.load([10, 11], "normal");
+    expect(request).toHaveBeenCalledTimes(4);
+    expect(stale[10].heroes).toBeUndefined();
+    expect(stale[10].heroError).toBe("API busy. Retry after the cooldown.");
+  });
+```
+
+- [ ] **Step 2: Run them and confirm they fail**
+
+Run: `npx vitest run tests/player-stats/StatsClient.test.ts`
+Expected: FAIL (1 failed, 5 passed: the failed rank is served from the cache after the cooldown (`expected undefined to be 81`)).
+
+- [ ] **Step 3: Ask again for what failed**
+
+In `src/features/player-stats/services/StatsClient.ts`:
+
+1. Replace:
+
+```ts
+  // rate limits along with every other, and wait out its cooldowns.
+```
+
+with:
+
+```ts
+  // rate limits along with every other, and fail at once during its
+  // cooldowns.
+```
+
+2. Replace:
+
+```ts
+      const saved = this.cache.get(`${mode}:${id}`);
+      return !saved || this.now() - saved.fetchedAt >= TTL.profile;
+```
+
+with:
+
+```ts
+      const saved = this.cache.get(`${mode}:${id}`);
+      // Stats that failed are asked for again: what loaded is kept (below),
+      // and during a cooldown the shared client fails without asking.
+      return (
+        !saved ||
+        saved.heroError !== undefined ||
+        saved.rankError !== undefined ||
+        this.now() - saved.fetchedAt >= TTL.profile
+      );
+```
+
+3. Replace:
+
+```ts
+      for (const id of pending) {
+        this.cache.set(`${mode}:${id}`, {
+          heroes: heroError
+            ? undefined
+            : heroes.filter((h) => h.account_id === id),
+          rank: ranks.find((r) => r.account_id === id),
+          heroError,
+          rankError,
+          fetchedAt: this.now(),
+        });
+      }
+```
+
+with:
+
+```ts
+      for (const id of pending) {
+        const saved = this.cache.get(`${mode}:${id}`);
+        // A half that fails keeps what had loaded while it is fresh: a
+        // changed roster asks for other paths, which the shared client
+        // hasn't cached. A rank that loaded may be none.
+        const fresh =
+          saved !== undefined && this.now() - saved.fetchedAt < TTL.profile;
+        const keepHeroes =
+          heroError !== undefined && fresh && saved.heroError === undefined;
+        const keepRank =
+          rankError !== undefined && fresh && saved.rankError === undefined;
+        this.cache.set(`${mode}:${id}`, {
+          heroes: keepHeroes
+            ? saved.heroes
+            : heroError
+              ? undefined
+              : heroes.filter((h) => h.account_id === id),
+          rank: keepRank ? saved.rank : ranks.find((r) => r.account_id === id),
+          heroError: keepHeroes ? undefined : heroError,
+          rankError: keepRank ? undefined : rankError,
+          // What was kept still dates from when it loaded.
+          fetchedAt: keepHeroes || keepRank ? saved.fetchedAt : this.now(),
+        });
+      }
+```
+
+- [ ] **Step 4: Run the tests and confirm they pass**
+
+Run: `npx vitest run tests/player-stats/StatsClient.test.ts`
+Expected: PASS (6 tests).
+
+Run: `npm test`
+Expected: PASS (405 tests).
+
+- [ ] **Step 5: Check and commit**
+
+```bash
+npx tsc --noEmit && npm run web:typecheck
+npx prettier --write src/features/player-stats/services/StatsClient.ts tests/player-stats/StatsClient.test.ts
+npm run test:browser && npm run test:web
+git add src/features/player-stats/services/StatsClient.ts tests/player-stats/StatsClient.test.ts
+git commit -m "fix(player-stats): the Live roster asks again for stats that failed"
+```
+
+Expected: 154 desktop and 79 website tests pass.
+
+---
+
+### Task 17: Coming back on the website keeps Matches' Show more and the Heroes sort
+
+**Files:**
+- Modify: `src/features/profile/components/MatchHistory.tsx`
+- Modify: `src/features/profile/components/HeroesTab.tsx`
+- Modify: `src/features/profile/components/ProfileView.tsx`
+- Test: `tests/web-browser/match-report.spec.ts`
+
+What changes (owner's choice: fix both):
+- **`ViewState`** holds `shown` (the Matches tab's rows, default `PAGE_SIZE`) and `sort` (the Heroes tab's, default `FIRST_SORT`), kept and restored with the rest of the view.
+- **`setFilter`** resets `shown` in the same `update()` that changes the filter, in place of `MatchHistory`'s effect, and only on a real change, as before. The filter is shared, so a filter change on Heroes resets the count too, as before.
+- **`MatchHistory`** takes `shown` and `onShowMore`, from the full Matches list only (not the Overview preview), and exports `PAGE_SIZE`. **`HeroesTab`** takes `sort` and `onSort`, and exports `HeroSort` and `FIRST_SORT`.
+- **Why:** the website mounts the profile again on coming back, so "Show more" went back to 20 rows (and a scroll position past row 20 never came back: the page never grew tall enough), and the Heroes sort went back to Games.
+- **Side effect, in both apps:** both now survive switching tabs too, where a tab switch reset them, as "Switching tabs keeps them anyway" says.
+- **Tests (website):**
+  - **Show more:** thirty matches, Show more, scrolled to row 28. Browser Back, then the report's "← Back to profile", find 30 rows and the scroll position. Opened afresh from the report's scoreboard, the Matches tab shows 20; Show more, then another filter and back to All, shows 20 again.
+  - **The sort:** WR, ascending. Back from a hero's page, and the report's "← Back to profile", keep it; opened afresh, it sorts by Games, descending.
+
+- [ ] **Step 1: Write the failing tests**
+
+In `tests/web-browser/match-report.spec.ts`:
+
+1. Replace:
+
+```ts
+import { expect, test } from "@playwright/test";
+import { heroes } from "../fixtures/match-report";
+import { FARGO, mockApi } from "./fixtures";
+
+const viewingAs = (page: import("@playwright/test").Page) =>
+  page.getByRole("combobox", { name: "Viewing as" });
+
+```
+
+with:
+
+```ts
+import { expect, test, type Page } from "@playwright/test";
+import { heroes, matchMetadata } from "../fixtures/match-report";
+import { FARGO, cors, historyRow, mockApi } from "./fixtures";
+
+const viewingAs = (page: Page) =>
+  page.getByRole("combobox", { name: "Viewing as" });
+
+// Thirty matches, a page and a half of the Matches tab, each with its
+// report.
+async function mockLongHistory(page: Page) {
+  const now = Math.floor(Date.now() / 1000);
+  await page.route(
+    `https://api.deadlock-api.com/v1/players/${FARGO}/match-history`,
+    (route) =>
+      route.fulfill({
+        json: Array.from({ length: 30 }, (_, index) => ({
+          ...historyRow(2001 + index, index % 2 === 0),
+          start_time: now - 3600 * (index + 1),
+        })),
+        headers: cors,
+      }),
+  );
+  await page.route(/\/v1\/matches\/\d+\/metadata$/, (route) => {
+    const matchId = Number(/matches\/(\d+)/.exec(route.request().url())![1]);
+    return route.fulfill({
+      json: matchMetadata(FARGO, matchId),
+      headers: cors,
+    });
+  });
+}
+
+// From a report, the scoreboard's link to its player: a fresh visit.
+const openProfileAfresh = async (page: Page) => {
+  await page
+    .locator(".report-table")
+    .first()
+    .getByRole("link", { name: "A Rather Long Persona Name Fixture" })
+    .click();
+  await expect(page).toHaveURL(`/players/${FARGO}`);
+  await expect(page.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+};
+
+```
+
+2. Replace:
+
+```ts
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(hero).toHaveValue(picked);
+});
+```
+
+with:
+
+```ts
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(hero).toHaveValue(picked);
+});
+
+test("coming back keeps the matches shown, and the scroll past the first page", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1260, height: 600 });
+  await mockApi(page);
+  await mockLongHistory(page);
+  await page.goto(`/players/${FARGO}`);
+  await page.getByRole("tab", { name: "Matches" }).click();
+  const rows = page.locator(".match-row");
+  await expect(rows).toHaveCount(20);
+  await page.getByRole("button", { name: "Show more" }).click();
+  await expect(rows).toHaveCount(30);
+  // Past the first page: its rows alone leave the page too short for it.
+  await rows.nth(27).scrollIntoViewIfNeeded();
+  await expect(rows.nth(19)).not.toBeInViewport();
+  const scrolled = () => page.evaluate(() => Math.round(window.scrollY));
+  const before = await scrolled();
+  const open = async () => {
+    await rows.nth(27).locator("a.match-open").click();
+    await expect(page).toHaveURL(`/matches/2028?player=${FARGO}`);
+  };
+  // Browser Back.
+  await open();
+  await page.goBack();
+  await expect(rows).toHaveCount(30);
+  await expect.poll(scrolled).toBe(before);
+  // The report's "Back to profile".
+  await open();
+  await page.getByRole("link", { name: "← Back to profile" }).click();
+  await expect(rows).toHaveCount(30);
+  await expect.poll(scrolled).toBe(before);
+  // Opened afresh, it shows the first page.
+  await open();
+  await openProfileAfresh(page);
+  await page.getByRole("tab", { name: "Matches" }).click();
+  await expect(rows).toHaveCount(20);
+  // So does another filter.
+  await page.getByRole("button", { name: "Show more" }).click();
+  await expect(rows).toHaveCount(30);
+  await page.getByRole("button", { name: "Street Brawl", exact: true }).click();
+  await page.getByRole("button", { name: "All", exact: true }).click();
+  await expect(rows).toHaveCount(20);
+});
+
+test("coming back keeps the Heroes tab's sort; opened afresh, it sorts by games", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto(`/players/${FARGO}`);
+  await page.getByRole("tab", { name: "Heroes" }).click();
+  const wr = page.getByRole("button", { name: "WR", exact: true });
+  await wr.click();
+  await wr.click();
+  const sorted = (name: RegExp, order: string) =>
+    expect(page.getByRole("columnheader", { name })).toHaveAttribute(
+      "aria-sort",
+      order,
+    );
+  await sorted(/WR/, "ascending");
+  // Browser Back from a hero's page.
+  await page.locator(".hero-row .hero-link").first().click();
+  await expect(page).toHaveURL(/\/heroes\/[a-z-]+$/);
+  await page.goBack();
+  await expect(page.getByRole("tab", { name: "Heroes" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await sorted(/WR/, "ascending");
+  // The report's "Back to profile".
+  await page.getByRole("tab", { name: "Matches" }).click();
+  await page.locator("a.match-open").first().click();
+  await expect(page).toHaveURL(`/matches/1001?player=${FARGO}`);
+  await page.getByRole("link", { name: "← Back to profile" }).click();
+  await page.getByRole("tab", { name: "Heroes" }).click();
+  await sorted(/WR/, "ascending");
+  // Opened afresh, by games.
+  await page.getByRole("tab", { name: "Matches" }).click();
+  await page.locator("a.match-open").first().click();
+  await openProfileAfresh(page);
+  await page.getByRole("tab", { name: "Heroes" }).click();
+  await sorted(/Games/, "descending");
+});
+```
+
+- [ ] **Step 2: Run them and confirm they fail**
+
+Run: `npx playwright test -c playwright.web.config.ts tests/web-browser/match-report.spec.ts -g "coming back keeps"`
+Expected: FAIL (2 failed: browser Back finds the first page again (`Expected: 30`, `Received: 20`), and Back from a hero's page sorts by Games again (`Expected: "ascending"`, `Received: ""` for WR's `aria-sort`)).
+
+- [ ] **Step 3: The rows shown and the sort as props**
+
+In `src/features/profile/components/MatchHistory.tsx`:
+
+1. Replace:
+
+```tsx
+import { useEffect, useState } from "react";
+import { RouteLink } from "@/app/links";
+```
+
+with:
+
+```tsx
+import { RouteLink } from "@/app/links";
+```
+
+2. Replace:
+
+```tsx
+const PAGE_SIZE = 20;
+const PREVIEW_SIZE = 3;
+
+export function MatchHistory({
+  matches,
+  filter = "all",
+  onFilter = () => undefined,
+  accountId,
+  preview = false,
+  onShowAll,
+}: {
+  matches: HistoryMatch[];
+  filter?: HistoryFilter;
+  onFilter?(filter: HistoryFilter): void;
+  accountId: number;
+  preview?: boolean;
+  onShowAll?(): void;
+}) {
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  useEffect(() => setVisible(PAGE_SIZE), [filter]);
+  const filtered = preview
+```
+
+with:
+
+```tsx
+export const PAGE_SIZE = 20;
+const PREVIEW_SIZE = 3;
+
+export function MatchHistory({
+  matches,
+  filter = "all",
+  onFilter = () => undefined,
+  shown = PAGE_SIZE,
+  onShowMore = () => undefined,
+  accountId,
+  preview = false,
+  onShowAll,
+}: {
+  matches: HistoryMatch[];
+  filter?: HistoryFilter;
+  onFilter?(filter: HistoryFilter): void;
+  // How many the full list shows: "Show more" adds a page.
+  shown?: number;
+  onShowMore?(shown: number): void;
+  accountId: number;
+  preview?: boolean;
+  onShowAll?(): void;
+}) {
+  const filtered = preview
+```
+
+3. Replace:
+
+```tsx
+        {filtered.slice(0, visible).map((match) => {
+```
+
+with:
+
+```tsx
+        {filtered.slice(0, shown).map((match) => {
+```
+
+4. Replace:
+
+```tsx
+      {!preview && filtered.length > visible && (
+        <button
+          className="show-more"
+          onClick={() => setVisible(visible + PAGE_SIZE)}
+        >
+```
+
+with:
+
+```tsx
+      {!preview && filtered.length > shown && (
+        <button
+          className="show-more"
+          onClick={() => onShowMore(shown + PAGE_SIZE)}
+        >
+```
+
+In `src/features/profile/components/HeroesTab.tsx`:
+
+1. Replace:
+
+```tsx
+import { useState } from "react";
+import { RouteLink } from "@/app/links";
+```
+
+with:
+
+```tsx
+import { RouteLink } from "@/app/links";
+```
+
+2. Replace:
+
+```tsx
+  value === null ? NONE : format(value);
+
+interface Column {
+```
+
+with:
+
+```tsx
+  value === null ? NONE : format(value);
+
+export interface HeroSort {
+  // The column, by its label: KDA and K/D/A both sort by `kda`.
+  label: string;
+  key: keyof Line;
+  dir: SortDir;
+}
+export const FIRST_SORT: HeroSort = {
+  label: "Games",
+  key: "games",
+  dir: "desc",
+};
+
+interface Column {
+```
+
+3. Replace:
+
+```tsx
+  filter,
+  onFilter,
+}: {
+  accountId: number;
+  history: AsyncState<HistoryMatch[]>;
+  filter: HistoryFilter;
+  onFilter(filter: HistoryFilter): void;
+}) {
+  const [sort, setSort] = useState<{
+    label: string;
+    key: keyof Line;
+    dir: SortDir;
+  }>({ label: "Games", key: "games", dir: "desc" });
+  const stats = useAsync(
+```
+
+with:
+
+```tsx
+  filter,
+  onFilter,
+  sort,
+  onSort,
+}: {
+  accountId: number;
+  history: AsyncState<HistoryMatch[]>;
+  filter: HistoryFilter;
+  onFilter(filter: HistoryFilter): void;
+  sort: HeroSort;
+  onSort(sort: HeroSort): void;
+}) {
+  const stats = useAsync(
+```
+
+4. Replace:
+
+```tsx
+    setSort((current) =>
+      current.label === label
+        ? { label, key, dir: current.dir === "desc" ? "asc" : "desc" }
+        : { label, key, dir: firstDir },
+    );
+```
+
+with:
+
+```tsx
+    onSort(
+      sort.label === label
+        ? { label, key, dir: sort.dir === "desc" ? "asc" : "desc" }
+        : { label, key, dir: firstDir },
+    );
+```
+
+- [ ] **Step 4: Keep them in the view**
+
+In `src/features/profile/components/ProfileView.tsx`:
+
+1. Replace:
+
+```tsx
+import { HeroesTab } from "./HeroesTab";
+import { MatchHistory } from "./MatchHistory";
+```
+
+with:
+
+```tsx
+import { FIRST_SORT, HeroesTab, type HeroSort } from "./HeroesTab";
+import { MatchHistory, PAGE_SIZE } from "./MatchHistory";
+```
+
+2. Replace:
+
+```tsx
+  filter: HistoryFilter;
+  range: PerformanceRange;
+  // Null for all heroes.
+  heroId: number | null;
+}
+const FIRST_VIEW: ViewState = {
+  subtab: "overview",
+  filter: "all",
+  range: 20,
+  heroId: null,
+};
+// Each profile's tab and filters as last left, for the session: coming back
+// from a match report (a page of its own on the website) finds them as they
+// were. Switching tabs keeps them anyway.
+```
+
+with:
+
+```tsx
+  filter: HistoryFilter;
+  // The Matches tab's rows, a page more for each "Show more".
+  shown: number;
+  // The Heroes tab's.
+  sort: HeroSort;
+  range: PerformanceRange;
+  // Null for all heroes.
+  heroId: number | null;
+}
+const FIRST_VIEW: ViewState = {
+  subtab: "overview",
+  filter: "all",
+  shown: PAGE_SIZE,
+  sort: FIRST_SORT,
+  range: 20,
+  heroId: null,
+};
+// Each profile's tab, filters, rows shown and sort as last left, for the
+// session: coming back from a match report (a page of its own on the
+// website) finds them as they were. Switching tabs keeps them anyway.
+```
+
+3. Replace:
+
+```tsx
+  const { subtab, filter, range, heroId } = view;
+```
+
+with:
+
+```tsx
+  const { subtab, filter, shown, sort, range, heroId } = view;
+```
+
+4. Replace:
+
+```tsx
+  const setFilter = (next: HistoryFilter) => update({ filter: next });
+```
+
+with:
+
+```tsx
+  const setFilter = (next: HistoryFilter) => {
+    // Another filter shows its first page.
+    if (next !== latest.current.filter)
+      update({ filter: next, shown: PAGE_SIZE });
+  };
+```
+
+5. Replace:
+
+```tsx
+                  {...{ filter, accountId }}
+                  onFilter={setFilter}
+                />
+```
+
+with:
+
+```tsx
+                  {...{ filter, shown, accountId }}
+                  onFilter={setFilter}
+                  onShowMore={(next) => update({ shown: next })}
+                />
+```
+
+6. Replace:
+
+```tsx
+          <HeroesTab {...{ accountId, history, filter }} onFilter={setFilter} />
+```
+
+with:
+
+```tsx
+          <HeroesTab
+            {...{ accountId, history, filter, sort }}
+            onFilter={setFilter}
+            onSort={(next) => update({ sort: next })}
+          />
+```
+
+- [ ] **Step 5: Run the tests and confirm they pass**
+
+Run: `npx playwright test -c playwright.web.config.ts tests/web-browser/match-report.spec.ts`
+Expected: PASS (14 tests).
+
+Run: `npm test`
+Expected: PASS (405 tests).
+
+- [ ] **Step 6: Check and commit**
+
+```bash
+npx tsc --noEmit && npm run web:typecheck
+npx prettier --write src/features/profile/components tests/web-browser/match-report.spec.ts
+npm run test:browser && npm run test:web
+git add src/features/profile/components tests/web-browser/match-report.spec.ts
+git commit -m "fix(profile): coming back on the website keeps Matches' Show more and the Heroes sort"
+```
+
+Expected: 154 desktop and 81 website tests pass.
+
+---
+
+### Task 18: A scroll position still waiting to come back is kept
+
+**Files:**
+- Modify: `src/shared/ui/useScrollBack.ts`
+- Test: `tests/web-browser/match-report.spec.ts`
+
+What changes:
+- **`useScrollBack`** keeps a position still to come back: `pending` is true while a restore waits, and `stop()` clears it. The cleanup saves `scrollY` only when nothing is pending.
+- **Why:** the cleanup always saved `scrollY`, even while a restore was pending. Under StrictMode (`npm run web:dev`) the first cleanup saved the router's clamped 0, so nothing came back. In production, leaving before the page had grown lost the kept position: the browser's Back and Forward buttons fire no takeover event.
+- **Test (website):** scrolled down the Matches tab, then a report. Time moves on three minutes (Playwright's clock, used here for the first time), so the history's two-minute cache has expired. Back while the history loads again, held; Forward before it has; then, released, Back again: the position comes back. `mockLongHistory` takes a `held` promise for this.
+- **Checked by hand:** `match-report.spec.ts` passes against `npm run web:dev` (StrictMode).
+
+- [ ] **Step 1: Write the failing test**
+
+In `tests/web-browser/match-report.spec.ts`:
+
+1. Replace:
+
+```ts
+// Thirty matches, a page and a half of the Matches tab, each with its
+// report.
+async function mockLongHistory(page: Page) {
+  const now = Math.floor(Date.now() / 1000);
+  await page.route(
+    `https://api.deadlock-api.com/v1/players/${FARGO}/match-history`,
+    (route) =>
+      route.fulfill({
+        json: Array.from({ length: 30 }, (_, index) => ({
+          ...historyRow(2001 + index, index % 2 === 0),
+          start_time: now - 3600 * (index + 1),
+        })),
+        headers: cors,
+      }),
+  );
+```
+
+with:
+
+```ts
+// Thirty matches, a page and a half of the Matches tab, each with its
+// report. The history is awaited on `held` first, so a test can hold it
+// back.
+async function mockLongHistory(
+  page: Page,
+  held: () => Promise<void> = () => Promise.resolve(),
+) {
+  const now = Math.floor(Date.now() / 1000);
+  await page.route(
+    `https://api.deadlock-api.com/v1/players/${FARGO}/match-history`,
+    async (route) => {
+      await held();
+      return route.fulfill({
+        json: Array.from({ length: 30 }, (_, index) => ({
+          ...historyRow(2001 + index, index % 2 === 0),
+          start_time: now - 3600 * (index + 1),
+        })),
+        headers: cors,
+      });
+    },
+  );
+```
+
+2. Replace:
+
+```ts
+  await expect.poll(scrolled).toBe(before);
+});
+
+test("the profile keeps its tab, range and hero after a match report", async ({
+```
+
+with:
+
+```ts
+  await expect.poll(scrolled).toBe(before);
+});
+
+test("a scroll position still waiting to come back is kept", async ({
+  page,
+}) => {
+  let hold: Promise<void> | null = null;
+  let release = () => {};
+  // Time is the test's to move on: the history, cached for two minutes,
+  // then loads again.
+  await page.clock.install();
+  await page.setViewportSize({ width: 1260, height: 600 });
+  await mockApi(page);
+  await mockLongHistory(page, () => hold ?? Promise.resolve());
+  await page.goto(`/players/${FARGO}`);
+  await page.getByRole("tab", { name: "Matches" }).click();
+  const rows = page.locator(".match-row");
+  await rows.nth(15).scrollIntoViewIfNeeded();
+  const scrolled = () => page.evaluate(() => Math.round(window.scrollY));
+  const before = await scrolled();
+  expect(before).toBeGreaterThan(200);
+  await rows.nth(15).locator("a.match-open").click();
+  await expect(page).toHaveURL(`/matches/2016?player=${FARGO}`);
+  // Back while the history loads again, and Forward before it has: the
+  // browser's buttons give the page no sign of the viewer scrolling.
+  hold = new Promise((resolve) => (release = resolve));
+  await page.clock.fastForward("03:00");
+  await page.goBack();
+  await expect(page.getByText("Loading match history…")).toBeVisible();
+  await page.goForward();
+  await expect(page).toHaveURL(`/matches/2016?player=${FARGO}`);
+  release();
+  hold = null;
+  // Back again, the history loads and the position comes back.
+  await page.goBack();
+  await expect(rows).toHaveCount(20);
+  await expect.poll(scrolled).toBe(before);
+});
+
+test("the profile keeps its tab, range and hero after a match report", async ({
+```
+
+- [ ] **Step 2: Run it and confirm it fails**
+
+Run: `npx playwright test -c playwright.web.config.ts tests/web-browser/match-report.spec.ts -g "still waiting to come back"`
+Expected: FAIL (`Expected: 913`, `Received: 0`: leaving before the history loaded again kept the top of the page).
+
+- [ ] **Step 3: Keep what is still to come back**
+
+In `src/shared/ui/useScrollBack.ts`:
+
+1. Replace:
+
+```ts
+    let stop = () => {};
+    if (y > 0) {
+```
+
+with:
+
+```ts
+    let pending = y > 0;
+    let stop = () => {};
+    if (pending) {
+```
+
+2. Replace:
+
+```ts
+      stop = () => {
+        observer.disconnect();
+```
+
+with:
+
+```ts
+      stop = () => {
+        pending = false;
+        observer.disconnect();
+```
+
+3. Replace:
+
+```ts
+    return () => {
+      stop();
+      positions.set(key, window.scrollY);
+    };
+```
+
+with:
+
+```ts
+    return () => {
+      // A position still to come back stays kept: the window is only where
+      // the page, too short yet, left it (left early, or StrictMode's
+      // remount in development).
+      if (!pending) positions.set(key, window.scrollY);
+      stop();
+    };
+```
+
+- [ ] **Step 4: Run the tests and confirm they pass**
+
+Run: `npx playwright test -c playwright.web.config.ts tests/web-browser/match-report.spec.ts`
+Expected: PASS (15 tests).
+
+Run: `npx playwright test -c playwright.web.config.ts tests/web-browser/match-report.spec.ts -g "still waiting to come back|scrolled|keeps the matches shown" --repeat-each=5`
+Expected: PASS (15 tests).
+
+Run: `npm test`
+Expected: PASS (405 tests).
+
+- [ ] **Step 5: Check and commit**
+
+```bash
+npx tsc --noEmit && npm run web:typecheck
+npx prettier --write src/shared/ui/useScrollBack.ts tests/web-browser/match-report.spec.ts
+npm run test:browser && npm run test:web
+git add src/shared/ui/useScrollBack.ts tests/web-browser/match-report.spec.ts
+git commit -m "fix(profile): a scroll position still waiting to come back is kept"
+```
+
+Expected: 154 desktop and 82 website tests pass.
+
+---
+
+### Task 19: The chart's tip covers a shorter card's numbers
+
+**Files:**
+- Modify: `src/features/profile/styles/profile.css`
+- Test: `tests/browser/home.spec.ts`
+
+What changes (owner's choice: numbers at the foot), in CSS only:
+- **`.perf-card-numbers`** takes `margin-top: auto` (keeping `margin-bottom: 6px`) in place of `.sparkline-box`, so the numbers and the chart sit together at the card's foot. The charts still line up, and the tip, which hangs from the chart, covers the numbers in every card. A card shorter than its row's tallest has a gap under its title instead.
+- **A card without a chart** (no game with a value yet: "Loading match details…", "No match details") keeps its numbers under its title: `.perf-card-numbers:last-child { margin-top: 0 }`.
+- **Why:** with the chart alone at the foot, a shorter card's spare height sat between its numbers and its chart, and the top of the big number showed above the tip (K/D/A at 1260 px).
+- **Tests (desktop):**
+  - **Five columns:** the line-up check no longer depends on the fallback font wrapping a title: a style tag makes Souls / min's title row taller. The row's charts still line up, and in K/D/A's shorter card the focused chart's tip covers the big number.
+  - **Still loading:** a card without a chart has its numbers as high as Souls / min's. This passes before the fix too: it pins the `:last-child` rule.
+
+- [ ] **Step 1: Write the failing tests**
+
+In `tests/browser/home.spec.ts`:
+
+1. Replace:
+
+```ts
+  await expect(view(page).locator(".perf-trend")).toHaveCount(0);
+  release();
+```
+
+with:
+
+```ts
+  await expect(view(page).locator(".perf-trend")).toHaveCount(0);
+  // Without a chart yet, its numbers stay under the title, as high as
+  // those of a charted card in its row.
+  const top = (label: string) =>
+    card(page, label)
+      .locator(".perf-card-numbers")
+      .evaluate((el) => el.getBoundingClientRect().top);
+  expect(await top("Hero damage / min")).toBe(await top("Souls / min"));
+  release();
+```
+
+2. Replace:
+
+```ts
+  // A title takes two lines ("Objective damage / min"), yet the first
+  // row's charts line up.
+  const tops = await view(page)
+    .locator(".perf-card .sparkline")
+    .evaluateAll((charts) =>
+      charts.slice(0, 5).map((chart) => chart.getBoundingClientRect().top),
+    );
+  expect(new Set(tops).size).toBe(1);
+```
+
+with:
+
+```ts
+  // One card's title row taller than the rest of its row's (as a title on
+  // two lines makes it), yet the row's charts line up.
+  await page.addStyleTag({
+    content:
+      '.perf-card[aria-label="Souls / min"] .perf-card-head { padding-bottom: 40px; }',
+  });
+  const head = (label: string) =>
+    card(page, label).locator(".perf-card-head").boundingBox();
+  expect((await head("Souls / min"))!.height).toBeGreaterThan(
+    (await head("K/D/A ratio"))!.height,
+  );
+  const tops = await view(page)
+    .locator(".perf-card .sparkline")
+    .evaluateAll((charts) =>
+      charts.slice(0, 5).map((chart) => chart.getBoundingClientRect().top),
+    );
+  expect(new Set(tops).size).toBe(1);
+  // In the shorter card, a game's tip covers the numbers it stands for.
+  const kda = card(page, "K/D/A ratio");
+  await kda.getByRole("slider").focus();
+  const tip = (await kda.locator(".spark-tip").boundingBox())!;
+  const number = (await kda.locator(".perf-card-numbers b").boundingBox())!;
+  expect(tip.y).toBeLessThanOrEqual(number.y);
+  expect(tip.y + tip.height).toBeGreaterThanOrEqual(number.y + number.height);
+```
+
+- [ ] **Step 2: Run them and confirm they fail**
+
+Run: `npx playwright test tests/browser/home.spec.ts -g "five columns|says what is still loading"`
+Expected: FAIL (1 failed, 1 passed: in K/D/A's card the tip starts below the top of the big number (`Expected: <= 505`, `Received: 558`)).
+
+- [ ] **Step 3: Numbers and chart at the foot**
+
+In `src/features/profile/styles/profile.css`:
+
+1. Replace:
+
+```css
+/* A column, its chart at the foot: in a row where one title wraps to two
+   lines, the charts still line up. */
+```
+
+with:
+
+```css
+/* A column, its numbers and chart at the foot: in a row where one title
+   wraps to two lines, the charts still line up, and the chart's tip still
+   covers the numbers above it. */
+```
+
+2. Replace:
+
+```css
+.perf-card-numbers {
+  margin-bottom: 6px;
+}
+```
+
+with:
+
+```css
+.perf-card-numbers {
+  margin-top: auto;
+  margin-bottom: 6px;
+}
+/* A card without a chart (no game with a value yet) keeps its numbers
+   under the title, not at the foot of a row the charts make tall. */
+.perf-card-numbers:last-child {
+  margin-top: 0;
+}
+```
+
+3. Replace:
+
+```css
+.sparkline-box {
+  position: relative;
+  margin-top: auto;
+}
+```
+
+with:
+
+```css
+.sparkline-box {
+  position: relative;
+}
+```
+
+- [ ] **Step 4: Run the tests and confirm they pass**
+
+Run: `npx playwright test tests/browser/home.spec.ts -g "performance"`
+Expected: PASS (23 tests).
+
+Run: `npm test`
+Expected: PASS (405 tests).
+
+- [ ] **Step 5: Check and commit**
+
+```bash
+npx tsc --noEmit && npm run web:typecheck
+npx prettier --write src/features/profile/styles/profile.css tests/browser/home.spec.ts
+npm run test:browser && npm run test:web
+git add src/features/profile/styles/profile.css tests/browser/home.spec.ts
+git commit -m "fix(profile): the chart's tip covers a shorter card's numbers"
+```
+
+Expected: 154 desktop and 82 website tests pass.
+
+---
+
+### Task 20: Docs after the final review, and final check
+
+**Files:**
+- Modify: `README.md`
+- Modify: `docs/superpowers/specs/2026-10-21-redesign-design.md`
+- Modify: `src/features/profile/utils/performance-metrics.ts` (two comments)
+
+- [ ] **Step 1: README**
+
+A cooldown's ten-minute maximum. The paragraph is one line, so prettier leaves it as it is.
+
+In `README.md`:
+
+Replace:
+
+```markdown
+The client caches in memory (two to ten minutes depending on the data) and drops responses that have expired, times out after 15 seconds and shares in-flight requests. It keeps requests within the API's per-IP limits for analytics (200 a minute, shared by every analytics endpoint), bulk metadata (30) and rank lookups (20) by holding them back, counting every tab of the website and every window of the app together: the counts, and the cooldowns of those three groups and of a 503 (below), are kept in `localStorage`, claimed under a Web Lock where the browser has one. A request no one waits for any more leaves the queue, and a cooldown fails the waiting ones at once. A 429 pauses only what was refused: the whole group for those three, otherwise the one request, as other endpoints' limits depend on where the data comes from. A 503, the API shedding load, pauses everything. Either honours `Retry-After`, with a 30-second minimum. The Performance tab also keeps each stored game's totals for the session.
+```
+
+with:
+
+```markdown
+The client caches in memory (two to ten minutes depending on the data) and drops responses that have expired, times out after 15 seconds and shares in-flight requests. It keeps requests within the API's per-IP limits for analytics (200 a minute, shared by every analytics endpoint), bulk metadata (30) and rank lookups (20) by holding them back, counting every tab of the website and every window of the app together: the counts, and the cooldowns of those three groups and of a 503 (below), are kept in `localStorage`, claimed under a Web Lock where the browser has one. A request no one waits for any more leaves the queue, and a cooldown fails the waiting ones at once. A 429 pauses only what was refused: the whole group for those three, otherwise the one request, as other endpoints' limits depend on where the data comes from. A 503, the API shedding load, pauses everything. Either honours `Retry-After`, with a 30-second minimum and, as a cooldown outlives a reload, a ten-minute maximum. The Performance tab also keeps each stored game's totals for the session.
+```
+
+- [ ] **Step 2: Spec**
+
+The second pass's paragraph, corrected: Retry keeps focus on the tab's match-details and rank notices and the report's rank note (not every Retry); a cooldown lasts at most ten minutes; the tip sits right under the title row only in a row's tallest card.
+
+In `docs/superpowers/specs/2026-10-21-redesign-design.md`:
+
+Replace:
+
+```markdown
+Changed after phase 4 (second follow-up pass): the ten cards run five a row where there is room, each share under its per-minute card. Over games on more than one hero the shares claim no trend, as the hero mix moves them more than form does. A range or hero left before it loads drops the requests it still waits for. A profile opened afresh starts at Overview; coming back from its match report, or with the browser's Back, finds it as it was left, on the website its scroll position too. The report and the tab share one rank rule, and a current rank that didn't load says so, with Retry. Retry keeps keyboard focus in place. The report's Impact gives no share of a team total of 0. The API client counts every tab and window of the app against one budget, with the Live statistics and the compact build now going through it, and a cooldown fails waiting requests at once. Kept as they were, by the owner's decision: the tip covers the card's numbers, so the whole line stays in sight; it sits right under the title row; and Enter on a chart opens the picked game's report, which the slider pattern doesn't define but the chart's label announces.
+```
+
+with:
+
+```markdown
+Changed after phase 4 (second follow-up pass): the ten cards run five a row where there is room, each share under its per-minute card. Over games on more than one hero the shares claim no trend, as the hero mix moves them more than form does. A range or hero left before it loads drops the requests it still waits for. A profile opened afresh starts at Overview; coming back from its match report, or with the browser's Back, finds it as it was left, on the website its scroll position too. The report and the tab share one rank rule, and a current rank that didn't load says so, with Retry. Retry on the tab's match-details and rank notices, and on the report's rank note, keeps keyboard focus in place. The report's Impact gives no share of a team total of 0. The API client counts every tab and window of the app against one budget, with the Live statistics and the compact build now going through it, and a cooldown fails waiting requests at once and lasts at most ten minutes. Kept as they were, by the owner's decision: the tip covers the card's numbers, so the whole line stays in sight, and in a row's tallest card it sits right under the title row (the numbers now sit with the chart at the card's foot, so a shorter card has a gap under its title); and Enter on a chart opens the picked game's report, which the slider pattern doesn't define but the chart's label announces.
+```
+
+The spec has never been prettier-formatted: leave its existing formatting alone. Check that the edit adds no new differences (prettier's differences from the file are the ones it had before the edit):
+
+```bash
+spec=docs/superpowers/specs/2026-10-21-redesign-design.md
+diff <(git show HEAD:$spec | npx prettier --stdin-filepath $spec | diff - <(git show HEAD:$spec)) <(npx prettier $spec | diff - $spec)
+```
+
+Expected: no output.
+
+- [ ] **Step 3: Two comments**
+
+In `src/features/profile/utils/performance-metrics.ts`:
+
+1. Replace:
+
+```ts
+  // change of hero moves it as much as form does, so it claims no trend.
+```
+
+with:
+
+```ts
+  // change of hero moves it more than form does, so it claims no trend.
+```
+
+2. Replace:
+
+```ts
+ * doesn't read as a change in form; otherwise the values themselves.
+ */
+```
+
+with:
+
+```ts
+ * doesn't read as a change in form; otherwise the values themselves, and
+ * only over one hero's games (`heroMix`).
+ */
+```
+
+- [ ] **Step 4: Final check**
+
+Run all of these; every one must pass:
+- `npm test` (405)
+- `npx tsc --noEmit`
+- `npm run web:typecheck`
+- `npm run test:browser` (154)
+- `npm run test:web` (82)
+- `npm run build`
+- `npm run web:build`
+- `npm run validate:manifest`
+
+- [ ] **Step 5: Commit**
+
+Check the README and the comments with prettier; the spec was checked in Step 2.
+
+```bash
+npx prettier --check README.md src/features/profile/utils/performance-metrics.ts
+git add README.md docs/superpowers/specs/2026-10-21-redesign-design.md src/features/profile/utils/performance-metrics.ts
+git commit -m "docs: the second pass's notes after its final review"
 ```
