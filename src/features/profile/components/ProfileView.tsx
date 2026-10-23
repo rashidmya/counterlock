@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { LinkScope } from "@/app/links";
 import type { Navigate } from "@/app/navigation";
 import type { AsyncState } from "@/shared/api/useAsync";
+import { useScrollBack } from "@/shared/ui/useScrollBack";
 import type { HistoryFilter, HistoryMatch } from "../types";
 import type { PerformanceRange } from "../utils/performance-metrics";
 import { HeroesTab } from "./HeroesTab";
@@ -59,6 +60,9 @@ export function ProfileView({
   useEffect(() => {
     views.set(accountId, latest.current);
   }, [accountId]);
+  // And its scroll position: on the website the profile loads again, so
+  // the router's own restore finds it still too short.
+  useScrollBack(`profile:${accountId}`, restore);
   const { subtab, filter, range, heroId } = view;
   const update = (change: Partial<ViewState>) => {
     const next = { ...latest.current, ...change };

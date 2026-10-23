@@ -155,6 +155,38 @@ test("browser Back finds the profile as it was; opened afresh, it starts at Over
   );
 });
 
+test("coming back from a report finds the profile scrolled as it was", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1260, height: 600 });
+  await mockApi(page);
+  await page.goto(`/players/${FARGO}`);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const share = page.getByRole("region", {
+    name: "Healing share",
+    exact: true,
+  });
+  await expect(share.locator("circle")).toHaveCount(8);
+  await share.scrollIntoViewIfNeeded();
+  const scrolled = () => page.evaluate(() => Math.round(window.scrollY));
+  const before = await scrolled();
+  expect(before).toBeGreaterThan(200);
+  const open = async () => {
+    const chart = (await share.getByRole("slider").boundingBox())!;
+    await page.mouse.click(chart.x + chart.width - 2, chart.y + 40);
+    await expect(page).toHaveURL(`/matches/1001?player=${FARGO}`);
+  };
+  // Browser Back: the profile loads again, then scrolls back.
+  await open();
+  await page.goBack();
+  await expect.poll(scrolled).toBe(before);
+  // So does the report's "Back to profile".
+  await open();
+  await page.getByRole("link", { name: "← Back to profile" }).click();
+  await expect(page).toHaveURL(`/players/${FARGO}`);
+  await expect.poll(scrolled).toBe(before);
+});
+
 test("the profile keeps its tab, range and hero after a match report", async ({
   page,
 }) => {
