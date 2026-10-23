@@ -89,15 +89,17 @@ Checked on account 400239835 (Eternus 6, 5,699 games) and three Archon–Arcanis
   - **All-or-nothing averages:** one failed or timed-out curve blanks every card's rank average until Retry (successful curves stay cached). On Last 100 a player with many heroes fires every uncached curve at once (about 7 s each against the client's 15 s timeout); catching per game, or limiting how many run together, would be more forgiving (Task 4 review).
   - **Point details:** they are SVG `<title>` tooltips, which only show on hover.
   - **Range switch (Task 6 review):** switching range blanks the totals cards ("Loading match details…") until the new set loads, although the games already cached are known; `useAsync` drops the previous result by design. Keeping the previous cards while loading would be smoother.
-  - **Untested (Task 6 review):** Retry recovering after a failure, and the loading texts, have no browser test.
-  - **Tab state:** the tab and its range reset when coming back from a match report (the existing profile follow-up).
+  - **Untested (Task 6 and final reviews):** Retry recovering after a failure (checked by hand), the loading texts, the point tooltip, the all-ranks and widening notes, and the column layout have no browser test. No browser fixture has a game's own rank badge, so the browser tests all take the current-rank path; unit tests cover a game's own rank.
+  - **Tab state:** the range and hero reset whenever the tab unmounts: switching to another profile tab or coming back from a match report (the existing profile follow-up). Lifting `range` and `picked` into `ProfileView`, as its match filter is, would keep them (final review).
+  - **Dots on Last 100 (final review):** at four columns on the desktop the dots shrink to 1.25 px and their win and loss colours sit close to the gold line, so the pattern is hard to see. A minimum radius with a `--surface` outline, or a win/loss strip under the line, would keep it readable.
+  - **Session memory (final review):** the client never evicts cached responses and the service also keeps the parsed totals, so bulk responses are held twice for the session (about 5 KB a game). Pruning expired entries in `DeadlockApi` would help every feature.
 
 ## Global Constraints
 
 - Every colour comes from `src/app/styles/tokens.css` (`var(--token)` or `rgb(from var(--token) r g b / a)`). `tests/app/theme.test.ts` fails on any hex literal in `src/**/*.css`, `web/app/**/*.css` or `src/**/*.tsx`.
 - Fonts and components are as in phases 1–3: Rajdhani uppercase for labels, buttons and numbers, DM Sans for body text, `SectionHeader` for the section title, `.filter-buttons` for the ranges and `.select-field` for the hero select.
 - **Constants (exported; tests import them):** `RANGES = [20, 50, 100]`, `MIN_TREND_GAMES = 6`, `TOTALS_BATCH = 50`; `criticalT(df)` gives the two-sided 95% t.
-- **Copy strings fixed by this plan (tests assert them):**
+- **Copy strings fixed by this plan** (tests assert most of them; see the follow-ups for those they don't):
   - **Controls:** buttons "Last 20", "Last 50" and "Last 100"; the select "Hero" with "All heroes" and options like "Haze · 181 games" ("1 game" for one).
   - **Legend:** "Game by game", "Average for that hero at that rank", "Win" and "Loss".
   - **Card titles:** "Souls / min", "K/D/A ratio", "Hero damage / min", "Objective damage / min", "Healing / min", "Creep kills / min", "Kill participation" and "Hero damage share".
@@ -115,9 +117,9 @@ Checked on account 400239835 (Eternus 6, 5,699 games) and three Archon–Arcanis
     - "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and hero damage share have no rank average."
   - **Notes (when they apply):**
     - "Games without a recorded rank use the player's current rank."
-    - "Games without a recorded rank are compared with all ranks: the player's current rank is unknown."
+    - "Games without a recorded rank, and no current rank to use, are compared with all ranks."
     - "Where a hero has too few games at one rank, its average covers the ranks either side."
-    - "{n} of {total} games have no match details yet, so they're missing from damage, healing, creep kills and shares."
+    - "{n} of {total} games have no match details yet, so they're missing from damage, healing, creep kills and shares." (not stored yet, or stored without the player)
 - No fake data in production. Every derived number carries its one-line "how it's derived" note.
 - One shared copy of the feature code for the app and the website.
 - **Before every commit**, run `npm test`, `npx tsc --noEmit` and `npm run web:typecheck`.
@@ -142,7 +144,7 @@ Checked on account 400239835 (Eternus 6, 5,699 games) and three Archon–Arcanis
 
    Tests: `only asks for games it doesn't have yet`, `shares one curve request per hero and rank between games`, and the bulk-request count in the desktop test.
 3. **Failure.** When totals or averages fail, the history-based values still show, each failure gets its own Retry, and no trend is claimed. Test: `performance tab keeps history values when details and averages fail`.
-4. **Widths.** Desktop at 850 px and 1260 px, and the website at 1600 px and 375 px: no horizontal page scroll; cards in four, two or one columns.
+4. **Widths.** Desktop at 850 px and 1260 px, and the website at 1600 px and 375 px: no horizontal page scroll; cards in four, two or one columns. Checked by eye; no test asserts the column count.
 
 ## File structure
 
@@ -643,8 +645,9 @@ describe("gameAverage", () => {
     ]);
   });
 
-  it("has no values past the curve's end", () => {
+  it("has no values past the curve's end or without a length", () => {
     expect(gameAverage(curve, 9000, "none").values).toEqual({});
+    expect(gameAverage(curve, 0, "game").values).toEqual({});
   });
 });
 
@@ -1007,7 +1010,7 @@ export interface GameAverage {
   // none), or neither (all ranks).
   source: "game" | "current" | "none";
   // Each stat's rank average at the game's length; missing past the
-  // curve's end.
+  // curve's end or without a length.
   values: Partial<Record<MetricId, number>>;
 }
 
@@ -1018,7 +1021,8 @@ export function gameAverage(
 ): GameAverage {
   const values: GameAverage["values"] = {};
   for (const id of AVERAGED) {
-    const at = averageAt(curve, metricById.get(id)!, durationS);
+    const at =
+      durationS > 0 && averageAt(curve, metricById.get(id)!, durationS);
     if (at) values[id] = at.avg;
   }
   return { band: curve.band, widenedFrom: curve.widenedFrom, source, values };
@@ -1981,6 +1985,7 @@ import { bulkMetadata } from "../fixtures/performance";
   failTotals?: boolean;
   failCurve?: boolean;
   unstoredTotals?: number[];
+  unlistedPlayer?: number[];
 ```
 
 - In `routeApi`, put these lines **before** `if (url.pathname.endsWith("/metadata"))`. Bulk metadata's path also ends in `/metadata`.
@@ -1990,9 +1995,20 @@ import { bulkMetadata } from "../fixtures/performance";
       return fixtures.failTotals
         ? json({}, 500)
         : json(
-            bulkMetadata(url, ACCOUNT).filter(
-              (match) => !fixtures.unstoredTotals?.includes(match.match_id),
-            ),
+            bulkMetadata(url, ACCOUNT)
+              .filter(
+                (match) => !fixtures.unstoredTotals?.includes(match.match_id),
+              )
+              .map((match) =>
+                fixtures.unlistedPlayer?.includes(match.match_id)
+                  ? {
+                      ...match,
+                      players: match.players.filter(
+                        (p) => p.account_id !== ACCOUNT,
+                      ),
+                    }
+                  : match,
+              ),
           );
     if (url.pathname === "/v1/analytics/player-performance-curve")
       return fixtures.failCurve ? json({}, 500) : json(rankCurveRows());
@@ -2180,7 +2196,9 @@ test("performance tab counts games without match details yet", async ({
   await storeAccount(page);
   await routeApi(page, {
     history: performanceHistory,
-    unstoredTotals: [3005, 3006],
+    // One game not stored yet, one stored without the player.
+    unstoredTotals: [3005],
+    unlistedPlayer: [3006],
   });
   await openMyProfile(page);
   await page.getByRole("tab", { name: "Performance" }).click();
@@ -2373,6 +2391,7 @@ function PerformanceCard({
 
 /** The one-line notes on how the numbers are made, as they apply. */
 function notes(
+  accountId: number,
   games: HistoryMatch[],
   totals: Map<number, PlayerTotals[]> | undefined,
   averages: Map<number, GameAverage> | undefined,
@@ -2387,14 +2406,15 @@ function notes(
     lines.push("Games without a recorded rank use the player's current rank.");
   if (sources.has("none"))
     lines.push(
-      "Games without a recorded rank are compared with all ranks: the player's current rank is unknown.",
+      "Games without a recorded rank, and no current rank to use, are compared with all ranks.",
     );
   if ([...(averages?.values() ?? [])].some((a) => a.widenedFrom))
     lines.push(
       "Where a hero has too few games at one rank, its average covers the ranks either side.",
     );
+  // Not stored yet, or stored without the player.
   const missing = totals
-    ? games.filter((g) => !totals.has(g.matchId)).length
+    ? games.filter((g) => !gameTotals(totals.get(g.matchId), accountId)).length
     : 0;
   if (missing)
     lines.push(
@@ -2527,7 +2547,7 @@ export function PerformanceTab({
               />
             ))}
           </div>
-          {notes(games, totals.data, averages.data).map((line) => (
+          {notes(accountId, games, totals.data, averages.data).map((line) => (
             <p key={line} className="data-note">
               {line}
             </p>
