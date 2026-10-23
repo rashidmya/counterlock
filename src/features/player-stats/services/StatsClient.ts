@@ -1,39 +1,17 @@
+import { TTL, deadlockApi, type DeadlockApi } from "@/shared/api/DeadlockApi";
 import type { HeroStats, PlayerRank, StatsEntry } from "../types";
 
-const BASE = "https://api.deadlock-api.com/v1";
-const TTL = 5 * 60_000;
 export class StatsClient {
   private cache = new Map<string, StatsEntry>();
-  private cooldownUntil = 0;
   constructor(
-    private request: typeof fetch = globalThis.fetch.bind(globalThis),
+    private api: DeadlockApi = deadlockApi,
     private now = Date.now,
   ) {}
 
+  // Through the app's shared client, so these requests keep to the API's
+  // rate limits along with every other, and wait out its cooldowns.
   private async get(path: string): Promise<unknown[]> {
-    if (this.now() < this.cooldownUntil)
-      throw new Error("API busy. Retry after the cooldown.");
-    const response = await this.request(`${BASE}${path}`, {
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (response.status === 429 || response.status === 503) {
-      const header = response.headers.get("Retry-After");
-      const seconds = header ? Number(header) : NaN;
-      const until = Number.isFinite(seconds)
-        ? this.now() + seconds * 1000
-        : Date.parse(header ?? "");
-      this.cooldownUntil = Math.max(
-        this.now() + 30_000,
-        Number.isFinite(until) ? until : 0,
-      );
-    }
-    if (!response.ok)
-      throw new Error(
-        response.status === 403
-          ? "Stats unavailable or profile protected."
-          : `Stats API unavailable (${response.status}).`,
-      );
-    const body: unknown = await response.json();
+    const body = await this.api.get<unknown>(`/v1${path}`, TTL.profile);
     if (!Array.isArray(body)) throw new Error("Unexpected stats response.");
     return body;
   }
@@ -45,7 +23,7 @@ export class StatsClient {
     const unique = [...new Set(ids)].sort((a, b) => a - b);
     const pending = unique.filter((id) => {
       const saved = this.cache.get(`${mode}:${id}`);
-      return !saved || this.now() - saved.fetchedAt >= TTL;
+      return !saved || this.now() - saved.fetchedAt >= TTL.profile;
     });
     if (pending.length) {
       const params = new URLSearchParams({ account_ids: pending.join(",") });

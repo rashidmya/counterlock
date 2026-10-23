@@ -1,3 +1,4 @@
+import { TTL, deadlockApi, type DeadlockApi } from "@/shared/api/DeadlockApi";
 import { categoryName } from "../utils/popular-builds";
 export type BuildStats = {
   hero_id: number;
@@ -59,34 +60,26 @@ export function parseBuild(raw: any, stats: BuildStats): MeasuredBuild {
     throw Error("Build contains no item groups");
   return { stats, name: b.name.slice(0, 200), groups };
 }
-const cache = new Map<number, { expires: number; value: MeasuredBuild }>();
+/**
+ * The hero's most played build with 20 recorded matches, through the app's
+ * shared client, which caches it and keeps to the API's rate limits. When
+ * `signal` aborts, the wait ends at once, and a request that hasn't gone
+ * out is dropped.
+ */
 export async function loadBuild(
   heroId: number,
   signal: AbortSignal,
+  api: DeadlockApi = deadlockApi,
 ): Promise<MeasuredBuild> {
-  const cached = cache.get(heroId);
-  if (cached && cached.expires > Date.now()) return cached.value;
-  const get = async (path: string) => {
-    const r = await fetch("https://api.deadlock-api.com/v1/" + path, {
-      signal,
-    });
-    if (!r.ok)
-      throw Error(
-        r.status === 429
-          ? "Build service busy; try again later."
-          : "Build statistics unavailable.",
-      );
-    return r.json();
-  };
+  const get = (path: string) =>
+    api.get<unknown>(`/v1/${path}`, TTL.analytics, signal);
   const stats = chooseBuild(
     await get(`analytics/hero-build-stats/${heroId}?min_matches=20`),
     heroId,
   );
   if (!stats) throw Error("No build has 20 recorded matches for this hero.");
-  const value = parseBuild(
+  return parseBuild(
     await get(`builds/${heroId}/${stats.hero_build_id}`),
     stats,
   );
-  cache.set(heroId, { expires: Date.now() + 300000, value });
-  return value;
 }

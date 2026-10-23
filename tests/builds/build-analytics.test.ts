@@ -1,9 +1,11 @@
-import { test } from "vitest";
+import { test, vi } from "vitest";
 import assert from "node:assert/strict";
 import {
   chooseBuild,
+  loadBuild,
   parseBuild,
 } from "@/features/builds/services/build-analytics";
+import { DeadlockApi } from "@/shared/api/DeadlockApi";
 const row = {
   hero_id: 77,
   hero_build_id: 100,
@@ -71,4 +73,40 @@ test("unmapped Citadel build group keys become readable names", () => {
     parseBuild(raw, row).groups.map((group) => group.name),
     ["Early", "Late game", "Situational picks", "Custom group"],
   );
+});
+
+test("builds load through the shared client, which keeps them", async () => {
+  const request = vi.fn<typeof fetch>().mockImplementation(
+    async (url) =>
+      new Response(
+        JSON.stringify(
+          String(url).includes("hero-build-stats")
+            ? [row]
+            : {
+                hero_build: {
+                  hero_id: 77,
+                  hero_build_id: 100,
+                  name: "Build",
+                  details: {
+                    mod_categories: [
+                      { name: "Early", mods: [{ ability_id: 42 }] },
+                    ],
+                  },
+                },
+              },
+        ),
+      ),
+  );
+  const api = new DeadlockApi(request, () => 0);
+  const signal = new AbortController().signal;
+  assert.equal((await loadBuild(77, signal, api)).name, "Build");
+  assert.deepEqual(
+    request.mock.calls.map(([url]) => String(url)),
+    [
+      "https://api.deadlock-api.com/v1/analytics/hero-build-stats/77?min_matches=20",
+      "https://api.deadlock-api.com/v1/builds/77/100",
+    ],
+  );
+  await loadBuild(77, signal, api);
+  assert.equal(request.mock.calls.length, 2);
 });
