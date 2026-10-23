@@ -50,7 +50,10 @@ Each task's end state was also checked on its own: type check and unit tests aft
 - **Rank averages per hero and rank tier, four at a time.** Games that ask for the same curve (`curvePath(hero, rankBand(badge))`) share their requests (the client shares them anyway); grouping lets a limit apply to distinct curves. A group never has more than one request in flight (its base curve, then its wider one), so four groups mean at most four curve requests at once. `CURVE_CONCURRENCY = 4`: an uncached curve takes about 7 s, and Last 100 can need a dozen, which all at once ran past the client's 15 s timeout. Each game's curve is awaited separately (`Promise.allSettled`), so a failure costs only its own games. `fetchGameAverages` fails as a whole only when no game gets an average, so the existing "Rank averages unavailable: {error}" notice and Retry still cover a full failure; a partial one gets "Rank averages unavailable for {n} of {count}: {error}" with Retry. Retry re-asks only the failed curves (the others are cached for 10 minutes).
   - **A card with any game whose curve failed claims no trend (Task 4 review).** Its trend would follow only the games that kept their average: after a rank-up, the recent games form the new, uncached group most likely to fail, and a trend from the older games alone could even point the wrong way. Such a card also shows no "Too few games" and no "no rank average for these games"; its numbers stay like for like ("20 games · 10 with a rank average: … vs …"). `GameAverages.failed` is the set of those games' match ids.
 - **The profile keeps its view for the session.** A module-level map in `ProfileView`, keyed by account, holds the tab, the match filter, the range and the hero. The desktop app keeps the profile mounted while a report is open, but the website opens the report as its own page, so its profile remounts; the map covers both, and switching profile tabs (which unmounts the Performance tab) too. Phase 3 suggested URL state; a session map needs no route changes in either shell. A reload starts at Overview again, and coming back to a profile later in the session finds it as it was left.
-- **Cards stay while new games load.** The tab remembers the last games whose totals and averages both finished, with their requests, and shows those while a new range or hero loads: `aria-busy` on the cards, 55% opacity, and "Updating to the last {n} games…" beside the controls. It uses React's documented "storing information from previous renders" pattern (`setState` during render, behind a condition that turns false once stored). The first load still shows the loading texts.
+- **Cards stay while new games load.** The tab remembers the last games whose totals and averages both finished, with their requests, and shows those while a new range or hero loads: `aria-busy` on the cards, 85% opacity, and "Updating the cards…" beside the range buttons. It uses React's documented "storing information from previous renders" pattern (`setState` during render, behind a condition that turns false once stored). The first load still shows the loading texts.
+  - **The status doesn't move anything (Task 6 review).** As its own item in the header's `space-between` row it moved the Hero select about 445 px at 1260 px, and at 720 px it pushed every card down a line. It now sits in the range group, always mounted (so screen readers announce its change), with its text laid over the free space beside the buttons. It reads "Updating the cards…", which is also true on Retry and with a hero picked.
+  - **85% opacity** keeps every text on a dimmed card at 4.5:1 or more ("Slipping" 4.91:1, muted 5.38:1); 55% took them below 3:1.
+  - **Live error notices are hidden while older cards are shown:** a fresh "Match details unavailable" above cards from the last range would contradict them. They show once both requests settle.
 - **Picking a game on a chart.**
   - **Mouse or pen:** hovering picks the nearest game (`nearestGame()`); a click opens its report.
   - **Touch:** a tap only picks it, so the details show first; the tip's "Report →" link opens it; a tap outside the chart clears it (as the match report's Graph does).
@@ -84,7 +87,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
   - **Card titles:** "Objective damage share" and "Healing share" after "Hero damage share".
   - **Notes:** "Creep kills stand in for last hits, which the rank average doesn't have. Kill participation and the hero damage, objective damage and healing shares have no rank average, as it has no team totals."
   - **Partial failure:** "Rank averages unavailable for {n} of {count}: {error}" with Retry, for example "Rank averages unavailable for 10 of 20 games: Deadlock API unavailable (500)."
-  - **Loading:** "Updating to the last {count}…", for example "Updating to the last 50 games…".
+  - **Loading:** "Updating the cards…", beside the range buttons while older cards are shown.
   - **Tip:** "{Hero} · Win · 3d ago" over "{value} rank avg {x} · Report →" ("—" without a value; no "rank avg" without an average).
   - **Chart label:** "{metric}, game by game. Arrow keys pick a game, Enter opens its match report." with `aria-valuetext` "{Hero} · Win · 3d ago: {value}, rank avg {x}".
   - **Match report notes:** " This player's rank isn't recorded for this match, so the average uses their current rank." and " This player's rank isn't recorded for this match, and there's no current rank to use."
@@ -3049,7 +3052,8 @@ Expected: 136 desktop and 75 website tests pass.
 **How it works:**
 - **What's remembered:** `Loaded` is the key, games, totals and averages of a render whose requests had both finished. It is stored with `setState` during render, behind a condition that is false once stored (React's "storing information from previous renders").
 - **What's shown:** while either request loads and something was stored, the tab shows the stored games, data and request states (`shown`); `stale` is true then.
-- **Display:** the cards get `aria-busy` (dimmed by CSS) and the controls a status, "Updating to the last {count}…". The first load, with nothing stored, still shows the loading texts.
+- **Display:** the cards get `aria-busy` (85% opacity). A status beside the range buttons reads "Updating the cards…". It is always mounted, and its text is laid over the free space, so it never moves the controls (Task 6 review). The live error notices wait until both requests settle. The first load, with nothing stored, still shows the loading texts.
+- **The test** holds a card that needs match details, and checks that the Hero select doesn't move.
 - **The test's `gate` option** holds the bulk requests for Last 50 back until the test releases them. Its route handler becomes `async`.
 
 - [ ] **Step 1: Write the failing test**
@@ -3125,19 +3129,25 @@ test("performance tab keeps the last cards, dimmed, while new games load", async
   });
   await openMyProfile(page);
   await page.getByRole("tab", { name: "Performance" }).click();
-  const souls = card(page, "Souls / min").locator(".perf-card-numbers");
+  // A card that needs match details, so the held request matters.
+  const damage = card(page, "Hero damage / min").locator(".perf-card-numbers");
   const cards = view(page).locator(".perf-cards");
-  await expect(souls).toHaveText("1,100 20 games · rank avg 1,000");
+  const status = view(page).locator(".perf-status");
+  const hero = view(page).getByRole("combobox", { name: "Hero" });
+  const select = (await hero.boundingBox())!;
+  await expect(damage).toHaveText("1,000 20 games · rank avg 500");
+  await expect(status).toHaveText("");
   hold = new Promise((resolve) => (release = resolve));
   await page.getByRole("button", { name: "Last 50", exact: true }).click();
-  await expect(
-    view(page).getByRole("status").filter({ hasText: "Updating" }),
-  ).toHaveText("Updating to the last 50 games…");
+  await expect(status).toHaveText("Updating the cards…");
   await expect(cards).toHaveAttribute("aria-busy", "true");
-  await expect(souls).toHaveText("1,100 20 games · rank avg 1,000");
+  await expect(damage).toHaveText("1,000 20 games · rank avg 500");
+  // The status doesn't move the controls.
+  expect(await hero.boundingBox()).toEqual(select);
   release();
   await expect(cards).toHaveAttribute("aria-busy", "false");
-  await expect(souls).toContainText("50 games");
+  await expect(damage).toHaveText("1,000 50 games · rank avg 500");
+  await expect(status).toHaveText("");
 });
 
 test("performance range and hero survive a profile tab switch", async ({
@@ -3149,7 +3159,7 @@ test("performance range and hero survive a profile tab switch", async ({
 - [ ] **Step 2: Run it and confirm it fails**
 
 Run: `npx playwright test tests/browser/home.spec.ts -g "keeps the last cards"`
-Expected: FAIL (1 failed: no "Updating to the last 50 games…" status).
+Expected: FAIL (1 failed: there is no `.perf-status` status yet).
 
 - [ ] **Step 3: Keep the last games**
 
@@ -3217,6 +3227,23 @@ export function PerformanceTab({
     ),
   );
   return (
+    <div className="performance">
+      <SectionHeader title="Performance" />
+      <div className="section-head">
+        <div className="filter-buttons" role="group" aria-label="Range">
+          {RANGES.map((value) => (
+            <button
+              key={value}
+              className={range === value ? "active" : ""}
+              aria-pressed={range === value}
+              onClick={() => onRange(value)}
+            >
+              Last {value}
+            </button>
+          ))}
+        </div>
+        {heroes.length > 1 && (
+          <label className="select-field">
 ```
 
 with:
@@ -3226,7 +3253,8 @@ with:
     [accountId, key],
   );
   // While a new range or hero loads, the cards keep the last games that
-  // finished loading, dimmed, rather than blanking.
+  // finished loading, dimmed, rather than blanking. (Per account:
+  // ProfilePage keys the view by account.)
   const [last, setLast] = useState<Loaded | null>(null);
   const settled = !totals.loading && !averages.loading;
   if (
@@ -3251,36 +3279,83 @@ with:
     ),
   );
   return (
+    <div className="performance">
+      <SectionHeader title="Performance" />
+      <div className="section-head">
+        <div className="perf-range">
+          <div className="filter-buttons" role="group" aria-label="Range">
+            {RANGES.map((value) => (
+              <button
+                key={value}
+                className={range === value ? "active" : ""}
+                aria-pressed={range === value}
+                onClick={() => onRange(value)}
+              >
+                Last {value}
+              </button>
+            ))}
+          </div>
+          {/* Always there, so screen readers announce it; it takes no space
+              of its own, so the controls never move. */}
+          <p className="perf-status" role="status">
+            <span>{stale ? "Updating the cards…" : ""}</span>
+          </p>
+        </div>
+        {heroes.length > 1 && (
+          <label className="select-field">
 ```
 
 4. Replace:
 
 ```tsx
-            </select>
-          </label>
-        )}
-      </div>
-      {history.loading && <p className="muted">Loading match history…</p>}
-      {history.error && (
+      )}
+      {!!games.length && (
+        <>
+          {totals.error && (
+            <p className="notice warning" role="status">
+              Match details unavailable: {totals.error}
+              <button type="button" onClick={totals.retry}>
 ```
 
 with:
 
 ```tsx
-            </select>
-          </label>
-        )}
-        {stale && (
-          <span className="muted" role="status">
-            Updating to the last {count(games.length)}…
-          </span>
-        )}
-      </div>
-      {history.loading && <p className="muted">Loading match history…</p>}
-      {history.error && (
+      )}
+      {!!games.length && (
+        <>
+          {/* Live failures: hidden while older cards are shown, which they
+              would contradict. */}
+          {!stale && totals.error && (
+            <p className="notice warning" role="status">
+              Match details unavailable: {totals.error}
+              <button type="button" onClick={totals.retry}>
 ```
 
 5. Replace:
+
+```tsx
+              </button>
+            </p>
+          )}
+          {averages.error && (
+            <p className="notice warning" role="status">
+              Rank averages unavailable: {averages.error}
+              <button type="button" onClick={averages.retry}>
+```
+
+with:
+
+```tsx
+              </button>
+            </p>
+          )}
+          {!stale && averages.error && (
+            <p className="notice warning" role="status">
+              Rank averages unavailable: {averages.error}
+              <button type="button" onClick={averages.retry}>
+```
+
+6. Replace:
 
 ```tsx
               Loss
@@ -3330,7 +3405,56 @@ with:
 
 In `src/features/profile/styles/profile.css`:
 
-Replace:
+1. Replace:
+
+```css
+  gap: 10px 16px;
+  margin-bottom: 0;
+}
+.performance .data-note,
+.performance > .notice {
+  margin: 0;
+```
+
+with:
+
+```css
+  gap: 10px 16px;
+  margin-bottom: 0;
+}
+/* The range buttons, and the loading status in the space beside them: the
+   status's text is laid over that space, so it never moves the controls. */
+.perf-range {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+}
+.perf-status {
+  position: relative;
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  margin: 0;
+}
+.perf-status span {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+.performance .data-note,
+.performance > .notice {
+  margin: 0;
+```
+
+2. Replace:
 
 ```css
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3347,8 +3471,9 @@ with:
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
+/* Dimmed, but every text still at 4.5:1 or more. */
 .perf-cards[aria-busy="true"] {
-  opacity: 0.55;
+  opacity: 0.85;
 }
 @container (max-width: 900px) {
   .perf-card {
@@ -4129,7 +4254,7 @@ Expected: 139 desktop and 76 website tests pass.
 
 These cover behaviour that already works, so they pass at once. While planning, each was checked against broken code: ignoring each game's own rank, or dropping the widening note, makes its test fail.
 - **Loading:** "loading rank average…" and "Loading match details…" while both requests are held.
-- **Retry:** failed match details come back after Retry.
+- **Retry:** failed match details come back after Retry, and while Last 50 then loads, the cards kept are the ones from after the Retry (Task 6 review: a stored view compared by key alone would keep the failed one; that fails this test).
 - **Own rank:** ranked games (`ranked_display_badge: 116`) ask for Eternus curves only, with no current-rank note.
 - **All ranks:** with no current rank, the all-ranks note shows.
 - **Widening:** thin tiers widen, and the note says so (`thinTiers`).
@@ -4203,7 +4328,7 @@ with:
 3. Replace:
 
 ```ts
-  await expect(souls).toContainText("50 games");
+  await expect(status).toHaveText("");
 });
 
 test("performance range and hero survive a profile tab switch", async ({
@@ -4214,7 +4339,7 @@ test("performance range and hero survive a profile tab switch", async ({
 with:
 
 ```ts
-  await expect(souls).toContainText("50 games");
+  await expect(status).toHaveText("");
 });
 
 test("performance tab says what is still loading", async ({ page }) => {
@@ -4247,7 +4372,16 @@ test("performance tab says what is still loading", async ({ page }) => {
 test("performance tab asks for match details again on Retry", async ({
   page,
 }) => {
-  const fixtures = { history: performanceHistory, failTotals: true };
+  let hold: Promise<void> | null = null;
+  let release = () => {};
+  const fixtures = {
+    history: performanceHistory,
+    failTotals: true,
+    gate: (url: URL) =>
+      url.pathname === "/v1/matches/metadata" && hold
+        ? hold
+        : Promise.resolve(),
+  };
   await storeAccount(page);
   await routeApi(page, fixtures);
   await openMyProfile(page);
@@ -4255,13 +4389,22 @@ test("performance tab asks for match details again on Retry", async ({
   const notice = view(page).getByText(
     "Match details unavailable: Deadlock API unavailable (500).",
   );
+  const damage = card(page, "Hero damage / min").locator(".perf-card-numbers");
   await expect(notice).toBeVisible();
   fixtures.failTotals = false;
   await notice.getByRole("button", { name: "Retry" }).click();
-  await expect(
-    card(page, "Hero damage / min").locator(".perf-card-numbers"),
-  ).toHaveText("1,000 20 games · rank avg 500");
+  await expect(damage).toHaveText("1,000 20 games · rank avg 500");
   await expect(notice).toHaveCount(0);
+  // The cards kept while Last 50 loads are the ones from after the Retry.
+  hold = new Promise((resolve) => (release = resolve));
+  await page.getByRole("button", { name: "Last 50", exact: true }).click();
+  await expect(view(page).locator(".perf-cards")).toHaveAttribute(
+    "aria-busy",
+    "true",
+  );
+  await expect(damage).toHaveText("1,000 20 games · rank avg 500");
+  release();
+  await expect(damage).toHaveText("1,000 50 games · rank avg 500");
 });
 
 test("performance tab compares ranked games at their own rank", async ({
