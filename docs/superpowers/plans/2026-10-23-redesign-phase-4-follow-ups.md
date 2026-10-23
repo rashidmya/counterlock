@@ -56,12 +56,12 @@ Each task's end state was also checked on its own: type check and unit tests aft
   - **Live error notices are hidden while older cards are shown,** the partial-failure one included: a fresh "Match details unavailable" above cards from the last range would contradict them. They show once both requests settle.
 - **Picking a game on a chart.**
   - **Mouse or pen:** hovering picks the nearest game (`nearestGame()`); a click opens its report. A click with Ctrl, Cmd, Shift or Alt is left to the browser.
-  - **Touch:** a tap only picks it, so the details show first; dragging along the chart moves the pick (`touch-action: pan-y`, as the Graph); the tip's "Report →" link opens it; a tap outside the chart clears it (as the match report's Graph does).
-  - **Keyboard:** the chart is a `role="slider"` (screen readers pass arrow keys to sliders): Left/Down and Right/Up, Home and End pick a game, Enter opens its report, Escape clears (from the chart or the tip's link), and focus starts on the newest game. Keys with Alt, Ctrl or Cmd stay the browser's. Its `aria-valuetext` reads the tip. The focus outline is 2 px gold.
+  - **Touch:** a tap only picks it, so the details show first; dragging along the chart moves the pick (`touch-action: pan-y` on the SVG, as the Graph: Chromium ignores it on the SVG's children); the tip's "Report →" link opens it; a tap outside the chart clears it (as the match report's Graph does).
+  - **Keyboard:** the chart is a `role="slider"` (screen readers pass arrow keys to sliders): Left/Down and Right/Up, Home and End pick a game, Enter opens its report, Escape clears (from the tip's link, focus moves back to the chart first), and focus starts on the newest game. Keys with Alt, Ctrl or Cmd stay the browser's. Its `aria-valuetext` reads the tip. The focus outline is 2 px gold.
   - **The pick is a match id, not an index (Task 7 review),** so when new games replace the shown ones (a range switch with kept cards), Enter can't open a game the user didn't pick.
   - **The tip** sits above the chart, over the card's numbers, on the picked game's side, so the whole line stays in sight. Two lines: "{Hero} · Win · 3d ago" and "{value} rank avg {x} · Report →". Rejected while planning: a readout line under the chart (truncated at four columns: "rank avg …") and a tip beside the point (ran off the card on narrow charts).
   - **The tip touches the chart and keeps focus where it is (Task 7 review).** A 2 px gap between them dropped the tip as a mouse moved slowly up to its link. And Safari doesn't focus a link on press: the chart's blur cleared the tip before the link's click, the only way to a report on a touch screen. So the tip prevents the default of `mousedown`.
-  - **Its link** is named "Match report" (the arrow isn't read out) and has a real 24 px touch target (`inline-block`, padding with matching negative margin).
+  - **Its link** is named "Match report" (the arrow isn't read out) and has a real 24 px touch target (`inline-block`, padding with matching negative margin, and `line-height` after the `font` shorthand, which resets it).
   - **Points without a value** can be picked too ("—"); the report is still useful.
   - The old `<title>` tooltips go.
 - **Readable dots on Last 100.** The radius still shrinks with the spacing (`dotRadius()`), but not below 2 px, and every dot has a 1 px outline in `--surface` (the card), which keeps neighbours apart and off the gold line. Checked on live data at 1260 px, Last 100.
@@ -3586,7 +3586,7 @@ Expected: 137 desktop and 75 website tests pass.
 - **Props:** `describe` (returning `PointText`) and `route` replace `title`. The tab passes `accountId` to each card for the route.
 - **Dots:** `dotRadius()` keeps them at 2 px or more, with an outline in `--surface`.
 - **The pick** is the game's match id; the tip touches the chart and prevents `mousedown`'s default, so focus stays put (Task 7 review).
-- **The tests** pick a game in the middle of the chart (not only the newest, where any mapping lands), and cover the tip's side, leaving the chart, Shift+Tab, Home/End, a press on the tip, Tab into its link, Escape, and a tap outside. Checked against broken code while planning: the pointer offset dropped, no pointer-leave, no blur, the tip's side inverted, Home/End swapped, no Escape, no `mousedown` guard and a gap under the tip each fail a test. (In Chromium a tap focuses the chart, so a tap outside clears it by blur as well as by the document listener; the listener stays for browsers that don't.)
+- **The tests** pick a game in the middle of the chart (not only the newest, where any mapping lands), and cover the tip's side, leaving the chart, Shift+Tab, Home/End, Up/Down, a key with Ctrl, a press on the tip, Tab into its link, Escape (focus back on the chart), a click with Ctrl, the link's 24 px height, the SVG's `touch-action` and a tap outside. Checked against broken code while planning: the pointer offset dropped, no pointer-leave, no blur, the tip's side inverted, Home/End swapped, no Escape, no `mousedown` guard, a gap under the tip, `line-height` before `font`, no refocus on Escape, no modifier guards and `touch-action` on the rect each fail a test. (In Chromium a tap focuses the chart, so a tap outside clears it by blur as well as by the document listener; the listener stays for browsers that don't.)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3720,6 +3720,17 @@ test("performance tab describes the game under the pointer and a click opens its
   ]);
   await expect(tip).toHaveClass(/right/);
   await expect(souls.locator("circle.picked")).toHaveCount(1);
+  // The link in the tip is a 24 px target.
+  const link = (await tip
+    .getByRole("button", { name: "Match report" })
+    .boundingBox())!;
+  expect(link.height).toBeGreaterThanOrEqual(24);
+  // A click with Ctrl held doesn't open the report; a plain one does.
+  await page.keyboard.down("Control");
+  await page.mouse.click(chart.x + chart.width - 2, chart.y + 40);
+  await page.keyboard.up("Control");
+  await expect(tip).toBeVisible();
+  expect(reports).toEqual([]);
   await page.mouse.click(chart.x + chart.width - 2, chart.y + 40);
   await expect(view(page).locator(".match-report")).toBeVisible();
   expect(reports).toEqual([3000]);
@@ -3750,6 +3761,13 @@ test("performance tab points can be picked and opened from the keyboard", async 
   await chart.focus();
   await page.keyboard.press("Home");
   await expect(chart).toHaveAttribute("aria-valuenow", "1");
+  await page.keyboard.press("ArrowUp");
+  await expect(chart).toHaveAttribute("aria-valuenow", "2");
+  await page.keyboard.press("ArrowDown");
+  await expect(chart).toHaveAttribute("aria-valuenow", "1");
+  // Keys with Ctrl held are the browser's.
+  await page.keyboard.press("Control+ArrowRight");
+  await expect(chart).toHaveAttribute("aria-valuenow", "1");
   await page.keyboard.press("End");
   await expect(chart).toHaveAttribute("aria-valuenow", "20");
   await page.keyboard.press("ArrowLeft");
@@ -3767,8 +3785,11 @@ test("performance tab points can be picked and opened from the keyboard", async 
   await expect(tip.getByRole("button", { name: "Match report" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(tip).toHaveCount(0);
-  // Back on the chart, Enter opens the picked game.
-  await chart.focus();
+  // Focus is back on the chart, where the arrows start again from the
+  // newest game; Enter opens the picked one.
+  await expect(chart).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(chart).toHaveAttribute("aria-valuenow", "20");
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("Enter");
   await expect(view(page).locator(".match-report")).toBeVisible();
@@ -3827,6 +3848,12 @@ test.describe("a touch screen at phone width", () => {
     await page.touchscreen.tap(chart.x + chart.width - 2, chart.y + 40);
     await expect(tip).toBeVisible();
     await expect(page).toHaveURL(`/players/${FARGO}`);
+    // A horizontal drag picks games rather than scrolling the page.
+    expect(
+      await souls
+        .locator(".sparkline svg")
+        .evaluate((svg) => getComputedStyle(svg).touchAction),
+    ).toBe("pan-y");
     await tip.getByRole("link", { name: "Match report" }).tap();
     await expect(page).toHaveURL(`/matches/1001?player=${FARGO}`);
   });
@@ -4012,9 +4039,12 @@ export function Sparkline({
         if (!box.current?.contains(event.relatedTarget as Node))
           setPicked(null);
       }}
-      // Escape clears the pick, from the chart or the tip's link.
+      // Escape clears the pick, from the chart or the tip's link; from the
+      // link, which goes with the tip, focus moves back to the chart first.
       onKeyDown={(event) => {
-        if (event.key === "Escape") setPicked(null);
+        if (event.key !== "Escape") return;
+        if (event.target !== chart.current) chart.current?.focus();
+        setPicked(null);
       }}
     >
       <div
@@ -4082,7 +4112,8 @@ export function Sparkline({
               onPointerMove={track}
               onPointerDown={track}
               onClick={(event) => {
-                // A tap only picks; a modified click is the browser's.
+                // A tap only picks; a modified click does nothing here
+                // (the tip's link can open the report in a new tab).
                 if (
                   pointer.current === "touch" ||
                   event.ctrlKey ||
@@ -4257,7 +4288,6 @@ In `src/features/profile/styles/profile.css`:
 }
 .spark-value {
   fill: none;
-  stroke: var(--gold);
 ```
 
 with:
@@ -4277,21 +4307,21 @@ with:
   outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
+/* A horizontal drag picks games; a vertical one still scrolls the page.
+   (Chromium ignores touch-action on the SVG's children.) */
 .sparkline svg {
   display: block;
+  touch-action: pan-y;
 }
-/* A horizontal drag picks games; a vertical one still scrolls the page. */
 .spark-hit {
   fill: transparent;
   cursor: pointer;
-  touch-action: pan-y;
 }
 .spark-cross {
   stroke: rgb(from var(--cream) r g b / 0.35);
 }
 .spark-value {
   fill: none;
-  stroke: var(--gold);
 ```
 
 2. Replace:
@@ -4356,10 +4386,11 @@ with:
   display: inline-block;
   margin: -4px 0;
   padding: 4px 0;
-  line-height: 16px;
   border: 0;
   background: none;
   font: inherit;
+  /* After the font shorthand, which resets it. */
+  line-height: 16px;
   color: var(--gold);
   cursor: pointer;
 }
