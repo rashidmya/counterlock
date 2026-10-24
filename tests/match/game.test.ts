@@ -20,6 +20,97 @@ const roster = (patch: Record<string, unknown> = {}) =>
   });
 
 describe("game event integration", () => {
+  it("retains live telemetry and distinguishes missing values from real zero", () => {
+    let state = applyInfo(initialState(), {
+      match_info: {
+        roster_0: roster({
+          hero_damage: 1200,
+          object_damage: 300,
+          hero_healing: 0,
+          souls: "741",
+          level: 3,
+          assist: 2,
+        }),
+      },
+    });
+    expect(state.players[0]).toMatchObject({
+      heroDamage: 1200,
+      objectiveDamage: 300,
+      healing: 0,
+      souls: 741,
+      level: 3,
+      assists: 2,
+      kills: null,
+      deaths: null,
+    });
+    state = applyInfo(state, {
+      category: "match_info",
+      key: "roster_0 ",
+      data: JSON.stringify({ hero_damage: 1300 }),
+    });
+    expect(state.players[0]).toMatchObject({
+      heroDamage: 1300,
+      healing: 0,
+      souls: 741,
+      assists: 2,
+    });
+    state = applyInfo(state, {
+      match_info: {
+        roster_0: {
+          hero_healing: null,
+          souls: "",
+          level: false,
+          kills: "invalid",
+          deaths: -1,
+          assist: Infinity,
+        },
+      },
+    });
+    expect(state.players[0]).toMatchObject({
+      healing: null,
+      souls: null,
+      level: null,
+      kills: null,
+      deaths: null,
+      assists: null,
+    });
+  });
+  it.each([null, "", "  ", true, false, -1, NaN, Infinity, "bad"])(
+    "does not turn invalid telemetry %s into a measurement",
+    (value) => {
+      const state = applyInfo(initialState(), {
+        match_info: {
+          roster_0: { hero_id: 7, hero_damage: value, kills: value },
+        },
+      });
+      expect(state.players[0]).toMatchObject({ heroDamage: null, kills: null });
+    },
+  );
+  it("clears measurements for a different account or hero in a reused slot", () => {
+    const before = applyInfo(initialState(), {
+      match_info: { roster_0: roster({ hero_damage: 1200, kills: 4 }) },
+    });
+    for (const patch of [{ steam_id: "100000001" }, { hero_id: 7 }]) {
+      const next = applyInfo(before, { match_info: { roster_0: patch } });
+      expect(next.players[0]).toMatchObject({ heroDamage: null, kills: null });
+    }
+    const removed = applyInfo(before, { match_info: { roster_0: null } });
+    expect(
+      applyInfo(removed, { match_info: { roster_0: { hero_id: 13 } } })
+        .players[0].kills,
+    ).toBeNull();
+  });
+  it("keeps telemetry when an anonymous player's account arrives later", () => {
+    const before = applyInfo(initialState(), {
+      match_info: {
+        roster_0: roster({ steam_id: "", hero_damage: 1200, kills: 4 }),
+      },
+    });
+    expect(
+      applyInfo(before, { match_info: { roster_0: { steam_id: "100000000" } } })
+        .players[0],
+    ).toMatchObject({ heroDamage: 1200, kills: 4 });
+  });
   it("converts exact Steam IDs and rejects rounded or invalid IDs", () => {
     expect(accountId("76561198060265728")).toBe(100000000);
     expect(accountId("[U:1:100000000]")).toBe(100000000);

@@ -125,11 +125,11 @@ export function PlayerRow({
         {history?.matches_played.toLocaleString() ?? "—"}
       </td>
       <td className="kda">
-        {player.kills}
+        {player.kills ?? "—"}
         <span>/</span>
-        {player.deaths}
+        {player.deaths ?? "—"}
         <span>/</span>
-        {player.assists}
+        {player.assists ?? "—"}
       </td>
     </tr>
   );

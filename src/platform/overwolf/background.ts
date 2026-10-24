@@ -2,6 +2,7 @@ import { isDeadlock, type GameInfo } from "./game";
 import { overlayPreferenceKey } from "@/features/overlay/preferences";
 import { recordDetectedAccount } from "@/features/profile/storage";
 import { LiveStore } from "@/features/match/store/LiveStore";
+import { decode } from "@/features/match/utils/game";
 import {
   kGamesFeatures,
   kHotkeys,
@@ -90,13 +91,27 @@ overwolf.games.events.onInfoUpdates2.addListener((update) => {
 overwolf.games.events.onNewEvents.addListener(({ events }) => {
   if (!running) return;
   for (const event of events) {
-    if (event.name === "match_end") store.patch({ phase: "PostGame" });
+    if (event.name === "match_end")
+      store.patch({ phase: "PostGame", paused: false });
     if (event.name === "match_start") {
-      store.patch({ phase: "GameInProgress", clock: "00:00" });
+      const previous = store.getSnapshot();
+      if (previous.phase === "PostGame") store.reset();
+      store.patch({
+        status: previous.status,
+        localAccountId: previous.localAccountId,
+        gameMode: previous.gameMode,
+        phase: "GameInProgress",
+        clock: "00:00",
+        paused: false,
+      });
       store.refresh();
     }
-    if (event.name === "match_clock" && typeof event.data === "string")
-      store.patch({ clock: event.data });
+    if (event.name === "match_clock")
+      store.ingest({ match_info: { match_clock: event.data } });
+    if (event.name === "game_paused") {
+      const paused = decode(event.data);
+      if (typeof paused === "boolean") store.patch({ paused });
+    }
   }
 });
 overwolf.games.events.onError.addListener(() => {

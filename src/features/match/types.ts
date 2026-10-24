@@ -8,9 +8,14 @@ export interface Player {
   team: number;
   local: boolean;
   accountId: number | null;
-  kills: number;
-  deaths: number;
-  assists: number;
+  kills: number | null;
+  deaths: number | null;
+  assists: number | null;
+  heroDamage: number | null;
+  objectiveDamage: number | null;
+  healing: number | null;
+  souls: number | null;
+  level: number | null;
   items: number[];
   itemsKnown?: boolean;
 }
@@ -22,6 +27,7 @@ export interface MatchState {
   gameMode: "normal" | "street_brawl";
   localAccountId: number | null;
   clock: string;
+  paused: boolean | null;
   players: Player[];
   stats: Record<number, StatsEntry>;
   error: string | null;

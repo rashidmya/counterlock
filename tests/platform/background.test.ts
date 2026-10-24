@@ -93,6 +93,45 @@ afterEach(() => {
 });
 
 describe("background window lifecycle", () => {
+  it("uses validated clock events and pause state, and resets them after a match", async () => {
+    const { api, info, changeGame } = setup(true);
+    await import("@/platform/overwolf/background");
+    const send = (name: string, data: unknown) =>
+      api.games.events.onNewEvents.emit({ events: [{ name, data }] });
+    send("match_clock", "09:59");
+    send("match_clock", "bad");
+    expect(window.counterlockStore!.getSnapshot().clock).toBe("09:59");
+    send("game_paused", true);
+    expect(window.counterlockStore!.getSnapshot().paused).toBe(true);
+    send("game_paused", "false");
+    expect(window.counterlockStore!.getSnapshot().paused).toBe(false);
+    send("game_paused", "maybe");
+    expect(window.counterlockStore!.getSnapshot().paused).toBe(false);
+    info.emit({
+      match_info: { roster_0: { hero_id: 7, kills: 4, hero_damage: 100 } },
+    });
+    send("match_end", "");
+    expect(window.counterlockStore!.getSnapshot()).toMatchObject({
+      phase: "PostGame",
+      paused: false,
+    });
+    send("match_start", "");
+    expect(window.counterlockStore!.getSnapshot()).toMatchObject({
+      phase: "GameInProgress",
+      clock: "00:00",
+      paused: false,
+      players: [],
+    });
+    info.emit({ match_info: { roster_0: { hero_id: 7, kills: 1 } } });
+    send("match_start", "");
+    expect(window.counterlockStore!.getSnapshot().players[0].kills).toBe(1);
+    changeGame(false);
+    expect(window.counterlockStore!.getSnapshot()).toMatchObject({
+      clock: "—",
+      paused: null,
+      players: [],
+    });
+  });
   it("preserves a manual reopen request during same-state game updates", async () => {
     const { api, windows, launch, changeGame } = setup(true);
     await import("@/platform/overwolf/background");

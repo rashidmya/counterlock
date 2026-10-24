@@ -35,6 +35,18 @@ function integer(value: unknown, fallback = 0): number {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
+function measurement(
+  row: Record<string, unknown>,
+  key: string,
+  previous?: number | null,
+): number | null {
+  if (!Object.hasOwn(row, key)) return previous ?? null;
+  const value = row[key];
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  if (typeof value === "string" && !value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+}
 export function initialState(mode: MatchState["mode"] = "live"): MatchState {
   return {
     mode,
@@ -44,6 +56,7 @@ export function initialState(mode: MatchState["mode"] = "live"): MatchState {
     gameMode: "normal",
     localAccountId: null,
     clock: "—",
+    paused: null,
     players: [],
     stats: {},
     error: null,
@@ -91,6 +104,7 @@ export function applyInfo(state: MatchState, payload: unknown): MatchState {
   )
     next.clock = match.match_clock;
   if (newId) next.matchId = newId;
+  if ("steam_id" in game) next.localAccountId = accountId(game.steam_id);
   const mode = object(game.game_mode).game_mode;
   if (typeof mode === "string") {
     const newMode = /street.?brawl/i.test(mode) ? "street_brawl" : "normal";
@@ -115,10 +129,24 @@ export function applyInfo(state: MatchState, payload: unknown): MatchState {
       row.is_local == null
         ? (previous?.local ?? false)
         : row.is_local === true || row.is_local === "true";
+    const heroId = integer(row.hero_id, previous?.heroId);
+    const id =
+      local && next.localAccountId
+        ? next.localAccountId
+        : row.steam_id === undefined
+          ? (previous?.accountId ?? null)
+          : accountId(row.steam_id);
+    const replaced =
+      previous &&
+      (heroId !== previous.heroId ||
+        (id !== null &&
+          previous.accountId !== null &&
+          id !== previous.accountId));
+    const prior = replaced ? undefined : previous;
     roster.set(key, {
       slot: key,
       name: String(row.player_name ?? previous?.name ?? "Unknown player"),
-      heroId: integer(row.hero_id, previous?.heroId),
+      heroId,
       heroName: heroName(
         integer(row.hero_id, previous?.heroId),
         catalog.heroes,
@@ -126,18 +154,27 @@ export function applyInfo(state: MatchState, payload: unknown): MatchState {
       ),
       team: integer(row.team_id, previous?.team),
       local,
-      accountId:
-        row.steam_id === undefined
-          ? (previous?.accountId ?? null)
-          : accountId(row.steam_id),
-      kills: integer(row.kills, previous?.kills),
-      deaths: integer(row.deaths, previous?.deaths),
-      assists: integer(row.assists ?? row.assist, previous?.assists),
-      items: previous?.items ?? [],
-      itemsKnown: previous?.itemsKnown ?? false,
+      accountId: id,
+      kills: measurement(row, "kills", prior?.kills),
+      deaths: measurement(row, "deaths", prior?.deaths),
+      assists: measurement(
+        row,
+        Object.hasOwn(row, "assists") ? "assists" : "assist",
+        prior?.assists,
+      ),
+      heroDamage: measurement(row, "hero_damage", prior?.heroDamage),
+      objectiveDamage: measurement(
+        row,
+        "object_damage",
+        prior?.objectiveDamage,
+      ),
+      healing: measurement(row, "hero_healing", prior?.healing),
+      souls: measurement(row, "souls", prior?.souls),
+      level: measurement(row, "level", prior?.level),
+      items: prior?.items ?? [],
+      itemsKnown: prior?.itemsKnown ?? false,
     });
   }
-  if ("steam_id" in game) next.localAccountId = accountId(game.steam_id);
   const localId = next.localAccountId;
   if (localId)
     for (const p of roster.values())

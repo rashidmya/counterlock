@@ -35,6 +35,11 @@ export function demoState(): MatchState {
     kills: [3, 2, 5, 4, 1, 2, 4, 6, 2, 3, 3, 1][i],
     deaths: [2, 3, 2, 3, 2, 4, 3, 1, 3, 4, 3, 3][i],
     assists: [5, 9, 3, 7, 11, 4, 5, 2, 6, 8, 4, 7][i],
+    heroDamage: (12 - i) * 1000,
+    objectiveDamage: i * 250,
+    healing: i % 3 === 0 ? i * 400 : 0,
+    souls: 10000 + i * 300,
+    level: 10 + (i % 3),
     items: [],
   }));
   for (const [i, p] of state.players.entries())

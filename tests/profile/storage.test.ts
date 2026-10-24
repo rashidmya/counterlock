@@ -35,6 +35,11 @@ const player = (overrides: Partial<Player>): Player => ({
   kills: 0,
   deaths: 0,
   assists: 0,
+  heroDamage: null,
+  objectiveDamage: null,
+  healing: null,
+  souls: null,
+  level: null,
   items: [],
   ...overrides,
 });
