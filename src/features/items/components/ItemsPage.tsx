@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { LinkScope } from "@/app/links";
 import type { Navigate, Route } from "@/app/navigation";
 import { useAsync } from "@/shared/api/useAsync";
@@ -47,6 +47,7 @@ export function ItemsPage({
   query: AnalyticsQuery;
   setQuery(query: AnalyticsQuery): void;
 }) {
+  const searchInput = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [sort, setSort] = useState<SortMode>("cost");
@@ -100,6 +101,7 @@ export function ItemsPage({
         <PageTitle title="The Shop" ribbon="Every item · win & pick rates" />
         <div className="items-toolbar">
           <input
+            ref={searchInput}
             type="search"
             aria-label="Search items"
             placeholder="Search items"
@@ -153,9 +155,27 @@ export function ItemsPage({
             />
           </p>
         )}
-        {tiles.length === 0 ? (
-          <p className="muted">No items match.</p>
-        ) : (
+        <div className="catalog-empty">
+          <p role="status">
+            {tiles.length === 0
+              ? "No items match your search and category filters."
+              : ""}
+          </p>
+          {tiles.length === 0 && (
+            <button
+              type="button"
+              className="reset-filters"
+              onClick={() => {
+                setSearch("");
+                setCategory("all");
+                searchInput.current?.focus();
+              }}
+            >
+              Reset filters
+            </button>
+          )}
+        </div>
+        {tiles.length > 0 && (
           <ItemShopGrid
             tiles={tiles}
             layout={sort === "cost" ? "shop" : "flat"}

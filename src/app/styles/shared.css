@@ -126,3 +126,18 @@
   color: var(--muted);
   font-size: 12px;
 }
+
+.catalog-empty {
+  color: var(--muted);
+}
+.catalog-empty:has(button) {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding-block: 16px;
+}
+.reset-filters {
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  color: var(--gold);
+}

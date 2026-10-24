@@ -1,5 +1,5 @@
 import { RetryButton } from "@/shared/ui/RetryButton";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { LinkScope } from "@/app/links";
 import type { Navigate, Route } from "@/app/navigation";
 import { useAsync } from "@/shared/api/useAsync";
@@ -23,6 +23,7 @@ function HeroRoster({
   search: string;
   setSearch(search: string): void;
 }) {
+  const searchInput = useRef<HTMLInputElement>(null);
   const summaries = useAsync(() => fetchHeroSummaries({ minBadge: 0 }), []);
   const summaryById = new Map(summaries.data?.map((s) => [s.heroId, s]));
   const needle = search.trim().toLowerCase();
@@ -52,6 +53,7 @@ function HeroRoster({
       </p>
       <div className="heroes-toolbar">
         <input
+          ref={searchInput}
           type="search"
           aria-label="Search heroes"
           placeholder="Search heroes"
@@ -66,6 +68,26 @@ function HeroRoster({
           <RetryButton onRetry={summaries.retry} />
         </p>
       )}
+      <div className="catalog-empty">
+        <p role="status">
+          {cards.length === 0
+            ? "No heroes match your search and role filters."
+            : ""}
+        </p>
+        {cards.length === 0 && (
+          <button
+            type="button"
+            className="reset-filters"
+            onClick={() => {
+              setSearch("");
+              setRole("all");
+              searchInput.current?.focus();
+            }}
+          >
+            Reset filters
+          </button>
+        )}
+      </div>
       <HeroGrid cards={cards} variant="roster" />
     </section>
   );

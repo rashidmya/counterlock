@@ -61,10 +61,10 @@
 **Files:** modify `src/features/heroes/components/HeroesPage.tsx`, `src/features/items/components/ItemsPage.tsx`, `src/app/styles/shared.css`, `web/app/styles/polish.css`; create `tests/web-browser/catalog-empty.spec.ts`.
 **Interfaces:** existing local state setters and search input refs; no global filter changes.
 
-- [ ] Write regressions: empty Heroes displays status/reset; reset clears search and role, restores cards and focuses search. Items reset clears search/category but preserves sort and rank. Network stats failure alone does not create an empty state/reset.
-- [ ] Run `npm run test:web -- catalog-empty.spec.ts --reporter=line`; expect missing reset controls and Heroes empty feedback.
-- [ ] Implement empty-state copy and reset handlers. Return focus to the search input. Announce empty results only, not every populated result update.
-- [ ] Run tests; expect PASS. Commit `feat(catalog): add recovery for empty searches`.
+- [x] Write regressions: empty Heroes displays status/reset; reset clears search and role, restores cards and focuses search. Items reset clears search/category but preserves sort and rank. Network stats failure alone does not create an empty state/reset.
+- [x] Run `npm run test:web -- catalog-empty.spec.ts --reporter=line`; expect missing reset controls and Heroes empty feedback.
+- [x] Implement empty-state copy and reset handlers. Return focus to the search input. Announce empty results only, not every populated result update.
+- [x] Run tests; expect PASS. Commit `feat(catalog): add recovery for empty searches`.
 
 ## Task 5: Cross-site verification and delivery
 
