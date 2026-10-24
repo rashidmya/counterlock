@@ -27,7 +27,7 @@
 
 Each task's end state was also checked on its own: type check and unit tests after every task (417 after each, Tasks 6–9 too), and both browser suites after every task (desktop 154, 155, 156, 159 and 159, then 159, 159, 160 and 160 for Tasks 6–9; website 82, 89, 94, 94 and 94, then 96, 96, 96 and 96).
 
-Before the plan was written, the reference commits were reviewed twice, and every finding was fixed in the task it belonged to (listed under the decisions below: the browser's cache, quiet checks and focus, nothing made up, accounts of 0, the visibility check, your own account, the duplicate id, the objective cards' alignment). After Tasks 1–5 ran, the final review's findings were fixed in Tasks 6–9 (under "Final review fixes" below) or listed for the owner.
+Before the plan was written, the reference commits were reviewed twice, and every finding was fixed in the task it belonged to (listed under the decisions below: the browser's cache, quiet checks and focus, nothing made up, accounts of 0, the visibility check, your own account, the duplicate id, the objective cards' alignment). After Tasks 1–5 ran, the final review's findings were fixed in Tasks 6–9 (under "Final review fixes" below) or listed for the owner. Tasks 6–9 ran on main on 2026-10-24; their final review found nothing worse than Minor (the last two follow-ups).
 
 Copy the code as given. If something fails, fix the cause rather than the test.
 
@@ -82,6 +82,8 @@ Copy the code as given. If something fails, fix the cause rather than the test.
 - **Tests not written:** browser tests of "Even", "Destroyed" and Street Brawl's "—" (unit tests cover them); `team_stats` winning over the top-level fields when they differ; `fetchLiveMatch` passing its signal.
 - **Retry shifts the tab a little:** while it runs, the notice gives way to the status line ("Checking again…"), which is shorter. The Performance tab's status takes no space of its own; this one does.
 - **A hidden profile in the desktop app isn't shown again:** every way back to a profile but the match report's "Back to profile" opens it afresh, so a Live tab left behind another page only stops checking. Coming back on the website is tested.
+- **Objectives the API leaves out:** a team with neither `team_stats[].objectives_mask` nor `objectives_mask_team{n}` has no "Objectives standing" block, and nothing says why. The README and the spec say a value the API leaves out shows "—", which holds for souls and rounds only. None in the sample.
+- **Three nits from the fix pass's final review:** the comment on `LiveMatchView`'s ref ("the players' links are all the view has to focus" reads as "must"; say they are "the only things in the view that take focus"); `profile.css`'s `/* MatchOverview's error. */` sits over `.live-tab.own .workspace` too (move the rule below it, saying it overrides the Watch list notice's margin); and the desktop test `a profile hidden behind another page of the app checks nothing` moves the clock on after an answer it can't see without the 300 ms wait Review Focus 4 asks for (it still catches a broken visibility check: 15 times in 15 with the answer held).
 - The second follow-up pass's list (`docs/superpowers/plans/2026-10-23-redesign-phase-4-second-follow-ups.md`, "Follow-ups for the owner") still stands.
 
 ## Global Constraints
