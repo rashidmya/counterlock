@@ -301,10 +301,12 @@ test("a check that goes well leaves alone focus that has left the notice", async
   await page.clock.runFor(60_000);
   const notice = page.locator(".live-watch-notice");
   await notice.getByRole("button", { name: "Retry" }).focus();
-  // A click on nothing in particular leaves focus on the page.
+  // A click on non-interactive content focuses the main skip-link target.
   await page.locator(".live-stats").click();
   const onPage = () =>
-    page.evaluate(() => document.activeElement === document.body);
+    page.evaluate(
+      () => document.activeElement === document.querySelector("main"),
+    );
   expect(await onPage()).toBe(true);
   await page.clock.runFor(60_000);
   await expect(notice).toHaveCount(0);

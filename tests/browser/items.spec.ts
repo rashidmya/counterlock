@@ -148,7 +148,9 @@ test("search narrows to matching items", async ({ page }) => {
   await expect(tiles(page).first()).toHaveAttribute("title", /^Leech/);
   await page.getByRole("searchbox", { name: "Search items" }).fill("zzzz");
   await expect(tiles(page)).toHaveCount(0);
-  await expect(page.getByText("No items match.")).toBeVisible();
+  await expect(
+    page.getByRole("status").filter({ hasText: "No items match" }),
+  ).toBeVisible();
 });
 
 test("category filter keeps only that category", async ({ page }) => {
@@ -275,7 +277,7 @@ test("failed item stats show a notice and keep the shop and dashes", async ({
   page,
 }) => {
   await openItems(page, { itemStatus: 500 });
-  await expect(page.getByRole("status")).toContainText(
+  await expect(page.locator(".notice[role=status]")).toContainText(
     "Item stats unavailable",
   );
   await expect(tiles(page)).toHaveCount(catalog.items.length);

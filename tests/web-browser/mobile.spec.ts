@@ -109,8 +109,14 @@ test("Updating… is never cut short beside the Performance range buttons", asyn
       .toBe(true);
     // The range buttons stay on one line.
     expect(
-      (await page.locator(".perf-range .filter-buttons").boundingBox())!.height,
-    ).toBeLessThan(40);
+      await page
+        .locator(".perf-range .filter-buttons button")
+        .evaluateAll(
+          (buttons) =>
+            new Set(buttons.map((button) => button.getBoundingClientRect().top))
+              .size,
+        ),
+    ).toBe(1);
   }
 });
 
