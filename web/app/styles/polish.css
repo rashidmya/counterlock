@@ -63,3 +63,43 @@
     min-width: 0;
   }
 }
+
+.app.web > header {
+  height: auto;
+  min-height: 60px;
+  flex-wrap: wrap;
+}
+.app.web header nav {
+  min-width: 0;
+  flex-shrink: 1;
+}
+.app.web .tabs {
+  flex-wrap: wrap;
+}
+.app.web .tabs a {
+  min-height: 44px;
+}
+.app.web :is(.brand, .my-profile) {
+  max-width: 100%;
+}
+.app.web :is(#web-content, #web-content *, .report-bar) {
+  scroll-margin-top: calc(var(--web-header-height, 100px) + 16px);
+}
+.app.web .skip-content {
+  position: fixed;
+  z-index: 100;
+  top: 8px;
+  left: 8px;
+  padding: 12px 16px;
+  background: var(--surface);
+  color: var(--gold);
+  border: 2px solid var(--gold);
+  transform: translateY(calc(-100% - 16px));
+}
+.app.web .skip-content:focus {
+  transform: none;
+}
+.app.web :focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}

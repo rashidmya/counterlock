@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router";
 import { LinkProvider } from "@/app/links";
 import type { Route } from "@/app/navigation";
@@ -13,11 +14,38 @@ const tabs = [
 ];
 
 export function WebShell({ children }: { children?: React.ReactNode }) {
+  const shell = useRef<HTMLDivElement>(null);
+  const header = useRef<HTMLElement>(null);
+  const content = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const node = header.current;
+    if (!node) return;
+    const measure = () =>
+      shell.current?.style.setProperty(
+        "--web-header-height",
+        `${node.getBoundingClientRect().height}px`,
+      );
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
   const navigate = useNavigate();
   const { meId } = useRememberedMe();
   return (
-    <div className="app web">
-      <header>
+    <div className="app web" ref={shell}>
+      <a
+        className="skip-content"
+        href="#web-content"
+        onClick={(event) => {
+          event.preventDefault();
+          content.current?.focus({ preventScroll: true });
+          content.current?.scrollIntoView({ block: "start" });
+        }}
+      >
+        Skip to content
+      </a>
+      <header ref={header}>
         <Link className="brand" to="/">
           <span>
             Counter<b>lock</b>
@@ -51,7 +79,9 @@ export function WebShell({ children }: { children?: React.ReactNode }) {
             ),
         }}
       >
-        <main className="page">{children ?? <Outlet />}</main>
+        <main className="page" id="web-content" ref={content} tabIndex={-1}>
+          {children ?? <Outlet />}
+        </main>
       </LinkProvider>
       <footer>
         <span>

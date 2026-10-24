@@ -41,10 +41,10 @@
 **Files:** modify `web/app/WebShell.tsx`, `web/app/styles/polish.css`, `tests/web-browser/polish.spec.ts`.
 **Interfaces:** main target `#web-content`; measured header height exposed as CSS `--web-header-height` on `.app.web` using a cleaned-up ResizeObserver.
 
-- [ ] Add tests: first Tab reveals Skip to content; Enter focuses main and next Tab reaches its content; skip/focused controls stay below the header at 375/768/1440 and enlarged text. Report/profile history restoration remains covered by existing tests.
-- [ ] Run targeted tests; expect missing skip link/clearance failures.
-- [ ] Implement native anchor with explicit focus and scroll, main tabIndex=-1, dynamic header clearance and focus-visible styling. No route-change autofocus.
-- [ ] Run task tests; expect PASS. Commit `feat(web): add skip navigation and sticky header clearance`.
+- [x] Add tests: first Tab reveals Skip to content; Enter focuses main and next Tab reaches its content; skip/focused controls stay below the header at 375/768/1440 and enlarged text. Report/profile history restoration remains covered by existing tests.
+- [x] Run targeted tests; expect missing skip link/clearance failures.
+- [x] Implement native anchor with explicit focus and scroll, main tabIndex=-1, dynamic header clearance and focus-visible styling. No route-change autofocus.
+- [x] Run task tests; expect PASS. Commit `feat(web): add skip navigation and sticky header clearance`.
 
 ## Task 3: Discoverable wide data
 

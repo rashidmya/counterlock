@@ -106,3 +106,39 @@ test.describe("larger touch screen", () => {
     );
   });
 });
+
+for (const width of [375, 768, 1440]) {
+  test(`skip navigation reaches visible content at ${width}px`, async ({
+    page,
+  }) => {
+    await mockApi(page);
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/heroes");
+    await expect(page.locator("a.hero-card").first()).toBeVisible();
+    await page.keyboard.press("Tab");
+    const skip = page.getByRole("link", { name: "Skip to content" });
+    await expect(skip).toBeFocused();
+    await expect(skip).toBeInViewport();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("main")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(
+      page.getByRole("searchbox", { name: "Search heroes" }),
+    ).toBeFocused();
+    // Browser scrolling to focused content must account for the actual header,
+    // including enlarged labels that make navigation occupy more than one row.
+    await page.addStyleTag({
+      content: ".app.web > header a {font-size: 200% !important;}",
+    });
+    const search = page.getByRole("searchbox", { name: "Search heroes" });
+    await search.evaluate((el) => el.scrollIntoView({ block: "start" }));
+    await expect
+      .poll(async () => {
+        const top = (await search.boundingBox())!.y;
+        const header = await page.locator(".app.web > header").boundingBox();
+        return top - header!.height;
+      })
+      .toBeGreaterThanOrEqual(0);
+    await noPageOverflow(page);
+  });
+}
