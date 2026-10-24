@@ -3,6 +3,8 @@ import type { DeadlockApi } from "@/shared/api/DeadlockApi";
 import {
   fetchMatchReport,
   fetchPlayerNames,
+  fetchCurrentBadges,
+  fetchRankCurve,
 } from "@/features/match-report/services/match-report";
 import { METRICS } from "@/features/match-report/utils/metrics";
 import {
@@ -17,6 +19,7 @@ import {
   bigItem,
   heroes,
   matchMetadata,
+  rankCurveRows,
   smallItem,
 } from "../fixtures/match-report";
 
@@ -156,6 +159,65 @@ describe("parseMatchReport", () => {
 });
 
 describe("match report services", () => {
+  it("forwards the report's signal through metadata, names and current rank requests", async () => {
+    const signal = new AbortController().signal;
+    const calls: { path: string; signal?: AbortSignal }[] = [];
+    const api = {
+      get: async (path: string, _ttl: number, passed?: AbortSignal) => {
+        calls.push({ path, signal: passed });
+        if (path.endsWith("/metadata")) return matchMetadata(ACCOUNT, 42);
+        if (path.includes("/steam?"))
+          return [{ account_id: 7, personaname: "Seven" }];
+        return [{ account_id: 7, badge: 73 }];
+      },
+    } as unknown as DeadlockApi;
+    expect((await fetchMatchReport(42, api, signal)).matchId).toBe(42);
+    expect(await fetchPlayerNames([7], api, signal)).toEqual(
+      new Map([[7, "Seven"]]),
+    );
+    expect(await fetchCurrentBadges([7], api, signal)).toEqual(
+      new Map([[7, 73]]),
+    );
+    expect(calls.map((call) => call.signal)).toEqual([signal, signal, signal]);
+  });
+
+  it("preserves cancellation when the report is waiting for a wider rank curve", async () => {
+    const left = new AbortController();
+    const reason = new Error("Report player changed");
+    let asked = 0;
+    const api = {
+      get: async (_path: string, _ttl: number, signal?: AbortSignal) => {
+        if (++asked === 1)
+          return rankCurveRows(5000).map((row, index) => ({
+            ...row,
+            samples: index === 0 ? 50 : row.samples,
+          }));
+        // First curve has usable points; cancelling the wider request must
+        // still reject rather than using those points as an error fallback.
+        left.abort(reason);
+        signal?.throwIfAborted();
+        throw new Error("Signal missing");
+      },
+    } as unknown as DeadlockApi;
+    await expect(fetchRankCurve(7, 73, 0, api, left.signal)).rejects.toBe(
+      reason,
+    );
+    expect(asked).toBe(2);
+  });
+
+  it("preserves cancellation rather than treating a names lookup as an ordinary failure", async () => {
+    const left = new AbortController();
+    const reason = new Error("Report left");
+    const api = {
+      get: async (_path: string, _ttl: number, signal?: AbortSignal) => {
+        left.abort(reason);
+        signal?.throwIfAborted();
+        throw new Error("Signal missing");
+      },
+    } as unknown as DeadlockApi;
+    await expect(fetchPlayerNames([7], api, left.signal)).rejects.toBe(reason);
+  });
+
   it("fetches the metadata path", async () => {
     const calls: string[] = [];
     const api = {

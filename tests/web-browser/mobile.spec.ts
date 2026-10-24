@@ -18,7 +18,13 @@ const clipped = (page: Page, limit: number) =>
           offenders.push(`${label} spans ${box.left}-${box.right}`);
         else if (
           getComputedStyle(node).overflowX !== "visible" &&
-          node.scrollWidth > node.clientWidth + 1
+          node.scrollWidth > node.clientWidth + 1 &&
+          // Player names deliberately ellipsize; their full text remains
+          // available to assistive technology. Bounds still count above.
+          !(
+            node.matches(".live-name") &&
+            getComputedStyle(node).textOverflow === "ellipsis"
+          )
         )
           offenders.push(
             `${label} hides ${node.scrollWidth - node.clientWidth}px`,
@@ -49,6 +55,7 @@ test.describe("a touch screen at phone width", () => {
       exact: true,
     });
     await expect(souls.locator("circle")).toHaveCount(8);
+    await souls.getByRole("slider").scrollIntoViewIfNeeded();
     const chart = (await souls.getByRole("slider").boundingBox())!;
     const tip = souls.locator(".spark-tip");
     // A tap anywhere else clears a picked game.
@@ -93,7 +100,7 @@ test("Updating… is never cut short beside the Performance range buttons", asyn
   const status = page.locator(".perf-status span");
   await expect(status).toHaveText("Updating…");
   // Between about 530 and 585 px the Hero select used to squeeze it.
-  for (const width of [375, 414, 530, 560, 585, 640, 800]) {
+  for (const width of [320, 360, 375, 414, 530, 560, 585, 640, 800]) {
     await page.setViewportSize({ width, height: 900 });
     await expect
       .poll(() => status.evaluate((el) => el.scrollWidth <= el.clientWidth), {
@@ -346,7 +353,8 @@ test.describe("phone width (375px)", () => {
     await page.goto(`/players/${FARGO}`);
     await page.getByRole("tab", { name: "Live" }).click();
     await expect(page.locator(".live-objectives")).toHaveCount(2);
-    for (const width of [375, 360]) {
+    await expect(page.locator(".live-tab-mark")).toBeVisible();
+    for (const width of [375, 360, 320]) {
       await page.setViewportSize({ width, height: 812 });
       expect(
         await page
@@ -367,6 +375,11 @@ test.describe("phone width (375px)", () => {
       ).toBe(1);
       expect((await overflow(page)).scroll).toBeLessThanOrEqual(width);
       expect(await clipped(page, width)).toEqual([]);
+      await expect(
+        page.locator(".live-players .live-name").filter({
+          hasText: "A Rather Long Persona Name Fixture",
+        }),
+      ).toHaveText("A Rather Long Persona Name Fixture");
     }
   });
 

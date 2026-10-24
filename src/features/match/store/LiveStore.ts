@@ -7,7 +7,7 @@ export class LiveStore implements CounterlockStore {
   private listeners = new Set<() => void>();
   private client = new StatsClient();
   private timer?: ReturnType<typeof setTimeout>;
-  private running = false;
+  private request?: AbortController;
   private generation = 0;
   getSnapshot = () => this.state;
   subscribe = (listener: () => void) => {
@@ -22,6 +22,8 @@ export class LiveStore implements CounterlockStore {
   }
   reset() {
     this.generation++;
+    this.request?.abort();
+    clearTimeout(this.timer);
     this.patch(initialState());
   }
   ingest(payload: unknown) {
@@ -31,7 +33,10 @@ export class LiveStore implements CounterlockStore {
       next.gameMode !== this.state.gameMode ||
       next.players.map((p) => `${p.slot}:${p.accountId}`).join() !==
         this.state.players.map((p) => `${p.slot}:${p.accountId}`).join();
-    if (changed) this.generation++;
+    if (changed) {
+      this.generation++;
+      this.request?.abort();
+    }
     this.patch(next);
     if (changed) this.refresh();
   }
@@ -40,10 +45,10 @@ export class LiveStore implements CounterlockStore {
     this.timer = setTimeout(() => void this.loadStats(), 750);
   };
   private async loadStats() {
-    if (this.running) {
-      this.refresh();
-      return;
-    }
+    // Refresh also supersedes an unchanged roster's queued lookup.
+    this.request?.abort();
+    const request = new AbortController();
+    this.request = request;
     const ids = this.state.players
       .map((p) => p.accountId)
       .filter((id): id is number => id !== null);
@@ -52,14 +57,22 @@ export class LiveStore implements CounterlockStore {
       return;
     }
     const generation = this.generation;
-    this.running = true;
     this.patch({ loading: true });
     try {
-      const stats = await this.client.load(ids, this.state.gameMode);
-      if (generation === this.generation) this.patch({ stats });
+      const stats = await this.client.load(
+        ids,
+        this.state.gameMode,
+        request.signal,
+      );
+      if (generation === this.generation && this.request === request)
+        this.patch({ stats });
+    } catch (error) {
+      if (!request.signal.aborted) throw error;
     } finally {
-      this.running = false;
-      this.patch({ loading: false });
+      if (this.request === request) {
+        this.request = undefined;
+        this.patch({ loading: false });
+      }
     }
   }
 }

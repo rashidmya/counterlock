@@ -4,6 +4,7 @@ import type { Navigate, Route } from "@/app/navigation";
 import { useAsync } from "@/shared/api/useAsync";
 import { catalog, itemById } from "@/shared/catalog";
 import { PageTitle } from "@/shared/ui/PageTitle";
+import { RetryButton } from "@/shared/ui/RetryButton";
 import { sortRows } from "@/shared/utils/sort";
 import { RankFilter } from "@/features/heroes/components/RankFilter";
 import {
@@ -144,15 +145,12 @@ export function ItemsPage({
         {failed && (
           <p className="notice warning" role="status">
             Item stats unavailable: {failed}
-            <button
-              type="button"
-              onClick={() => {
+            <RetryButton
+              onRetry={() => {
                 if (stats.error) stats.retry();
                 if (heroes.error) heroes.retry();
               }}
-            >
-              Retry
-            </button>
+            />
           </p>
         )}
         {tiles.length === 0 ? (

@@ -189,6 +189,25 @@ test("Impact gives no share of a team total of 0", async ({ page }) => {
   ]);
 });
 
+test("Impact gives no kill participation when the team has no kills", async ({
+  page,
+}) => {
+  const metadata = matchMetadata(ACCOUNT);
+  for (const player of metadata.match_info.players) {
+    player.kills = 0;
+    player.assists = 0;
+    for (const snapshot of player.stats) {
+      snapshot.kills = 0;
+      snapshot.assists = 0;
+    }
+  }
+  await openWith(page, metadata);
+  await expect(report(page).locator(".impact-kp b")).toHaveText("—");
+  await expect(report(page).locator(".impact-kp small")).toHaveText(
+    "0 of 0 team kills",
+  );
+});
+
 test("Viewing as another player switches every perspective-dependent part", async ({
   page,
 }) => {
@@ -361,7 +380,7 @@ test("a failed copy shows the link to copy by hand", async ({ page }) => {
   });
   await openReport(page);
   await report(page).getByRole("button", { name: "Copy link" }).click();
-  await expect(report(page).getByRole("status")).toHaveText(
+  await expect(report(page).locator(".copy-link-note")).toHaveText(
     "Couldn't copy the link. Copy it from here:",
   );
   const field = report(page).getByRole("textbox", { name: "Match link" });
@@ -577,11 +596,18 @@ test("Retry asks again for current ranks that failed to load", async ({
   await expect(note).toHaveText(
     /^Rank average unavailable: Deadlock API unavailable \(500\)\./,
   );
-  healthy = true;
-  // From the keyboard: focus stays on the note, which says what loads.
+  // A second failure is still announced after Retry clears the first one.
+  await expect(note).toHaveAttribute("role", "status");
   await note.getByRole("button", { name: "Retry" }).focus();
   await page.keyboard.press("Enter");
-  await expect(note).toBeFocused();
+  await expect(viewingAs(page)).toBeFocused();
+  await expect(note.getByRole("button", { name: "Retry" })).toBeVisible();
+  await expect(note).toContainText("Rank average unavailable:");
+  healthy = true;
+  // The stable perspective control keeps focus; the note announces updates.
+  await note.getByRole("button", { name: "Retry" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(viewingAs(page)).toBeFocused();
   // The player's current rank, looked up again, not all ranks.
   await expect(note).toHaveText(
     `Compared with the average ${lead.name} at Eternus at the same match length, over the last 30 days. This player's rank isn't recorded for this match, so the average uses their current rank.`,

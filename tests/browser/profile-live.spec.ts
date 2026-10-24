@@ -89,6 +89,8 @@ test("a profile hidden behind another page of the app checks nothing", async ({
   ).toBeVisible();
   await page.clock.runFor(60_000);
   await expect.poll(() => asked.length).toBe(2);
+  // The answer is offscreen after navigation; let it reach the page first.
+  await page.waitForTimeout(300);
   await page
     .getByRole("navigation", { name: "Main" })
     .getByRole("button", { name: "Heroes" })
@@ -210,4 +212,58 @@ test("the account Overwolf reports on this PC gets the Overwolf tab, whichever a
     view(page).getByRole("heading", { name: "Live match", exact: true }),
   ).toBeVisible();
   expect(asked).toEqual(["200"]);
+});
+
+test("your own match ending hands focus to a meaningful status in the tab", async ({
+  page,
+}) => {
+  await nativeWindow(page, "desktop");
+  await storeMe(page);
+  await routeApi(page);
+  await openMyLive(page);
+  const tab = view(page).locator(".live-tab.own");
+  await tab.getByRole("button").first().focus();
+  await updateMatch(page, { players: [] });
+  await expect(tab.locator(".live-status")).toBeFocused();
+  await expect(tab.locator(".live-status")).toHaveText("Not in a game.");
+});
+
+test("the roster's local account is yours before localAccountId arrives", async ({
+  page,
+}) => {
+  await nativeWindow(page, "desktop");
+  await storeMe(page, 200);
+  const asked = await routeApi(page);
+  await page.goto("/desktop/desktop.html");
+  await page.evaluate((accountId) => {
+    const win = window as unknown as {
+      overwolf: {
+        windows: {
+          getMainWindow(): {
+            counterlockStore: { getSnapshot(): { players: object[] } };
+          };
+        };
+      };
+      updateMatch(patch: object): void;
+    };
+    const state = win.overwolf.windows
+      .getMainWindow()
+      .counterlockStore.getSnapshot();
+    win.updateMatch({
+      players: state.players.map((player, index) =>
+        index === 0 ? { ...player, accountId } : player,
+      ),
+    });
+  }, ACCOUNT);
+  await page
+    .getByRole("navigation", { name: "Main" })
+    .getByRole("button", { name: "Home" })
+    .click();
+  await view(page).getByLabel("Find a player").fill(STEAM_ID);
+  await view(page)
+    .getByRole("button", { name: /Use this ID/ })
+    .click();
+  await view(page).getByRole("tab", { name: "Live" }).click();
+  await expect(view(page).locator(".live-tab .match-clock")).toBeVisible();
+  expect(asked).toHaveLength(0);
 });

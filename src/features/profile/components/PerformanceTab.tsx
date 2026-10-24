@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { deadlockApi } from "@/shared/api/DeadlockApi";
 import type { AsyncState } from "@/shared/api/useAsync";
 import { useAsync } from "@/shared/api/useAsync";
 import { heroById } from "@/shared/catalog";
 import { SectionHeader } from "@/shared/ui/SectionHeader";
+import { RetryButton } from "@/shared/ui/RetryButton";
 import {
   fetchGameAverages,
   fetchMatchTotals,
@@ -117,18 +118,20 @@ function PerformanceCard({
         )}
         {tooFew && <span className="perf-trend">Too few games</span>}
       </div>
-      <div className="perf-card-numbers">
-        <b>{value === null ? "—" : format(metric, value)}</b>{" "}
-        <span>{detail}</span>
+      <div className={`perf-card-body${games ? "" : " no-chart"}`}>
+        <div className="perf-card-numbers">
+          <b>{value === null ? "—" : format(metric, value)}</b>{" "}
+          <span>{detail}</span>
+        </div>
+        {games > 0 && (
+          <Sparkline
+            points={summary.points}
+            label={`${metric.label}, game by game`}
+            describe={describe}
+            route={(p) => ({ page: "match", matchId: p.matchId, accountId })}
+          />
+        )}
       </div>
-      {games > 0 && (
-        <Sparkline
-          points={summary.points}
-          label={`${metric.label}, game by game`}
-          describe={describe}
-          route={(p) => ({ page: "match", matchId: p.matchId, accountId })}
-        />
-      )}
     </section>
   );
 }
@@ -240,14 +243,6 @@ export function PerformanceTab({
   const shown =
     !settled && last && games.length ? last : { games, totals, averages };
   const stale = shown === last;
-  // A notice's Retry goes with the notice as soon as it's pressed: focus
-  // moves to the status, which then says "Updating…", rather than falling
-  // to the page.
-  const status = useRef<HTMLParagraphElement>(null);
-  const retry = (again: () => void) => () => {
-    status.current?.focus();
-    again();
-  };
   const summaries = PERFORMANCE_METRICS.map((metric) =>
     summarizeMetric(
       metric,
@@ -273,10 +268,10 @@ export function PerformanceTab({
               </button>
             ))}
           </div>
-          {/* Always there, so screen readers announce it; it takes no space
-              of its own, so the controls never move. */}
-          <p className="perf-status" role="status" ref={status} tabIndex={-1}>
-            <span>{stale ? "Updating…" : ""}</span>
+          {/* Always mounted so screen readers announce loading changes;
+              its space is reserved while there is nothing to announce. */}
+          <p className="perf-status" role="status">
+            <span>{!settled ? "Updating…" : ""}</span>
           </p>
         </div>
         {heroes.length > 1 && (
@@ -302,9 +297,10 @@ export function PerformanceTab({
       {history.error && (
         <p className="notice warning" role="status">
           Match history unavailable
-          <button type="button" onClick={history.retry}>
-            Retry
-          </button>
+          <RetryButton
+            onRetry={history.retry}
+            focusTarget='.subtabs [aria-selected="true"]'
+          />
         </p>
       )}
       {history.data && !games.length && (
@@ -317,26 +313,20 @@ export function PerformanceTab({
           {!stale && totals.error && (
             <p className="notice warning" role="status">
               Match details unavailable: {totals.error}
-              <button type="button" onClick={retry(totals.retry)}>
-                Retry
-              </button>
+              <RetryButton onRetry={totals.retry} />
             </p>
           )}
           {!stale && averages.error && (
             <p className="notice warning" role="status">
               Rank averages unavailable: {averages.error}
-              <button type="button" onClick={retry(averages.retry)}>
-                Retry
-              </button>
+              <RetryButton onRetry={averages.retry} />
             </p>
           )}
           {!stale && !!averages.data?.failed.size && (
             <p className="notice warning" role="status">
               Rank averages unavailable for {averages.data.failed.size} of{" "}
               {count(games.length)}: {averages.data.error}
-              <button type="button" onClick={retry(averages.retry)}>
-                Retry
-              </button>
+              <RetryButton onRetry={averages.retry} />
             </p>
           )}
           {/* Games without a recorded rank are meanwhile compared with all
@@ -344,9 +334,7 @@ export function PerformanceTab({
           {!stale && averages.data?.rankError && (
             <p className="notice warning" role="status">
               Current rank unavailable: {averages.data.rankError}
-              <button type="button" onClick={retry(averages.retry)}>
-                Retry
-              </button>
+              <RetryButton onRetry={averages.retry} />
             </p>
           )}
           <div className="performance-legend" aria-hidden="true">

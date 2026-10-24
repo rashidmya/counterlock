@@ -20,6 +20,7 @@ import { HomePage } from "@/features/home/components/HomePage";
 import { MyProfileLabel } from "@/features/profile/components/MyProfileLabel";
 import { ProfilePage } from "@/features/profile/components/ProfilePage";
 import { accountSubtitle, useDesktopMe } from "@/features/profile/me";
+import { detectedAccountId } from "@/features/profile/storage";
 import { TierListPage } from "@/features/heroes/components/TierListPage";
 import { HeroesPage } from "@/features/heroes/components/HeroesPage";
 import { ItemsPage } from "@/features/items/components/ItemsPage";
@@ -212,10 +213,11 @@ export function DesktopApp({
                   ? accountSubtitle(me.account)
                   : undefined
               }
+              liveActive={status === "in-match"}
               // Yours: the account Overwolf reports playing on this PC, or
               // else the remembered one.
               live={
-                profileId === (state.localAccountId ?? me.meId) ? (
+                profileId === (detectedAccountId(state) ?? me.meId) ? (
                   <OwnLiveTab
                     {...{
                       state,

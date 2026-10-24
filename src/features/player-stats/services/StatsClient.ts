@@ -1,18 +1,21 @@
 import { TTL, deadlockApi, type DeadlockApi } from "@/shared/api/DeadlockApi";
 import type { HeroStats, PlayerRank, StatsEntry } from "../types";
 
+interface CachedStats {
+  entry: StatsEntry;
+  heroesAt?: number;
+  rankAt?: number;
+}
+
 export class StatsClient {
-  private cache = new Map<string, StatsEntry>();
+  private cache = new Map<string, CachedStats>();
   constructor(
     private api: DeadlockApi = deadlockApi,
     private now = Date.now,
   ) {}
 
-  // Through the app's shared client, so these requests keep to the API's
-  // rate limits along with every other, and fail at once during its
-  // cooldowns.
-  private async get(path: string): Promise<unknown[]> {
-    const body = await this.api.get<unknown>(`/v1${path}`, TTL.profile);
+  private async get(path: string, signal?: AbortSignal): Promise<unknown[]> {
+    const body = await this.api.get<unknown>(`/v1${path}`, TTL.profile, signal);
     if (!Array.isArray(body)) throw new Error("Unexpected stats response.");
     return body;
   }
@@ -20,68 +23,104 @@ export class StatsClient {
   async load(
     ids: number[],
     mode: "normal" | "street_brawl",
+    signal?: AbortSignal,
   ): Promise<Record<number, StatsEntry>> {
+    signal?.throwIfAborted();
     const unique = [...new Set(ids)].sort((a, b) => a - b);
-    const pending = unique.filter((id) => {
-      const saved = this.cache.get(`${mode}:${id}`);
-      // Stats that failed are asked for again: what loaded is kept (below),
-      // and during a cooldown the shared client fails without asking.
-      return (
-        !saved ||
-        saved.heroError !== undefined ||
-        saved.rankError !== undefined ||
-        this.now() - saved.fetchedAt >= TTL.profile
+    const key = (id: number) => `${mode}:${id}`;
+    const fresh = (at: number | undefined) =>
+      at !== undefined && this.now() - at < TTL.profile;
+    const pendingHeroes = unique.filter(
+      (id) => !fresh(this.cache.get(key(id))?.heroesAt),
+    );
+    const pendingRanks = unique.filter(
+      (id) => !fresh(this.cache.get(key(id))?.rankAt),
+    );
+    const params = (pending: number[]) =>
+      new URLSearchParams({ account_ids: pending.join(",") });
+    const save = (
+      id: number,
+      patch: Partial<StatsEntry>,
+      half: "heroesAt" | "rankAt",
+      at?: number,
+    ) => {
+      const saved = this.cache.get(key(id)) ?? {
+        entry: { fetchedAt: this.now() },
+      };
+      const next = {
+        ...saved,
+        [half]: at,
+        entry: { ...saved.entry, ...patch },
+      };
+      // Each successful half keeps its own age, including through retries of
+      // the other half and the shared client's cached responses.
+      next.entry.fetchedAt = Math.min(
+        next.heroesAt ?? Infinity,
+        next.rankAt ?? Infinity,
+        this.now(),
       );
-    });
-    if (pending.length) {
-      const params = new URLSearchParams({ account_ids: pending.join(",") });
-      // Batch the roster; keep the two upstream queries sequential to avoid database pressure.
-      let heroes: HeroStats[] = [],
-        ranks: PlayerRank[] = [];
-      let heroError: string | undefined, rankError: string | undefined;
+      this.cache.set(key(id), next);
+    };
+    // Batch only the halves that need loading, one query at a time to avoid
+    // database pressure. Save a completed half before starting the next, so
+    // a roster that leaves a queued rank request retains its hero data.
+    if (pendingHeroes.length) {
+      let heroes: HeroStats[] = [];
+      let heroError: string | undefined;
       try {
         heroes = (
           await this.get(
-            `/players/hero-stats?${params}&game_mode=${mode}&match_mode=ranked,unranked`,
+            `/players/hero-stats?${params(pendingHeroes)}&game_mode=${mode}&match_mode=ranked,unranked`,
+            signal,
           )
         ).filter(validHeroStats);
       } catch (error) {
+        signal?.throwIfAborted();
         heroError =
           error instanceof Error ? error.message : "Hero stats unavailable.";
       }
+      signal?.throwIfAborted();
+      const at = this.now();
+      for (const id of pendingHeroes)
+        save(
+          id,
+          {
+            heroes: heroError
+              ? undefined
+              : heroes.filter((hero) => hero.account_id === id),
+            heroError,
+          },
+          "heroesAt",
+          heroError ? undefined : at,
+        );
+    }
+    if (pendingRanks.length) {
+      let ranks: PlayerRank[] = [];
+      let rankError: string | undefined;
       try {
-        ranks = (await this.get(`/players/rank?${params}`)).filter(validRank);
+        ranks = (
+          await this.get(`/players/rank?${params(pendingRanks)}`, signal)
+        ).filter(validRank);
       } catch (error) {
+        signal?.throwIfAborted();
         rankError =
           error instanceof Error ? error.message : "Rank unavailable.";
       }
-      for (const id of pending) {
-        const saved = this.cache.get(`${mode}:${id}`);
-        // A half that fails keeps what had loaded while it is fresh: a
-        // changed roster asks for other paths, which the shared client
-        // hasn't cached. A rank that loaded may be none.
-        const fresh =
-          saved !== undefined && this.now() - saved.fetchedAt < TTL.profile;
-        const keepHeroes =
-          heroError !== undefined && fresh && saved.heroError === undefined;
-        const keepRank =
-          rankError !== undefined && fresh && saved.rankError === undefined;
-        this.cache.set(`${mode}:${id}`, {
-          heroes: keepHeroes
-            ? saved.heroes
-            : heroError
-              ? undefined
-              : heroes.filter((h) => h.account_id === id),
-          rank: keepRank ? saved.rank : ranks.find((r) => r.account_id === id),
-          heroError: keepHeroes ? undefined : heroError,
-          rankError: keepRank ? undefined : rankError,
-          // What was kept still dates from when it loaded.
-          fetchedAt: keepHeroes || keepRank ? saved.fetchedAt : this.now(),
-        });
-      }
+      signal?.throwIfAborted();
+      const at = this.now();
+      for (const id of pendingRanks)
+        save(
+          id,
+          {
+            rank: ranks.find((rank) => rank.account_id === id),
+            rankError,
+          },
+          "rankAt",
+          rankError ? undefined : at,
+        );
     }
     return Object.fromEntries(
-      unique.map((id) => [id, this.cache.get(`${mode}:${id}`)!]),
+      unique.map((id) => [id, this.cache.get(key(id))!.entry]),
     );
   }
 }

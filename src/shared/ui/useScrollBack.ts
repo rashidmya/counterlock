@@ -32,10 +32,25 @@ export function useScrollBack(key: string, restore: boolean) {
         pending = false;
         observer.disconnect();
         clearTimeout(timer);
-        for (const event of TAKEOVER) window.removeEventListener(event, stop);
+        for (const event of TAKEOVER)
+          window.removeEventListener(event, takeover);
+      };
+      const takeover = (event: Event) => {
+        // Browser history buttons and shortcuts navigate without taking
+        // over scrolling, just like the browser toolbar's Back/Forward.
+        if (event instanceof PointerEvent && event.button > 2) return;
+        if (event instanceof KeyboardEvent && (event.altKey || event.metaKey))
+          return;
+        // A horizontal trackpad gesture can be a browser swipe back.
+        if (
+          event instanceof WheelEvent &&
+          Math.abs(event.deltaX) > Math.abs(event.deltaY)
+        )
+          return;
+        stop();
       };
       for (const event of TAKEOVER)
-        window.addEventListener(event, stop, { passive: true });
+        window.addEventListener(event, takeover, { passive: true });
       observer.observe(document.body);
     }
     return () => {

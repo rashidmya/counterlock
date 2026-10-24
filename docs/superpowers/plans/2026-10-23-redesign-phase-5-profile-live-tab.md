@@ -62,6 +62,8 @@ Copy the code as given. If something fails, fix the cause rather than the test.
 
 ## Follow-ups for the owner (not built)
 
+Update 2026-10-24: this list records the state after phase 5. The implementation and current manual checks are tracked in [Phase 4 and phase 5 follow-ups](2026-10-24-phase-4-5-follow-ups.md).
+
 - **Ranks** of the players in a live match aren't shown (above). The Live page shows them for your own match.
 - **Region and spectators:** the API gives both (`region_mode_parsed`, `spectators`); the tab shows neither.
 - **After the match:** the tab drops to "No live match found" once the Watch list does; it doesn't link to the match report, which only exists once the API has stored the match.

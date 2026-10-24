@@ -42,11 +42,17 @@ export function clearProfileAccount() {
   }
 }
 
-export function recordDetectedAccount(state: MatchState, now = Date.now()) {
-  const id =
+/** The same PC-account rule for remembering it and choosing its Live tab. */
+export function detectedAccountId(state: MatchState) {
+  return (
     state.localAccountId ??
     state.players.find((p) => p.local)?.accountId ??
-    null;
+    null
+  );
+}
+
+export function recordDetectedAccount(state: MatchState, now = Date.now()) {
+  const id = detectedAccountId(state);
   if (!id) return;
   const stored = readProfileAccount();
   if (

@@ -1270,11 +1270,12 @@ test("performance tab asks for match details again on Retry", async ({
   const damage = card(page, "Hero damage / min").locator(".perf-card-numbers");
   await expect(notice).toBeVisible();
   fixtures.failTotals = false;
-  // From the keyboard: the notice goes, and focus moves to the status
-  // rather than falling to the page.
+  // The heading keeps focus; the live loading status has its own job.
   await notice.getByRole("button", { name: "Retry" }).focus();
   await page.keyboard.press("Enter");
-  await expect(view(page).locator(".perf-status")).toBeFocused();
+  await expect(
+    view(page).getByRole("heading", { name: "Performance", exact: true }),
+  ).toBeFocused();
   await expect(damage).toHaveText("1,000 20 games · rank avg 500");
   await expect(notice).toHaveCount(0);
   // The cards kept while Last 50 loads are the ones from after the Retry.
@@ -1287,6 +1288,38 @@ test("performance tab asks for match details again on Retry", async ({
   await expect(damage).toHaveText("1,000 20 games · rank avg 500");
   release();
   await expect(damage).toHaveText("1,000 50 games · rank avg 500");
+});
+
+test("a fast first Performance failure retries with meaningful focus while averages still load", async ({
+  page,
+}) => {
+  let release = () => {};
+  const hold = new Promise<void>((resolve) => (release = resolve));
+  const fixtures = {
+    history: performanceHistory,
+    failTotals: true,
+    gate: (url: URL) =>
+      url.pathname === "/v1/analytics/player-performance-curve"
+        ? hold
+        : Promise.resolve(),
+  };
+  await storeAccount(page);
+  await routeApi(page, fixtures);
+  await openMyProfile(page);
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const notice = view(page).getByText(
+    "Match details unavailable: Deadlock API unavailable (500).",
+  );
+  await expect(notice).toBeVisible();
+  fixtures.failTotals = false;
+  await notice.getByRole("button", { name: "Retry" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    view(page).getByRole("heading", { name: "Performance", exact: true }),
+  ).toBeFocused();
+  await expect(view(page).locator(".perf-status")).toHaveText("Updating…");
+  await expect(notice).toHaveCount(0);
+  release();
 });
 
 test("performance tab compares ranked games at their own rank", async ({
@@ -1371,6 +1404,28 @@ test("performance tab widens a thin rank's average and says so", async ({
       "Where a hero has too few games at one rank, its average covers the ranks either side.",
     ),
   ).toBeVisible();
+});
+
+test("Performance tooltips cover wrapped values with fallback fonts", async ({
+  page,
+}) => {
+  await storeAccount(page);
+  await routeApi(page, { history: performanceHistory });
+  await openMyProfile(page);
+  await page.addStyleTag({
+    content:
+      ":root { --font-label: Arial, sans-serif; --font-body: Arial, sans-serif; }",
+  });
+  await page.getByRole("tab", { name: "Performance" }).click();
+  const souls = card(page, "Souls / min");
+  await expect(souls.locator(".perf-card-numbers")).toHaveText(
+    "1,100 20 games · rank avg 1,000",
+  );
+  await souls.getByRole("slider").focus();
+  const tip = (await souls.locator(".spark-tip").boundingBox())!;
+  const values = (await souls.locator(".perf-card-numbers").boundingBox())!;
+  expect(tip.y).toBeLessThanOrEqual(values.y);
+  expect(tip.y + tip.height).toBeGreaterThanOrEqual(values.y + values.height);
 });
 
 test("performance cards sit in five columns when wide, then four, then two", async ({

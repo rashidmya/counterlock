@@ -1,3 +1,4 @@
+import { RetryButton } from "@/shared/ui/RetryButton";
 import type { AsyncState } from "@/shared/api/useAsync";
 import {
   PHASE_SIZE,
@@ -31,9 +32,11 @@ export function MainBuild({
     return (
       <p className="build-empty" role="status">
         Build unavailable: {state.error}{" "}
-        <button type="button" className="retry" onClick={state.retry}>
-          Retry
-        </button>
+        <RetryButton
+          className="retry"
+          focusTarget='[role="tab"][aria-selected="true"], h1, h2, h3'
+          onRetry={state.retry}
+        />
       </p>
     );
   if (!state.data) return null;

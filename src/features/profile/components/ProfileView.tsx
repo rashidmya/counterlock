@@ -3,6 +3,8 @@ import { LinkScope } from "@/app/links";
 import type { Navigate } from "@/app/navigation";
 import type { AsyncState } from "@/shared/api/useAsync";
 import { useScrollBack } from "@/shared/ui/useScrollBack";
+import { RetryButton } from "@/shared/ui/RetryButton";
+import { useLiveMatch } from "../hooks/useLiveMatch";
 import type { HistoryFilter, HistoryMatch } from "../types";
 import type { PerformanceRange } from "../utils/performance-metrics";
 import { FIRST_SORT, HeroesTab, type HeroSort } from "./HeroesTab";
@@ -51,6 +53,7 @@ export function ProfileView({
   navigate,
   restore,
   live,
+  liveActive = false,
 }: {
   accountId: number;
   history: AsyncState<HistoryMatch[]>;
@@ -62,7 +65,13 @@ export function ProfileView({
   // The Live tab, when the app has better than the Watch list (your own
   // account, from Overwolf's live data).
   live?: React.ReactNode;
+  liveActive?: boolean;
 }) {
+  const profile = useRef<HTMLElement>(null);
+  // One lookup supplies the tab label and its contents. Your own account
+  // uses the app's live data and makes no Watch-list request.
+  const watch = useLiveMatch(accountId, profile, !live);
+  const inGame = live ? liveActive : !!watch.match;
   const [view, setView] = useState(
     () => (restore && views.get(accountId)) || FIRST_VIEW,
   );
@@ -90,7 +99,7 @@ export function ProfileView({
   };
   return (
     <LinkScope navigate={navigate}>
-      <section className="profile">
+      <section className="profile" ref={profile}>
         {header}
         <div className="subtabs" role="tablist">
           {subtabs.map(({ id, label }) => (
@@ -98,10 +107,16 @@ export function ProfileView({
               key={id}
               role="tab"
               aria-selected={subtab === id}
+              aria-description={
+                id === "live" && inGame ? "Live match found" : undefined
+              }
               className={subtab === id ? "active" : ""}
               onClick={() => setSubtab(id)}
             >
               {label}
+              {id === "live" && inGame && (
+                <span className="live-tab-mark" aria-hidden="true" />
+              )}
             </button>
           ))}
         </div>
@@ -117,9 +132,10 @@ export function ProfileView({
             {history.error && (
               <p className="notice warning" role="status">
                 Match history unavailable
-                <button type="button" onClick={history.retry}>
-                  Retry
-                </button>
+                <RetryButton
+                  onRetry={history.retry}
+                  focusTarget='.subtabs [aria-selected="true"]'
+                />
               </p>
             )}
             {history.data &&
@@ -149,7 +165,8 @@ export function ProfileView({
             onHero={(next) => update({ heroId: next })}
           />
         )}
-        {subtab === "live" && (live ?? <LiveTab accountId={accountId} />)}
+        {subtab === "live" &&
+          (live ?? <LiveTab accountId={accountId} live={watch} />)}
       </section>
     </LinkScope>
   );

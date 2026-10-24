@@ -18,7 +18,8 @@ import { fetchRank } from "./profile-api";
 // Kept per match and per client (tests bring their own), so a wider range
 // only asks for the games it adds: a match's totals once known, or the batch
 // request still out for it.
-type Entry = PlayerTotals[] | { path: string; batch: number[] };
+type PendingBatch = { path: string; batch: number[]; callers: number };
+type Entry = PlayerTotals[] | PendingBatch;
 const totalsCache = new WeakMap<DeadlockApi, Map<number, Entry>>();
 
 /**
@@ -38,31 +39,39 @@ export async function fetchMatchTotals(
   api: DeadlockApi = deadlockApi,
   signal?: AbortSignal,
 ): Promise<Map<number, PlayerTotals[]>> {
+  signal?.throwIfAborted();
   const known = totalsCache.get(api) ?? new Map<number, Entry>();
   totalsCache.set(api, known);
   const missing = [...new Set(matchIds)].filter((id) => !known.has(id));
   for (let start = 0; start < missing.length; start += TOTALS_BATCH) {
     const batch = missing.slice(start, start + TOTALS_BATCH);
-    const entry = { path: totalsPath(batch), batch };
+    const entry = { path: totalsPath(batch), batch, callers: 0 };
     for (const id of batch) known.set(id, entry);
   }
-  const waiting = new Map<string, number[]>();
+  const waiting = new Map<string, PendingBatch>();
   for (const id of matchIds) {
     const entry = known.get(id);
-    if (entry && !Array.isArray(entry)) waiting.set(entry.path, entry.batch);
+    if (entry && !Array.isArray(entry)) waiting.set(entry.path, entry);
   }
   await Promise.all(
-    [...waiting].map(async ([path, batch]) => {
-      const matches = parseMatchTotals(
-        await api.get<unknown>(path, TTL.history, signal),
-      );
-      for (const id of batch) {
-        const players = matches.get(id);
-        const entry = known.get(id);
-        if (players) known.set(id, players);
-        // Not stored yet: ask again next time.
-        else if (entry && !Array.isArray(entry) && entry.path === path)
-          known.delete(id);
+    [...waiting].map(async ([path, pending]) => {
+      pending.callers++;
+      try {
+        const matches = parseMatchTotals(
+          await api.get<unknown>(path, TTL.history, signal),
+        );
+        for (const id of pending.batch) {
+          if (known.get(id) !== pending) continue;
+          const players = matches.get(id);
+          if (players) known.set(id, players);
+          else known.delete(id);
+        }
+      } finally {
+        // Keep a shared batch while another call waits. Once nobody needs
+        // it, a failed or dropped batch can join the next range's batching.
+        if (!--pending.callers)
+          for (const id of pending.batch)
+            if (known.get(id) === pending) known.delete(id);
       }
     }),
   );

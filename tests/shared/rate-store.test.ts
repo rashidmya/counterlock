@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DeadlockApi, RATE_WINDOW } from "@/shared/api/DeadlockApi";
 import {
   defaultRateStore,
+  MAX_COOLDOWN,
   serialLocks,
   sharedRateStore,
   type Locks,
@@ -41,10 +42,103 @@ function twoTabs(request: typeof fetch) {
 }
 
 // What a browser fires in the other tabs when one writes a key.
-const storageEvent = (key: string) =>
+const storageEvent = (key: string | null) =>
   Object.assign(new Event("storage"), { key });
 
 describe("rate limits shared by every tab", () => {
+  it("keeps a refused path's cooldown in its tab", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("", { status: 429 }))
+      .mockImplementation(async () => json([]));
+    const { items, a, b } = twoTabs(request);
+    const path = "/v1/players/hero-stats?account_ids=1";
+    await expect(a.api.get(path, 1)).rejects.toThrow("API busy");
+    await expect(a.api.get(path, 1)).rejects.toThrow("API busy");
+    await expect(b.api.get(path, 1)).resolves.toEqual([]);
+    await expect(
+      a.api.get("/v1/players/hero-stats?account_ids=2", 1),
+    ).resolves.toEqual([]);
+    expect(items.size).toBe(0);
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+
+  it("shares a 503's cooldown across all endpoint groups and tabs", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("", { status: 503 }))
+      .mockImplementation(async () => json([]));
+    const { items, a, b } = twoTabs(request);
+    await expect(
+      a.api.get("/v1/players/hero-stats?account_ids=1", 1),
+    ).rejects.toThrow("API busy");
+    await expect(b.api.get("/v1/analytics/hero-stats", 1)).rejects.toThrow(
+      "API busy",
+    );
+    await expect(
+      b.api.get("/v1/players/steam?account_ids=2", 1),
+    ).rejects.toThrow("API busy");
+    expect(items.has("counterlock.api.cooldown.*")).toBe(true);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("wakes watchers when storage is cleared, ignores counts and removes listeners", () => {
+    const { storage } = sharedStorage();
+    const events = new EventTarget();
+    const store = sharedRateStore(storage, serialLocks(), () => 0, events);
+    let wakes = 0;
+    const unwatch = store.watch(() => wakes++);
+    events.dispatchEvent(storageEvent("counterlock.api.sent./v1/players/rank"));
+    events.dispatchEvent(storageEvent("other-key"));
+    expect(wakes).toBe(0);
+    events.dispatchEvent(storageEvent(null));
+    expect(wakes).toBe(1);
+    events.dispatchEvent(storageEvent("counterlock.api.cooldown.*"));
+    expect(wakes).toBe(2);
+    unwatch();
+    events.dispatchEvent(storageEvent(null));
+    expect(wakes).toBe(2);
+  });
+
+  it("replaces a stored cooldown too far ahead with a usable later cooldown", () => {
+    const { storage } = sharedStorage();
+    let now = 1_000;
+    const store = sharedRateStore(
+      storage,
+      serialLocks(),
+      () => now,
+      new EventTarget(),
+    );
+    storage.setItem(
+      "counterlock.api.cooldown.*",
+      String(now + MAX_COOLDOWN + 1),
+    );
+    expect(store.cooling(["*"])).toBe(false);
+    store.cool("*", now + 30_000);
+    expect(store.cooling(["*"])).toBe(true);
+    now += 30_000;
+    expect(store.cooling(["*"])).toBe(false);
+  });
+
+  it("uses memory when localStorage refuses writes", async () => {
+    const setItem = vi.fn(() => {
+      throw new Error("Storage full");
+    });
+    vi.stubGlobal("window", { localStorage: { setItem } });
+    try {
+      const store = defaultRateStore(() => 0);
+      await expect(store.take("rank", 1, [], () => {})).resolves.toBe(0);
+      await expect(store.take("rank", 1, [], () => {})).resolves.toBe(
+        RATE_WINDOW,
+      );
+      store.cool("*", 30_000);
+      await expect(store.take("other", 1, ["*"], () => {})).resolves.toBeNull();
+      expect(setItem).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("keeps two tabs together within one limit", async () => {
     vi.useFakeTimers();
     try {

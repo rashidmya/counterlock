@@ -2,7 +2,7 @@ import type { Team } from "@/features/match-report/utils/report";
 
 export interface LivePlayer {
   accountId: number;
-  heroId: number;
+  heroId: number | null;
   team: Team;
 }
 // Each null where the API gave none.
@@ -21,6 +21,8 @@ export interface LiveMatch {
   durationS: number | null;
   gameMode: number;
   matchMode: number;
+  region: string | null;
+  spectators: number | null;
   players: LivePlayer[];
   teams: Record<Team, LiveTeam>;
 }
@@ -50,17 +52,22 @@ export function parseLiveMatch(
   accountId: number,
 ): LiveMatch | null {
   for (const match of rows(data)) {
-    const players = rows(match.players).flatMap((p) =>
-      isNumber(p.account_id) && isNumber(p.hero_id) && isTeam(p.team)
-        ? [{ accountId: p.account_id, heroId: p.hero_id, team: p.team }]
+    const roster = rows(match.players);
+    // Presence comes from the account itself. An incomplete hero or team
+    // must not turn a listed player into "No live match found".
+    if (!roster.some((p) => p.account_id === accountId)) continue;
+    const players = roster.flatMap((p) =>
+      isNumber(p.account_id) && isTeam(p.team)
+        ? [
+            {
+              accountId: p.account_id,
+              heroId: isNumber(p.hero_id) ? p.hero_id : null,
+              team: p.team,
+            },
+          ]
         : [],
     );
-    if (
-      !isNumber(match.match_id) ||
-      !isNumber(match.start_time) ||
-      !players.some((p) => p.accountId === accountId)
-    )
-      continue;
+    if (!isNumber(match.match_id) || !isNumber(match.start_time)) continue;
     // The team's stats, or else the match's own fields for them.
     const team = (id: Team): LiveTeam => {
       const stats = rows(match.team_stats).find((t) => t.team === id);
@@ -80,6 +87,15 @@ export function parseLiveMatch(
       durationS: isNumber(match.duration_s) ? match.duration_s : null,
       gameMode: isNumber(match.game_mode) ? match.game_mode : 0,
       matchMode: isNumber(match.match_mode) ? match.match_mode : 0,
+      region:
+        typeof match.region_mode_parsed === "string" &&
+        match.region_mode_parsed.trim()
+          ? match.region_mode_parsed
+          : null,
+      spectators:
+        isNumber(match.spectators) && match.spectators >= 0
+          ? match.spectators
+          : null,
       players,
       teams: { 0: team(0), 1: team(1) },
     };

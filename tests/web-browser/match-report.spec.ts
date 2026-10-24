@@ -267,6 +267,89 @@ test("a scroll position still waiting to come back is kept", async ({
   await expect.poll(scrolled).toBe(before);
 });
 
+for (const takeover of [
+  "wheel",
+  "horizontal wheel",
+  "history button",
+  "Alt+Left",
+  "Cmd+Left",
+] as const) {
+  test(`pending profile scroll ${takeover === "wheel" ? "yields to" : "survives"} ${takeover}`, async ({
+    page,
+  }) => {
+    let hold: Promise<void> | null = null;
+    let release = () => {};
+    await page.clock.install();
+    await page.setViewportSize({ width: 1260, height: 600 });
+    await mockApi(page);
+    await mockLongHistory(page, () => hold ?? Promise.resolve());
+    await page.goto(`/players/${FARGO}`);
+    await page.getByRole("tab", { name: "Matches" }).click();
+    const rows = page.locator(".match-row");
+    await rows.nth(15).scrollIntoViewIfNeeded();
+    const scrolled = () => page.evaluate(() => Math.round(window.scrollY));
+    const before = await scrolled();
+    expect(before).toBeGreaterThan(200);
+    await rows.nth(15).locator("a.match-open").click();
+    await expect(page).toHaveURL(`/matches/2016?player=${FARGO}`);
+    hold = new Promise((resolve) => (release = resolve));
+    await page.clock.fastForward("03:00");
+    await page.goBack();
+    await expect(page.getByText("Loading match history…")).toBeVisible();
+    await page.evaluate((kind) => {
+      if (kind === "wheel") {
+        window.scrollTo(0, 0);
+        window.dispatchEvent(new WheelEvent("wheel", { deltaY: -100 }));
+      } else if (kind === "horizontal wheel") {
+        window.dispatchEvent(
+          new WheelEvent("wheel", { deltaX: -100, deltaY: 5 }),
+        );
+      } else if (kind === "history button") {
+        window.dispatchEvent(new PointerEvent("pointerdown", { button: 3 }));
+      } else {
+        window.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "ArrowLeft",
+            altKey: kind === "Alt+Left",
+            metaKey: kind === "Cmd+Left",
+          }),
+        );
+      }
+    }, takeover);
+    release();
+    hold = null;
+    await expect(rows).toHaveCount(20);
+    if (takeover === "wheel") {
+      await page.clock.runFor(50);
+      expect(await scrolled()).toBe(0);
+    } else {
+      await expect.poll(scrolled).toBe(before);
+    }
+  });
+}
+
+test("My profile reopens the current profile at Overview and remembers that unchanged fresh visit", async ({
+  page,
+}) => {
+  await page.addInitScript((accountId) => {
+    localStorage.setItem(
+      "counterlock.web.account",
+      JSON.stringify({ accountId }),
+    );
+  }, FARGO);
+  await mockApi(page);
+  await page.goto(`/players/${FARGO}`);
+  await page.getByRole("tab", { name: "Matches" }).click();
+  await page.getByRole("link", { name: "My profile", exact: true }).click();
+  const overview = page.getByRole("tab", { name: "Overview" });
+  await expect(overview).toHaveAttribute("aria-selected", "true");
+  // No tab change on this fresh visit: its mount must record Overview.
+  await page.locator("a.match-open").first().click();
+  await expect(page).toHaveURL(`/matches/1001?player=${FARGO}`);
+  await page.getByRole("link", { name: "← Back to profile" }).click();
+  await expect(overview).toHaveAttribute("aria-selected", "true");
+});
+
 test("the profile keeps its tab, range and hero after a match report", async ({
   page,
 }) => {

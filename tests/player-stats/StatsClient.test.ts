@@ -113,10 +113,54 @@ describe("stats API", () => {
     expect(loaded[10].heroes?.[0].wins).toBe(5);
     expect(request).toHaveBeenCalledTimes(3);
     expect(String(request.mock.calls[2][0])).toContain("/players/rank?");
-    // Stats that loaded are kept for TTL.profile.
-    now += TTL.profile - 1;
+    // Retrying rank must not renew the hero stats' five-minute lifetime.
+    now = TTL.profile - 1;
     await stats.load([10], "normal");
     expect(request).toHaveBeenCalledTimes(3);
+    now = TTL.profile;
+    await stats.load([10], "normal");
+    expect(request).toHaveBeenCalledTimes(4);
+    expect(String(request.mock.calls[3][0])).toContain("/hero-stats?");
+    now = TTL.profile + 30_000;
+    await stats.load([10], "normal");
+    expect(request).toHaveBeenCalledTimes(5);
+    expect(String(request.mock.calls[4][0])).toContain("/players/rank?");
+  });
+  it("drops a queued rank lookup without caching cancellation as a stats failure", async () => {
+    vi.useFakeTimers();
+    try {
+      const request = vi
+        .fn<typeof fetch>()
+        .mockImplementation(async () => new Response("[]"));
+      const api = new DeadlockApi(request, Date.now);
+      await Promise.all(
+        Array.from({ length: 20 }, (_, id) =>
+          api.get(`/v1/players/rank?account_ids=${100 + id}`, TTL.profile),
+        ),
+      );
+      const stats = new StatsClient(api, Date.now);
+      const left = new AbortController();
+      const reason = new Error("Roster replaced");
+      const leaving = stats.load([10], "normal", left.signal);
+      leaving.catch(() => {});
+      await vi.advanceTimersByTimeAsync(0);
+      left.abort(reason);
+      let failure: unknown;
+      leaving.catch((error: unknown) => {
+        failure = error;
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(failure).toBe(reason);
+      await vi.advanceTimersByTimeAsync(61_000);
+      expect(request).toHaveBeenCalledTimes(21);
+      const loaded = await stats.load([10], "normal");
+      expect(loaded[10]).toMatchObject({ heroes: [], rank: undefined });
+      expect(loaded[10].heroError).toBeUndefined();
+      expect(loaded[10].rankError).toBeUndefined();
+      expect(request).toHaveBeenCalledTimes(22);
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it("keeps the stats that loaded when the roster changes during a cooldown", async () => {
     let now = 0;

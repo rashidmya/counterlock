@@ -37,12 +37,14 @@ const rows = (value: unknown): Row[] =>
 export async function fetchSteamProfiles(
   ids: number[],
   api: DeadlockApi = deadlockApi,
+  signal?: AbortSignal,
 ): Promise<SteamProfile[]> {
   if (!ids.length) return [];
   return parseSteamProfiles(
     await api.get<unknown>(
       `/v1/players/steam?account_ids=${ids.join(",")}`,
       TTL.profile,
+      signal,
     ),
   );
 }

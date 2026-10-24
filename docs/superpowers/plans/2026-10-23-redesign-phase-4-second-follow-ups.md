@@ -80,6 +80,7 @@ Each task's end state was also checked on its own: type check and unit tests aft
   - **The docs** say a cooldown lasts at most ten minutes. The spec says which Retry buttons keep focus (the tab's match-details and rank notices, and the report's rank note), and that the tip sits right under the title row only in a row's tallest card.
 
 - **Follow-ups for the owner (not built):**
+  - **Update 2026-10-24:** this list records the state after the second pass. The implementation and current manual checks are tracked in [Phase 4 and phase 5 follow-ups](2026-10-24-phase-4-5-follow-ups.md).
   - **Other Retry buttons** (tier list, Heroes, items, hero page, the match history notices) still drop focus to the page when their notice unmounts.
   - **Focus after Retry:** on a first load, a fast match-details failure shows its notice before any cards, and Retry then focuses an empty status. A double "Updating…" announcement (focus and live region) is unchecked with a screen reader. The report's rank note has no live region, so a second failure after Retry isn't announced. Only the match-details notice's Retry is tested from the keyboard.
   - **Web Locks in Overwolf** are unchecked. Without them the windows still share their counts, but two could claim a group's last slot at the same moment.

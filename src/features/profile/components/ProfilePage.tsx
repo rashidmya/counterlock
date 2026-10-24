@@ -15,6 +15,7 @@ export function ProfilePage({
   subtitle = "Deadlock profile",
   restore = false,
   live,
+  liveActive,
 }: {
   accountId: number;
   me: MeAdapter;
@@ -24,6 +25,7 @@ export function ProfilePage({
   restore?: boolean;
   // The Live tab in place of the Watch list's (see ProfileView).
   live?: ReactNode;
+  liveActive?: boolean;
 }) {
   const history = useAsync(() => fetchMatchHistory(accountId), [accountId]);
   const topHeroId = history.data && topHeroes(history.data, 1)[0]?.heroId;
@@ -37,6 +39,7 @@ export function ProfilePage({
       navigate={navigate}
       restore={restore}
       live={live}
+      liveActive={liveActive}
       header={
         <ProfileHeader
           accountId={accountId}

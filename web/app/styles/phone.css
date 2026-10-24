@@ -211,18 +211,26 @@
     flex-wrap: wrap;
     gap: 8px;
   }
-  /* Five tabs: spread over the row, and a second row only below about
-     340 px. */
+  /* Keep the five tabs, including the live marker, on one row. */
   .app.web .subtabs {
     flex-wrap: wrap;
     justify-content: space-between;
-    gap: 0 10px;
+    gap: 0 8px;
   }
   .app.web .subtabs button {
     min-height: 44px;
     padding: 0;
     font-size: 13px;
     letter-spacing: 0.08em;
+  }
+  @media (max-width: 359px) {
+    .app.web .subtabs {
+      gap: 0 4px;
+    }
+    .app.web .subtabs button {
+      font-size: 12px;
+      letter-spacing: 0.06em;
+    }
   }
   .app.web .stat-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -62,6 +62,41 @@ describe("parseLiveMatch", () => {
     expect(modeLabel(match!)).toBe("Street Brawl");
   });
 
+  it("keeps the viewed match when the player's hero hasn't been supplied", () => {
+    const raw = activeMatch(ME);
+    raw.players[0].hero_id = null as never;
+    const match = parseLiveMatch([raw], ME);
+    expect(match?.matchId).toBe(LIVE_MATCH_ID);
+    expect(match?.players[0]).toEqual({ accountId: ME, heroId: null, team: 0 });
+  });
+
+  it("recognizes the viewed account before filtering an incomplete team row", () => {
+    const raw = activeMatch(ME);
+    raw.players[0].team = null as never;
+    expect(parseLiveMatch([raw], ME)?.matchId).toBe(LIVE_MATCH_ID);
+    expect(parseLiveMatch([raw], ME)?.players).toHaveLength(11);
+  });
+
+  it("prefers team stats over conflicting top-level fields and reads match metadata", () => {
+    const raw = activeMatch(ME);
+    raw.team_stats[0] = {
+      ...raw.team_stats[0],
+      net_worth: 0,
+      objectives_mask: 0,
+      brawl_score: 3,
+    };
+    expect(parseLiveMatch([raw], ME)).toMatchObject({
+      region: "europe",
+      spectators: 3,
+      teams: { 0: { netWorth: 0, objectives: 0, rounds: 3 } },
+    });
+    const bare = { ...raw, region_mode_parsed: null, spectators: null };
+    expect(parseLiveMatch([bare], ME)).toMatchObject({
+      region: null,
+      spectators: null,
+    });
+  });
+
   it("is null when the account isn't in any listed match", () => {
     expect(parseLiveMatch([activeMatch(9)], ME)).toBeNull();
     expect(parseLiveMatch([], ME)).toBeNull();
@@ -152,6 +187,20 @@ describe("soulLead", () => {
 });
 
 describe("fetchLiveMatch", () => {
+  it("forwards cancellation to the shared client", async () => {
+    const left = new AbortController();
+    const api = {
+      get: async (_: string, __: number, signal: AbortSignal) => {
+        expect(signal).toBe(left.signal);
+        signal.throwIfAborted();
+        return [];
+      },
+    } as unknown as DeadlockApi;
+    left.abort(new Error("left the profile"));
+    await expect(fetchLiveMatch(ME, api, left.signal)).rejects.toThrow(
+      "left the profile",
+    );
+  });
   it("asks the Watch list for the account alone, past the browser's cache", async () => {
     const calls: unknown[][] = [];
     const api = {

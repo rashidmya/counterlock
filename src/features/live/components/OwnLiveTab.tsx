@@ -1,4 +1,5 @@
-import type { ComponentProps } from "react";
+import { useRef, type ComponentProps, type RefObject } from "react";
+import { useFocusOnRemoval } from "@/shared/ui/useFocusOnRemoval";
 import { MatchOverview } from "@/features/match/components/MatchOverview";
 import { LiveEmpty } from "@/features/profile/components/LiveTab";
 import type { LiveStatus } from "../utils/live-status";
@@ -14,10 +15,15 @@ export function OwnLiveTab({
   ComponentProps<typeof MatchOverview>,
   "embedded"
 >) {
+  const message = useRef<HTMLParagraphElement>(null);
+  const inMatch = status === "in-match";
   return (
     <div className="live-tab own">
-      {status === "in-match" ? (
-        <MatchOverview embedded {...overview} />
+      <p className="live-status" ref={message} tabIndex={-1} role="status">
+        {inMatch ? "Live match in progress." : "Not in a game."}
+      </p>
+      {inMatch ? (
+        <OwnMatch status={message} overview={overview} />
       ) : (
         <LiveEmpty title="Not in a game">
           {status === "waiting"
@@ -25,6 +31,22 @@ export function OwnLiveTab({
             : "Deadlock isn't running. Your match shows here once you're in one."}
         </LiveEmpty>
       )}
+    </div>
+  );
+}
+
+function OwnMatch({
+  status,
+  overview,
+}: {
+  status: RefObject<HTMLElement | null>;
+  overview: Omit<ComponentProps<typeof MatchOverview>, "embedded">;
+}) {
+  const match = useRef<HTMLDivElement>(null);
+  useFocusOnRemoval(match, status);
+  return (
+    <div ref={match} className="own-live-match">
+      <MatchOverview embedded {...overview} />
     </div>
   );
 }

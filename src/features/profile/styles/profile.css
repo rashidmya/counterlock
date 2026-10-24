@@ -473,6 +473,7 @@
    status's text is laid over that space, so it never moves the controls. */
 .perf-range {
   display: flex;
+  flex-wrap: wrap;
   flex: 1 1 auto;
   align-items: center;
   gap: 12px;
@@ -481,25 +482,13 @@
   position: relative;
   flex: 1;
   align-self: stretch;
-  min-width: 0;
+  min-width: 5.25em;
+  min-height: 1.5em;
   margin: 0;
   font-size: 12px;
 }
-/* Room for "Updating…" itself where the Hero select could share the line
-   (about 500 px up): where the select would squeeze it, the select takes
-   the next line instead, whether the status shows or not. Phones have room
-   beside the buttons without it, down to 375 px; narrower ones can cut it
-   short. */
-@container (min-width: 400px) {
-  .perf-status {
-    min-width: 5.25em;
-  }
-}
-/* Where Retry leaves focus: a place to read from, not a control, so no
-   ring. */
-.perf-status:focus {
-  outline: none;
-}
+/* Below 375 px the status can take its own row. Its reserved width keeps
+   "Updating…" readable without splitting the range buttons. */
 .perf-status span {
   position: absolute;
   top: 50%;
@@ -608,14 +597,17 @@
 .perf-trend.slipping {
   color: var(--bad);
 }
-.perf-card-numbers {
+.perf-card-body {
+  position: relative;
   margin-top: auto;
-  margin-bottom: 6px;
 }
 /* A card without a chart (no game with a value yet) keeps its numbers
    under the title, not at the foot of a row the charts make tall. */
-.perf-card-numbers:last-child {
+.perf-card-body.no-chart {
   margin-top: 0;
+}
+.perf-card-numbers {
+  margin-bottom: 6px;
 }
 .perf-card-numbers b {
   font: 700 26px var(--font-label);
@@ -626,6 +618,18 @@
 }
 .sparkline-box {
   position: relative;
+}
+/* The tooltip covers the full number area, including a wrapped line in
+   fallback fonts. The chart is always 80 px tall; its numbers determine
+   the remaining height, without covering the title above them. */
+.perf-card-body .sparkline-box {
+  position: static;
+}
+.perf-card-body .spark-tip {
+  top: 0;
+  bottom: auto;
+  width: 100%;
+  min-height: calc(100% - 80px);
 }
 .sparkline {
   height: 80px;
@@ -713,13 +717,15 @@
 
 /* Live tab. */
 .live-status {
+  min-height: 18px;
   margin: 12px 0 0;
   font-size: 12px;
   color: var(--muted);
 }
-/* Where Retry leaves focus: a place to read from, not a control. */
+/* Make recovered focus visible without scrolling to it. */
 .live-status:focus {
-  outline: none;
+  outline: 1px solid var(--gold);
+  outline-offset: 3px;
 }
 .live-tab > .notice {
   margin: 12px 0 0;
@@ -817,6 +823,27 @@
 .live-players button:hover {
   color: var(--gold);
 }
+.live-player-rank {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.live-tab-mark {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: var(--ally);
+}
+.last-live-match,
+.last-live-match > span {
+  display: block;
+  margin-top: 8px;
+}
 .live-team h4 {
   margin: 14px 0 6px;
   font: 600 11px var(--font-label);
@@ -861,10 +888,10 @@
   flex: 1;
   margin: 22px 0 0;
 }
-/* MatchOverview's error. */
-.live-tab.own > .notice {
-  margin: 0 0 14px;
-}
 .live-tab.own .workspace {
   padding: 0;
+}
+/* Override the Watch-list notice's margin for MatchOverview's error. */
+.own-live-match > .notice {
+  margin: 0 0 14px;
 }

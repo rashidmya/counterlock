@@ -1,3 +1,4 @@
+import { RetryButton } from "@/shared/ui/RetryButton";
 import {
   useEffect,
   useId,
@@ -160,9 +161,7 @@ export function CounterItems({
             <span>
               Match data unavailable: {data.error.replace(/\.$/, "")}. Based on
               hero traits instead.{" "}
-              <button type="button" className="retry" onClick={data.retry}>
-                Retry
-              </button>
+              <RetryButton className="retry" onRetry={data.retry} />
             </span>
           ) : covered ? (
             "Every item with a clear gain against these heroes is already in the main build. These are based on hero traits."

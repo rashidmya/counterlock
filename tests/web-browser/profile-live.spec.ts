@@ -136,7 +136,7 @@ test("a failed lookup says so; Retry keeps focus in place and asks again", async
   await mockApi(page);
   const asked = await mockLive(page, [500, {}]);
   await openLive(page);
-  const notice = page.locator(".live-tab .notice");
+  const notice = page.locator(".live-watch-notice");
   await expect(notice).toContainText(
     "Live matches unavailable: Deadlock API unavailable (500).",
   );
@@ -181,6 +181,10 @@ test("the Live tab checks again every minute while it's open", async ({
     { startTime, netWorth: [120000, 125000] },
   ]);
   await openLive(page);
+  // Settle the independent rank lookup before advancing its timeout clock.
+  await expect(
+    page.locator('.live-players li[aria-current="true"] .live-player-rank'),
+  ).toHaveAttribute("title", "Current rank");
   const stats = page.locator(".live-stats .stat-card");
   await expect(stats.nth(1)).toContainText("Amber +5,426");
   await page.clock.runFor(30_000);
@@ -202,6 +206,10 @@ test("a check that falls due while the page is hidden waits until it's back", as
   await mockApi(page);
   const asked = await mockLive(page, [{}]);
   await openLive(page);
+  // Settle the independent rank lookup before advancing its timeout clock.
+  await expect(
+    page.locator('.live-players li[aria-current="true"] .live-player-rank'),
+  ).toHaveAttribute("title", "Current rank");
   await expect(page.getByRole("heading", { name: "Live match" })).toBeVisible();
   const visibility = (value: string) =>
     page.evaluate((value) => {
@@ -209,6 +217,7 @@ test("a check that falls due while the page is hidden waits until it's back", as
         value,
         configurable: true,
       });
+      document.dispatchEvent(new Event("visibilitychange"));
     }, value);
   await visibility("hidden");
   await page.clock.runFor(180_000);
@@ -227,9 +236,13 @@ test("a check that fails keeps the match shown and says so; Retry asks again", a
   await mockApi(page);
   await mockLive(page, [{}, 500, { netWorth: [120000, 125000] }]);
   await openLive(page);
+  // Settle the independent rank lookup before advancing its timeout clock.
+  await expect(
+    page.locator('.live-players li[aria-current="true"] .live-player-rank'),
+  ).toHaveAttribute("title", "Current rank");
   await expect(page.getByRole("heading", { name: "Live match" })).toBeVisible();
   await page.clock.runFor(60_000);
-  const notice = page.locator(".live-tab .notice");
+  const notice = page.locator(".live-watch-notice");
   await expect(notice).toContainText(
     "Couldn't check again: Deadlock API unavailable (500).",
   );
@@ -251,9 +264,13 @@ test("the minute's checks leave the notice, and focus on its Retry, in place", a
   await mockApi(page);
   const asked = await mockLive(page, [{}, 500, 500, {}]);
   await openLive(page);
+  // Settle the independent rank lookup before advancing its timeout clock.
+  await expect(
+    page.locator('.live-players li[aria-current="true"] .live-player-rank'),
+  ).toHaveAttribute("title", "Current rank");
   await expect(page.getByRole("heading", { name: "Live match" })).toBeVisible();
   await page.clock.runFor(60_000);
-  const notice = page.locator(".live-tab .notice");
+  const notice = page.locator(".live-watch-notice");
   const retry = notice.getByRole("button", { name: "Retry" });
   await retry.focus();
   // Failing again: the same notice, still focused, and nothing announced.
@@ -276,9 +293,13 @@ test("a check that goes well leaves alone focus that has left the notice", async
   await mockApi(page);
   await mockLive(page, [{}, 500, {}]);
   await openLive(page);
+  // Settle the independent rank lookup before advancing its timeout clock.
+  await expect(
+    page.locator('.live-players li[aria-current="true"] .live-player-rank'),
+  ).toHaveAttribute("title", "Current rank");
   await expect(page.getByRole("heading", { name: "Live match" })).toBeVisible();
   await page.clock.runFor(60_000);
-  const notice = page.locator(".live-tab .notice");
+  const notice = page.locator(".live-watch-notice");
   await notice.getByRole("button", { name: "Retry" }).focus();
   // A click on nothing in particular leaves focus on the page.
   await page.locator(".live-stats").click();
@@ -298,6 +319,10 @@ test("a check that finds the match over leaves focus in the tab", async ({
   await mockApi(page);
   await mockLive(page, [{}, null]);
   await openLive(page);
+  // Settle the independent rank lookup before advancing its timeout clock.
+  await expect(
+    page.locator('.live-players li[aria-current="true"] .live-player-rank'),
+  ).toHaveAttribute("title", "Current rank");
   await page
     .locator(".live-team.team-1")
     .getByRole("link", { name: "Player 7006" })
@@ -328,6 +353,10 @@ test("a new match in place of the last leaves focus in the tab", async ({
       }),
   );
   await openLive(page);
+  // Settle the independent rank lookup before advancing its timeout clock.
+  await expect(
+    page.locator('.live-players li[aria-current="true"] .live-player-rank'),
+  ).toHaveAttribute("title", "Current rank");
   await page
     .locator(".live-team.team-1")
     .getByRole("link", { name: "Player 7006" })
@@ -335,4 +364,368 @@ test("a new match in place of the last leaves focus in the tab", async ({
   await page.clock.runFor(60_000);
   await expect(page.locator(".live-stats")).toContainText("Match 999");
   await expect(page.locator(".live-status")).toBeFocused();
+});
+
+test("live presence is marked before opening the tab, with region, spectators and current ranks inside", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await mockLive(page, [{}]);
+  await page.route("https://api.deadlock-api.com/v1/players/rank?**", (route) =>
+    route.fulfill({ json: [{ account_id: 7006, badge: 116 }], headers: cors }),
+  );
+  await page.goto(`/players/${FARGO}`);
+  const live = page.getByRole("tab", { name: "Live", exact: true });
+  await expect(live).toHaveAttribute("aria-description", "Live match found");
+  await live.click();
+  await expect(page.locator(".live-match-meta")).toHaveText(
+    "Region: europe · Spectators: 3",
+  );
+  await expect(
+    page.locator(".live-team.team-1 .live-player-rank").first(),
+  ).toContainText("Eternus 6");
+});
+
+test("missing heroes and objectives keep the match and show unknown values", async ({
+  page,
+}) => {
+  await mockApi(page);
+  const raw = activeMatch(FARGO);
+  raw.players[0].hero_id = null as never;
+  raw.team_stats = [];
+  delete (raw as unknown as Record<string, unknown>).objectives_mask_team0;
+  await page.route(
+    "https://api.deadlock-api.com/v1/matches/active**",
+    (route) => route.fulfill({ json: [raw], headers: cors }),
+  );
+  await openLive(page);
+  await expect(
+    page.getByRole("heading", { name: "Live match", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('li[aria-current="true"]')).toContainText(
+    "Hero unknown",
+  );
+  await expect(
+    page.locator(".live-team.team-0 .live-objectives dd"),
+  ).toHaveText(["—", "—", "—", "—", "—"]);
+  await expect(page.locator(".live-team.team-0")).toContainText(
+    "Objectives unavailable",
+  );
+});
+
+test("reordering a roster keeps a focused player's identity and loaded names", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockApi(page);
+  const raw = activeMatch(FARGO);
+  let asked = 0;
+  await page.route(
+    "https://api.deadlock-api.com/v1/matches/active**",
+    (route) =>
+      route.fulfill({
+        json: [
+          {
+            ...raw,
+            players: asked++ ? [...raw.players].reverse() : raw.players,
+          },
+        ],
+        headers: cors,
+      }),
+  );
+  await openLive(page);
+  // Settle the independent rank lookup before advancing its timeout clock.
+  await expect(
+    page.locator('.live-players li[aria-current="true"] .live-player-rank'),
+  ).toHaveAttribute("title", "Current rank");
+  const link = page.getByRole("link", { name: "Player 7006", exact: true });
+  await link.focus();
+  await page.clock.runFor(60_000);
+  await expect.poll(() => asked).toBe(2);
+  await page.waitForTimeout(300);
+  await expect(link).toBeFocused();
+  await expect(link).toHaveAttribute("href", "/players/7006");
+  await expect(page.locator('li[aria-current="true"]')).toContainText(
+    "A Rather Long Persona Name Fixture",
+  );
+});
+
+test("failed names have their own Retry without reloading the Watch list", async ({
+  page,
+}) => {
+  await mockApi(page);
+  const asked = await mockLive(page, [{}]);
+  let failed = true;
+  await page.route(
+    "https://api.deadlock-api.com/v1/players/steam?**",
+    (route) => {
+      const ids =
+        new URL(route.request().url()).searchParams.get("account_ids") ?? "";
+      if (ids.includes("7006") && failed)
+        return route.fulfill({ status: 500, json: {}, headers: cors });
+      return route.fulfill({
+        json: [{ account_id: 7006, personaname: "Recovered player" }],
+        headers: cors,
+      });
+    },
+  );
+  await openLive(page);
+  const notice = page.locator(".live-names-notice");
+  await expect(notice).toContainText("Player names unavailable");
+  failed = false;
+  await notice.getByRole("button", { name: "Retry" }).click();
+  await expect(
+    page.getByRole("link", { name: "Recovered player" }),
+  ).toBeVisible();
+  await expect(notice).toHaveCount(0);
+  expect(asked).toHaveLength(1);
+});
+
+test("a finished match leaves a report link with availability explained", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockApi(page);
+  await mockLive(page, [{}, null]);
+  await openLive(page);
+  // Settle the independent rank lookup before advancing its timeout clock.
+  await expect(
+    page.locator('.live-players li[aria-current="true"] .live-player-rank'),
+  ).toHaveAttribute("title", "Current rank");
+  await expect(
+    page.getByRole("heading", { name: "Live match", exact: true }),
+  ).toBeVisible();
+  await page.clock.runFor(60_000);
+  await expect(
+    page.getByRole("link", { name: "Open last match report" }),
+  ).toHaveAttribute("href", `/matches/123009323?player=${FARGO}`);
+  await expect(
+    page.getByText(
+      "The report becomes available once Deadlock API has stored the match.",
+    ),
+  ).toBeVisible();
+});
+
+test("the first lookup announces found or missing, and repeated failures use the existing live region", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await mockLive(page, [500, 500, null]);
+  await openLive(page);
+  const status = page.locator(".live-status");
+  await expect(status).toContainText("Live matches unavailable");
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(status).toContainText("Live matches unavailable");
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(status).toHaveText("No live match found.");
+  await expect(page.locator(".live-tab [role=status]")).toHaveCount(1);
+});
+
+test("quiet focus recovery has useful text and leaves the phone's scroll position alone", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 700 });
+  await page.clock.install();
+  await mockApi(page);
+  await mockLive(page, [{}, { matchId: 999 }]);
+  await openLive(page);
+  // Settle the independent rank lookup before advancing its timeout clock.
+  await expect(
+    page.locator('.live-players li[aria-current="true"] .live-player-rank'),
+  ).toHaveAttribute("title", "Current rank");
+  await page.getByRole("link", { name: "Player 7011", exact: true }).focus();
+  const y = await page.evaluate(() => scrollY);
+  expect(y).toBeGreaterThan(100);
+  await page.clock.runFor(60_000);
+  const status = page.locator(".live-status");
+  await expect(status).toBeFocused();
+  await expect(status).toHaveText("Live match found.");
+  expect(Math.abs((await page.evaluate(() => scrollY)) - y)).toBeLessThan(5);
+});
+
+test("Even, destroyed objectives and missing Street Brawl rounds are explicit", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockApi(page);
+  const raw = activeMatch(FARGO, { gameMode: 4 });
+  raw.team_stats = [];
+  let asked = 0;
+  await page.route(
+    "https://api.deadlock-api.com/v1/matches/active**",
+    (route) =>
+      route.fulfill({
+        json: [
+          asked++
+            ? raw
+            : activeMatch(FARGO, { netWorth: [10, 10], masks: [0, 0] }),
+        ],
+        headers: cors,
+      }),
+  );
+  await openLive(page);
+  // Settle the independent rank lookup before advancing its timeout clock.
+  await expect(
+    page.locator('.live-players li[aria-current="true"] .live-player-rank'),
+  ).toHaveAttribute("title", "Current rank");
+  await expect(page.locator(".live-stats .stat-card").nth(1)).toContainText(
+    "Even",
+  );
+  await expect(page.locator(".live-objectives").first()).toContainText(
+    "PatronDestroyed",
+  );
+  await page.clock.runFor(60_000);
+  await expect(page.locator(".live-stats .stat-card").nth(1)).toHaveText(
+    "Rounds won— – —Amber – Sapphire",
+  );
+});
+
+test("a Live tab first mounted in a hidden document waits for a visibility event", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    Object.defineProperty(document, "visibilityState", {
+      value: "hidden",
+      configurable: true,
+    }),
+  );
+  await mockApi(page);
+  const asked = await mockLive(page, [{}]);
+  await openLive(page);
+  await page.waitForTimeout(300);
+  expect(asked).toHaveLength(0);
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", {
+      value: "visible",
+      configurable: true,
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect(
+    page.getByRole("heading", { name: "Live match", exact: true }),
+  ).toBeVisible();
+  expect(asked).toHaveLength(1);
+});
+
+for (const detail of ["names", "ranks"] as const) {
+  test(`${detail} Retry announces its own loading and repeat failure`, async ({
+    page,
+  }) => {
+    await mockApi(page);
+    await mockLive(page, [{}]);
+    let attempts = 0;
+    let release: (() => Promise<void>) | undefined;
+    const endpoint = detail === "names" ? "steam" : "rank";
+    await page.route(
+      `https://api.deadlock-api.com/v1/players/${endpoint}?**`,
+      (route) => {
+        const ids =
+          new URL(route.request().url()).searchParams.get("account_ids") ?? "";
+        if (!ids.includes(","))
+          return route.fulfill({ json: [], headers: cors });
+        if (attempts++ === 0)
+          return route.fulfill({ status: 500, json: {}, headers: cors });
+        release = () => route.fulfill({ status: 500, json: {}, headers: cors });
+      },
+    );
+    await openLive(page);
+    const notice = page.locator(`.live-${detail}-notice`);
+    await expect(notice).toBeVisible();
+    await notice.getByRole("button", { name: "Retry" }).click();
+    const status = page.locator(".live-status");
+    await expect(status).toHaveText(
+      detail === "names" ? "Loading player names…" : "Loading current ranks…",
+    );
+    await expect.poll(() => attempts).toBe(2);
+    await release!();
+    await expect(status).toContainText(
+      detail === "names"
+        ? "Player names unavailable"
+        : "Current ranks unavailable",
+    );
+    await expect(status).toBeFocused();
+  });
+}
+
+test("a roster change hands focus back when it removes a failed names notice", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockApi(page);
+  const raw = activeMatch(FARGO);
+  let matches = 0;
+  await page.route(
+    "https://api.deadlock-api.com/v1/matches/active**",
+    (route) =>
+      route.fulfill({
+        json: [
+          {
+            ...raw,
+            players: matches++
+              ? raw.players.filter((p) => p.account_id !== 7006)
+              : raw.players,
+          },
+        ],
+        headers: cors,
+      }),
+  );
+  let names = 0;
+  await page.route(
+    "https://api.deadlock-api.com/v1/players/steam?**",
+    (route) => {
+      const ids =
+        new URL(route.request().url()).searchParams.get("account_ids") ?? "";
+      if (!ids.includes(",")) return route.fulfill({ json: [], headers: cors });
+      if (!names++)
+        return route.fulfill({ status: 500, json: {}, headers: cors });
+      // Leave the changed roster's names loading while checking focus.
+    },
+  );
+  await openLive(page);
+  // Settle the independent rank lookup before advancing its timeout clock.
+  await expect(
+    page.locator('.live-players li[aria-current="true"] .live-player-rank'),
+  ).toHaveAttribute("title", "Current rank");
+  await page
+    .locator(".live-names-notice")
+    .getByRole("button", { name: "Retry" })
+    .focus();
+  await page.clock.runFor(60_000);
+  await expect.poll(() => matches).toBe(2);
+  await expect(page.locator(".live-names-notice")).toHaveCount(0);
+  await expect(page.locator(".live-status")).toBeFocused();
+  await expect(page.locator(".live-status")).toHaveText(
+    "Loading player names…",
+  );
+});
+
+test("a newer Watch-list failure is announced after a player-name failure", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockApi(page);
+  await mockLive(page, [{}, 500]);
+  await page.route(
+    "https://api.deadlock-api.com/v1/players/steam?**",
+    (route) => {
+      const ids =
+        new URL(route.request().url()).searchParams.get("account_ids") ?? "";
+      return route.fulfill({
+        status: ids.includes(",") ? 500 : 200,
+        json: [],
+        headers: cors,
+      });
+    },
+  );
+  await openLive(page);
+  await expect(
+    page.locator('.live-players li[aria-current="true"] .live-player-rank'),
+  ).toHaveAttribute("title", "Current rank");
+  const status = page.locator(".live-status");
+  await expect(status).toContainText("Player names unavailable");
+  await page.clock.runFor(60_000);
+  await expect(page.locator(".live-watch-notice")).toContainText(
+    "Couldn't check again",
+  );
+  await expect(status).toContainText("Couldn't check again");
 });

@@ -1,5 +1,5 @@
-import { useRef } from "react";
 import type { AsyncState } from "@/shared/api/useAsync";
+import { RetryButton } from "@/shared/ui/RetryButton";
 import { clock, percent } from "../utils/format";
 import { verdicts } from "../utils/insights";
 import { heroName } from "../utils/perspective";
@@ -55,9 +55,6 @@ export function Verdicts({
 }) {
   const hero = heroName(player.heroId);
   const band = curve.data?.band.label;
-  // Retry goes as soon as it's pressed: focus stays on the note, which then
-  // says what loads, rather than falling to the page.
-  const note = useRef<HTMLParagraphElement>(null);
   return (
     <>
       <div className="report-verdicts">
@@ -82,22 +79,17 @@ export function Verdicts({
           </div>
         ))}
       </div>
-      <p className="data-note" ref={note} tabIndex={-1}>
+      <p className="data-note" role="status">
         {curveNote(hero, curve, normal, durationS, rank, rankFailed)}
         {/* The curve's Retry also asks again for the current rank. */}
         {(curve.error || (rankFailed && !curve.loading)) && (
           <>
             {" "}
-            <button
-              type="button"
+            <RetryButton
               className="retry"
-              onClick={() => {
-                note.current?.focus();
-                curve.retry();
-              }}
-            >
-              Retry
-            </button>
+              focusTarget=".view-as select"
+              onRetry={curve.retry}
+            />
           </>
         )}
       </p>

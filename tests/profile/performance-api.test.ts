@@ -82,6 +82,17 @@ describe("fetchMatchTotals", () => {
     expect(request).toHaveBeenCalledTimes(1);
   });
 
+  it("preserves the abort reason even when all totals are already cached", async () => {
+    const { api } = bulkApi();
+    await fetchMatchTotals([1, 2], api);
+    const left = new AbortController();
+    const reason = new Error("Range already left");
+    left.abort(reason);
+    await expect(fetchMatchTotals([1, 2], api, left.signal)).rejects.toBe(
+      reason,
+    );
+  });
+
   it("drops a batch no call waits for any more, and the next asks afresh", async () => {
     vi.useFakeTimers();
     try {
@@ -119,8 +130,13 @@ describe("fetchMatchTotals", () => {
       // A wider range waits for the same games, and one more.
       const staying = fetchMatchTotals([1, 2, 3], api);
       left.abort();
+      await expect(leaving).rejects.toThrow(/abort/i);
+      // A caller joining after the abort must still share the batch that
+      // `staying` wants, rather than regrouping and requesting it twice.
+      const joining = fetchMatchTotals([1, 2, 3], api);
       await vi.advanceTimersByTimeAsync(RATE_WINDOW);
       expect((await staying).size).toBe(3);
+      expect((await joining).size).toBe(3);
       expect(
         request.mock.calls
           .slice(30)
@@ -146,6 +162,47 @@ describe("fetchMatchTotals", () => {
     );
     await expect(fetchMatchTotals([1, 2], failing.api)).rejects.toThrow();
     expect(failing.calls).toHaveLength(2);
+  });
+
+  it("regroups a failed batch with the next range instead of repeating the failure", async () => {
+    const asked: string[] = [];
+    const request = vi.fn<typeof fetch>().mockImplementation(async (url) => {
+      const ids = new URL(String(url)).searchParams.get("match_ids")!;
+      asked.push(ids);
+      // This particular batch fails because of its contents; a wider batch works.
+      if (ids === "1,2") return new Response("Unavailable", { status: 500 });
+      return new Response(
+        JSON.stringify(ids.split(",").map((id) => bulkMatch(Number(id), 77))),
+      );
+    });
+    const api = new DeadlockApi(request);
+    await expect(fetchMatchTotals([1, 2], api)).rejects.toThrow("500");
+    expect((await fetchMatchTotals([1, 2, 3], api)).size).toBe(3);
+    expect(asked).toEqual(["1,2", "1,2,3"]);
+  });
+
+  it("regroups a dropped batch with the next range", async () => {
+    vi.useFakeTimers();
+    try {
+      const { api, request } = realBulkApi([1, 2, 3], Date.now);
+      await Promise.all(
+        range(101, 130).map((id) => fetchMatchTotals([id], api)),
+      );
+      const left = new AbortController();
+      const leaving = fetchMatchTotals([1, 2], api, left.signal);
+      left.abort();
+      await expect(leaving).rejects.toThrow(/abort/i);
+      const next = fetchMatchTotals([1, 2, 3], api);
+      await vi.advanceTimersByTimeAsync(RATE_WINDOW);
+      expect((await next).size).toBe(3);
+      expect(
+        request.mock.calls
+          .slice(30)
+          .map(([url]) => new URL(String(url)).searchParams.get("match_ids")),
+      ).toEqual(["1,2,3"]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("sees a newly stored game once the client's answer is two minutes old", async () => {
@@ -370,5 +427,34 @@ describe("fetchGameAverages", () => {
     expect(calls.some((path) => path.startsWith("/v1/players/rank"))).toBe(
       false,
     );
+  });
+
+  it("rejects with the abort reason even after some groups have loaded", async () => {
+    const left = new AbortController();
+    const reason = new Error("Range replaced");
+    const asked: string[] = [];
+    const api = {
+      get: (path: string, _ttl: number, signal?: AbortSignal) => {
+        asked.push(path);
+        if (asked.length === 1) return Promise.resolve(rankCurveRows());
+        return new Promise((_, reject) =>
+          signal?.addEventListener("abort", () => reject(signal.reason), {
+            once: true,
+          }),
+        );
+      },
+    } as unknown as DeadlockApi;
+    const averages = fetchGameAverages(
+      77,
+      range(1, 12).map((id) => game({ matchId: id, heroId: id })),
+      api,
+      left.signal,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // The completed first group let one worker start a fifth group.
+    expect(asked).toHaveLength(5);
+    left.abort(reason);
+    await expect(averages).rejects.toBe(reason);
+    expect(asked).toHaveLength(5);
   });
 });

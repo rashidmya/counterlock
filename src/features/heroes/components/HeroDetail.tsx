@@ -1,3 +1,4 @@
+import { RetryButton } from "@/shared/ui/RetryButton";
 import {
   useId,
   useMemo,
@@ -90,9 +91,7 @@ function Body({
     return (
       <p className="muted">
         Unavailable: {state.error}{" "}
-        <button type="button" className="retry" onClick={state.retry}>
-          Retry
-        </button>
+        <RetryButton className="retry" onRetry={state.retry} />
       </p>
     );
   if (empty) return <p className="muted">Not enough data</p>;
@@ -232,9 +231,7 @@ export function HeroDetail({
       {summaries.error && (
         <p className="notice warning" role="status">
           Hero stats unavailable: {summaries.error}
-          <button type="button" onClick={summaries.retry}>
-            Retry
-          </button>
+          <RetryButton onRetry={summaries.retry} />
         </p>
       )}
       <div className="hero-detail-body">

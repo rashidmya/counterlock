@@ -1,3 +1,4 @@
+import { RetryButton } from "@/shared/ui/RetryButton";
 import { useState } from "react";
 import { LinkScope } from "@/app/links";
 import type { Navigate, Route } from "@/app/navigation";
@@ -62,9 +63,7 @@ function HeroRoster({
       {summaries.error && (
         <p className="notice warning" role="status">
           Hero stats unavailable: {summaries.error}
-          <button type="button" onClick={summaries.retry}>
-            Retry
-          </button>
+          <RetryButton onRetry={summaries.retry} />
         </p>
       )}
       <HeroGrid cards={cards} variant="roster" />

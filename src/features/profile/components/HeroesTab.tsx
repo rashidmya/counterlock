@@ -1,3 +1,4 @@
+import { RetryButton } from "@/shared/ui/RetryButton";
 import { RouteLink } from "@/app/links";
 import type { AsyncState } from "@/shared/api/useAsync";
 import { useAsync } from "@/shared/api/useAsync";
@@ -104,9 +105,10 @@ export function HeroesTab({
       {history.error && (
         <p className="notice warning" role="status">
           Match history unavailable
-          <button type="button" onClick={history.retry}>
-            Retry
-          </button>
+          <RetryButton
+            onRetry={history.retry}
+            focusTarget='.subtabs [aria-selected="true"]'
+          />
         </p>
       )}
       {matches && !lines.length && <p className="muted">No recorded matches</p>}

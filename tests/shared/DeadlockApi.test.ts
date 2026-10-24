@@ -6,11 +6,47 @@ import {
   TTL,
   endpointGroup,
 } from "@/shared/api/DeadlockApi";
+import type { RateStore } from "@/shared/api/rate-store";
 
 const json = (body: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(body), init);
 
 describe("DeadlockApi", () => {
+  it.each(["abandoned", "cooling"] as const)(
+    "does not start a pause when already %s after asking for a rate slot",
+    async (condition) => {
+      let giveWait!: (wait: number | null) => void;
+      let cooling = false;
+      const limits: RateStore = {
+        take: async () =>
+          cooling
+            ? null
+            : new Promise<number | null>((resolve) => {
+                giveWait = resolve;
+              }),
+        cooling: () => cooling,
+        cool: () => {},
+        watch: () => () => {},
+      };
+      const request = vi.fn<typeof fetch>();
+      const wait = vi.fn(async () => {});
+      const api = new DeadlockApi(request, () => 0, wait, limits);
+      const left = new AbortController();
+      const pending = api.get("/v1/players/rank?account_ids=1", 1, left.signal);
+      pending.catch(() => {});
+      if (condition === "abandoned") left.abort(new Error("Roster left"));
+      else cooling = true;
+      giveWait(RATE_WINDOW);
+      await expect(pending).rejects.toThrow(
+        condition === "abandoned" ? "Roster left" : "API busy",
+      );
+      // Let the abandoned background request leave its rate loop too.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(wait).not.toHaveBeenCalled();
+      expect(request).not.toHaveBeenCalled();
+    },
+  );
+
   it("caches by path until ttl", async () => {
     const request = vi
       .fn<typeof fetch>()

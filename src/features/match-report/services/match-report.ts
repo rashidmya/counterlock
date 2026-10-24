@@ -18,9 +18,14 @@ import {
 export async function fetchMatchReport(
   matchId: number,
   api: DeadlockApi = deadlockApi,
+  signal?: AbortSignal,
 ): Promise<MatchReport> {
   return parseMatchReport(
-    await api.get<unknown>(`/v1/matches/${matchId}/metadata`, TTL.analytics),
+    await api.get<unknown>(
+      `/v1/matches/${matchId}/metadata`,
+      TTL.analytics,
+      signal,
+    ),
     matchId,
   );
 }
@@ -29,14 +34,17 @@ export async function fetchMatchReport(
 export async function fetchPlayerNames(
   accountIds: number[],
   api: DeadlockApi = deadlockApi,
+  signal?: AbortSignal,
 ): Promise<Map<number, string>> {
   try {
     const profiles = await fetchSteamProfiles(
       accountIds.filter((id) => id > 0),
       api,
+      signal,
     );
     return new Map(profiles.map((p) => [p.accountId, p.name]));
   } catch {
+    signal?.throwIfAborted();
     return new Map();
   }
 }
@@ -85,6 +93,7 @@ export async function fetchRankCurve(
       points: keep(await load(wider)),
     };
   } catch (error) {
+    signal?.throwIfAborted();
     // The tier's own curve is still better than none.
     if (!kept.length) throw error;
     return { band, points: kept };
