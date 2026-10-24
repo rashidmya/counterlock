@@ -13,23 +13,14 @@
     "window_icon": "icon.ico",
     "dock_button_title": "Counterlock"
   },
-  "permissions": [
-    "GameInfo",
-    "Hotkeys",
-    "Extensions",
-    "Clipboard"
-  ],
+  "permissions": ["GameInfo", "Hotkeys", "Extensions", "Clipboard"],
   "data": {
     "start_window": "background",
     "game_targeting": {
       "type": "dedicated",
-      "game_ids": [
-        24482
-      ]
+      "game_ids": [24482]
     },
-    "game_events": [
-      24482
-    ],
+    "game_events": [24482],
     "windows": {
       "background": {
         "file": "background/background.html",
@@ -168,9 +159,7 @@
       {
         "event": "GameLaunch",
         "event_data": {
-          "game_ids": [
-            24482
-          ]
+          "game_ids": [24482]
         },
         "start_minimized": false
       }

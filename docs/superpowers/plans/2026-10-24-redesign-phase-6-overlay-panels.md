@@ -258,3 +258,27 @@ These are release evidence still to collect, not failing automated checks and no
 ## Execution recommendation
 
 Native implementation in the current checkout is the proposed default: the tasks share the live-state, panel-registry and window interfaces closely. Establish a clean test baseline before product edits. If the owner selects subagent-driven execution, follow that skill's independent task reviews instead. The owner selected native execution in this checkout. Five task commits implement the phase; no dependencies or worktrees were added.
+
+## Verification record
+
+Verified on 2026-10-24:
+
+- `npm test`: 478 passed (42 files), against 437 before the phase. The four tests of the removed compact-build service were removed with that service.
+- `npx tsc --noEmit` and `npm run web:typecheck`: passed.
+- `npm run test:browser -- --workers=4 --reporter=line`: 191 passed, including 20 tests of the five new overlays.
+- `npm run test:web -- --workers=4 --reporter=line`: 115 passed.
+- `npm run build` and `npm run web:build`: passed.
+- `npm run validate:manifest`: official schema passed; all declared assets and window entrypoints exist.
+- Formatting and whitespace checks passed. The existing design document's formatting was preserved.
+- Screenshots of all five panels at default and minimum sizes were inspected. Default meters fit 12 players; minimum sizes scroll internally while retaining their Hide control.
+
+The native checks above remain outstanding; simulated Overwolf browser tests do not establish native runtime behavior.
+
+Independent review found one Important identity issue: measurements could survive a blank account ID and then attach to a replacement player. The fix retains the last confirmed identity and clears measurements on replacement, including when the PC account changes before a roster update. Both regressions were observed failing before the fix and passing afterward.
+
+Deferred minor findings:
+
+- Empty or missing-metric curves can show a synthetic zero average at exactly 00:00.
+- Multiple local flags can mark multiple meter rows as You, although comparisons and team colors reject ambiguous identity.
+
+Review ruling: native telemetry, DPI, input release and gameplay readability remain manual Windows validation because this workspace has no Windows/Overwolf session, within the accepted validation boundary. Runtime behavior may differ from the mocks.

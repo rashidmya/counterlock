@@ -136,12 +136,14 @@ export function applyInfo(state: MatchState, payload: unknown): MatchState {
         : row.steam_id === undefined
           ? (previous?.accountId ?? null)
           : accountId(row.steam_id);
+    const lastKnownAccountId =
+      previous?.lastKnownAccountId ?? previous?.accountId ?? null;
     const replaced =
       previous &&
       (heroId !== previous.heroId ||
         (id !== null &&
-          previous.accountId !== null &&
-          id !== previous.accountId));
+          lastKnownAccountId !== null &&
+          id !== lastKnownAccountId));
     const prior = replaced ? undefined : previous;
     roster.set(key, {
       slot: key,
@@ -155,6 +157,7 @@ export function applyInfo(state: MatchState, payload: unknown): MatchState {
       team: integer(row.team_id, previous?.team),
       local,
       accountId: id,
+      lastKnownAccountId: id ?? lastKnownAccountId,
       kills: measurement(row, "kills", prior?.kills),
       deaths: measurement(row, "deaths", prior?.deaths),
       assists: measurement(
@@ -178,7 +181,29 @@ export function applyInfo(state: MatchState, payload: unknown): MatchState {
   const localId = next.localAccountId;
   if (localId)
     for (const p of roster.values())
-      if (p.local) roster.set(p.slot, { ...p, accountId: localId });
+      if (p.local) {
+        const knownId = p.lastKnownAccountId ?? p.accountId;
+        const replaced = knownId !== null && knownId !== localId;
+        roster.set(p.slot, {
+          ...p,
+          ...(replaced
+            ? {
+                kills: null,
+                deaths: null,
+                assists: null,
+                heroDamage: null,
+                objectiveDamage: null,
+                healing: null,
+                souls: null,
+                level: null,
+                items: [],
+                itemsKnown: false,
+              }
+            : {}),
+          accountId: localId,
+          lastKnownAccountId: localId,
+        });
+      }
   for (const [key, value] of Object.entries(match)) {
     if (!/^items_\d+$/.test(key)) continue;
     const row = object(value);

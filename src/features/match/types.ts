@@ -8,6 +8,9 @@ export interface Player {
   team: number;
   local: boolean;
   accountId: number | null;
+  // Identity guard for retained measurements when GEP temporarily blanks an
+  // account. Lookups and remembered-account decisions still use accountId.
+  lastKnownAccountId?: number | null;
   kills: number | null;
   deaths: number | null;
   assists: number | null;

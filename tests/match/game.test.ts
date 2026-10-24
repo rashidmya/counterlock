@@ -111,6 +111,52 @@ describe("game event integration", () => {
         .players[0],
     ).toMatchObject({ heroDamage: 1200, kills: 4 });
   });
+  it("does not pass measurements to another account after the provider blanks its ID", () => {
+    const before = applyInfo(initialState(), {
+      match_info: {
+        roster_0: roster({ steam_id: "100", hero_damage: 1200, kills: 4 }),
+      },
+    });
+    const hidden = applyInfo(before, {
+      match_info: { roster_0: { steam_id: "" } },
+    });
+    expect(hidden.players[0].accountId).toBeNull();
+    const same = applyInfo(hidden, {
+      match_info: { roster_0: { steam_id: "100" } },
+    });
+    expect(same.players[0]).toMatchObject({
+      accountId: 100,
+      heroDamage: 1200,
+      kills: 4,
+    });
+    const replacement = applyInfo(hidden, {
+      match_info: { roster_0: { steam_id: "101" } },
+    });
+    expect(replacement.players[0]).toMatchObject({
+      accountId: 101,
+      heroDamage: null,
+      kills: null,
+    });
+  });
+  it("invalidates retained measurements when the PC account changes before the next roster row", () => {
+    const before = applyInfo(initialState(), {
+      game_info: { steam_id: "100" },
+      match_info: {
+        roster_0: roster({
+          is_local: true,
+          steam_id: "100",
+          hero_damage: 1200,
+          kills: 4,
+        }),
+      },
+    });
+    const after = applyInfo(before, { game_info: { steam_id: "101" } });
+    expect(after.players[0]).toMatchObject({
+      accountId: 101,
+      heroDamage: null,
+      kills: null,
+    });
+  });
   it("converts exact Steam IDs and rejects rounded or invalid IDs", () => {
     expect(accountId("76561198060265728")).toBe(100000000);
     expect(accountId("[U:1:100000000]")).toBe(100000000);
