@@ -1,6 +1,6 @@
 # Web usability and responsive layout polish
 
-Status: owner approved; implementation in progress.
+Status: implemented and verified on Linux (2026-10-24).
 
 ## Intent and constraints
 
@@ -71,4 +71,4 @@ Do not add a new menu, mobile navigation drawer, sticky filter bars, filter URL 
 - Existing data, Retry behavior, report perspective, browser Back restoration and touch chart behavior remain unchanged.
 - Run targeted regressions, the full web browser suite, desktop browser tests for shared components, unit tests, both type checks and builds. No Windows checks are required for this phase. Use existing fixtures and tooling; check console/runtime errors on inspected routes.
 
-The implementation plan will name exact test cases and files. A fresh builder check on 2026-10-24 reported “nothing important left.” The design is ready for owner review before product changes.
+The implementation plan records the delivered changes and verification: 478 unit, 146 web browser and 191 desktop browser tests passed, along with type checks, builds and manifest validation. The independent review’s three Important findings were fixed with failing-then-passing regressions. One minor remains deferred: tablet profile tabs are 43 px high, 1 px below the target. Windows/Overwolf validation remains deferred under the Linux-only scope.

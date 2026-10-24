@@ -20,11 +20,26 @@ export function WebShell({ children }: { children?: React.ReactNode }) {
   useLayoutEffect(() => {
     const node = header.current;
     if (!node) return;
-    const measure = () =>
-      shell.current?.style.setProperty(
-        "--web-header-height",
-        `${node.getBoundingClientRect().height}px`,
-      );
+    let previousHeight = 0;
+    const measure = () => {
+      const height = node.getBoundingClientRect().height;
+      shell.current?.style.setProperty("--web-header-height", `${height}px`);
+      const active = document.activeElement;
+      if (
+        height > previousHeight &&
+        previousHeight > 0 &&
+        active instanceof HTMLElement &&
+        active !== content.current &&
+        content.current?.contains(active)
+      ) {
+        const top = active.getBoundingClientRect().top;
+        // Preserve a control that was visible before header growth. Do not
+        // pull it back if the user deliberately scrolled away from focus.
+        if (top >= previousHeight && top < height)
+          active.scrollIntoView({ block: "start", inline: "nearest" });
+      }
+      previousHeight = height;
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);

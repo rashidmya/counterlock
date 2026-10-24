@@ -99,3 +99,19 @@ test("skill order gains a scrolling hint when newly loaded content becomes wider
     "aria-describedby",
   );
 });
+
+test("phone Heroes table keeps the final Last played column available for sorting", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.goto(`/players/${FARGO}`);
+  await page.getByRole("tab", { name: "Heroes", exact: true }).click();
+  const header = page.getByRole("columnheader", { name: "Last played" });
+  await expect(header).toBeVisible();
+  await header.getByRole("button").click();
+  await expect(header).toHaveAttribute("aria-sort", "descending");
+  await expect(
+    page.locator(".hero-table tbody tr").first().locator("td").last(),
+  ).toBeVisible();
+});

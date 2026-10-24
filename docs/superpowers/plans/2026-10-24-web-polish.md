@@ -73,14 +73,18 @@
 
 - [x] Add a representative route/tab viewport matrix at 320/375/640/641/768/900/901/1024/1440, including long labels and fallback fonts. Keep existing loading, error/retry, touch chart and Back restoration tests. Inspect changed surfaces at 375/768/1440, including populated skill orders and empty states. Fix reproduced regressions under TDD.
 - [x] Run `npm test`, `npm run build`, `npm run web:typecheck`, `npm run test:web -- --workers=4 --reporter=line`, `npm run test:browser -- --workers=4 --reporter=line`, `npm run validate:manifest`, formatting and `git diff --check`. Web tests build the web app. Expect all pass.
-- [ ] Perform one independent whole-change review, fix Important/Critical findings with failing regression tests then green suites; record deferred minor findings and limitations. Commit remaining verification/docs.
+- [x] Perform one independent whole-change review, fix Important/Critical findings with failing regression tests then green suites; record deferred minor findings and limitations. Commit remaining verification/docs.
 
 ## Verification record
 
-2026-10-24: 478 unit tests, 141 web browser tests and 191 desktop browser tests passed. Both type checks and builds passed; the web suite performs its production build. Official manifest validation, formatting and whitespace checks passed. The new site matrix covers 14 route/tab states at nine widths (126 combinations), with separate keyboard, coarse-pointer, enlarged-text, empty/error and content-resize checks. Twelve screenshots across 375/768/1440 px were inspected using fixture data and placeholder remote artwork.
+2026-10-24: 478 unit tests, 146 web browser tests and 191 desktop browser tests passed. Both type checks and builds passed; the web suite performs its production build. Official manifest validation, formatting and whitespace checks passed. The new site matrix covers 14 route/tab states at nine widths (126 combinations), with separate keyboard, coarse-pointer, enlarged-text, empty/error and content-resize checks. Twelve screenshots across 375/768/1440 px were inspected using fixture data and placeholder remote artwork.
 
 Existing assertions were updated for the approved 44 px controls (preserving the one-row check), explicit catalog live feedback, and main as the skip-navigation focus target. The enlarged-text check exposed an Items rank-select overflow, now fixed by allowing label/select groups to wrap.
 
 Ruling: Skill order is a separate hero section, not part of popular builds. Scrolling polish applies to that existing section; this phase introduces no popular-build-specific skill ordering.
 
-Validation is Linux Chromium emulation; no physical-device, screen-reader or Windows claims are made. Final independent review is pending.
+Validation is Linux Chromium emulation; no physical-device, screen-reader or Windows claims are made. The independent review found three Important gaps, each reproduced by a failing browser regression before correction: enlarged tablet tabs now wrap, header growth preserves previously visible focus without undoing a deliberate scroll away, and the web Heroes table retains its final Last played column on phones. Tablet text stress now includes 640/641/768 px. No Critical findings were reported.
+
+Deferred minor: tablet profile tabs remain 43 px high, 1 px below the 44 px target.
+
+Review ruling: Windows/Overwolf runtime validation stays deferred under the owner's Linux-only constraint. Browser coverage supports this web phase but cannot establish native runtime behavior; native behavior may differ.

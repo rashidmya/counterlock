@@ -75,7 +75,8 @@
   min-width: 0;
   flex-shrink: 1;
 }
-.app.web .tabs {
+.app.web .tabs,
+.app.web .subtabs {
   flex-wrap: wrap;
 }
 .app.web .tabs a {
@@ -110,4 +111,9 @@
   .app.web .reset-filters {
     min-height: 44px;
   }
+}
+
+/* Retain the data column hidden by the desktop's legacy narrow-table rule. */
+.app.web .hero-table :is(th, td):last-child {
+  display: table-cell;
 }

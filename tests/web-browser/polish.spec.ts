@@ -217,3 +217,63 @@ test("enlarged fallback labels reflow navigation and filters without clipping", 
     await noPageOverflow(page);
   }
 });
+
+for (const width of [640, 641, 768]) {
+  test(`tablet profile tabs wrap when fallback text is doubled at ${width}px`, async ({
+    page,
+  }) => {
+    await mockApi(page);
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`/players/${FARGO}`);
+    await expect(
+      page.getByRole("tab", { name: "Live", exact: true }),
+    ).toBeVisible();
+    await page.locator(".subtabs button").evaluateAll((buttons) => {
+      const sizes = buttons.map(
+        (el) => parseFloat(getComputedStyle(el).fontSize) * 2,
+      );
+      buttons.forEach((button, i) => {
+        const el = button as HTMLElement;
+        el.style.fontFamily = "sans-serif";
+        el.style.fontSize = `${sizes[i]}px`;
+      });
+    });
+    await noPageOverflow(page);
+    await page.getByRole("tab", { name: "Live", exact: true }).click();
+    await expect(
+      page.getByRole("tab", { name: "Live", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+  });
+}
+
+test("a growing sticky header keeps visible focus clear without pulling back a scrolled-away control", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.goto("/heroes");
+  const search = page.getByRole("searchbox", { name: "Search heroes" });
+  await search.focus();
+  await search.evaluate((el) => el.scrollIntoView({ block: "start" }));
+  const clearance = async () =>
+    (await search.boundingBox())!.y -
+    (await page.locator(".app.web > header").boundingBox())!.height;
+  await expect.poll(clearance).toBeGreaterThanOrEqual(0);
+  await page.addStyleTag({
+    content: ".app.web > header a {font-size:200% !important}",
+  });
+  await expect.poll(clearance).toBeGreaterThanOrEqual(0);
+  await expect(search).toBeFocused();
+  // Deliberately scrolling away should not be undone by a later header resize.
+  await page.evaluate(() => scrollBy(0, 650));
+  await page.addStyleTag({
+    content: ".app.web > header a {font-size:250% !important}",
+  });
+  await expect
+    .poll(async () => {
+      const b = (await search.boundingBox())!;
+      return b.y + b.height;
+    })
+    .toBeLessThan(0);
+  await expect(search).toBeFocused();
+});
