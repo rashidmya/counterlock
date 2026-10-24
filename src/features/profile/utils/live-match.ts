@@ -90,8 +90,9 @@ export function parseLiveMatch(
 // A team's objectives mask has a bit per objective, set while it stands, as
 // numbered in the game's ECitadelObjective: 0 the Patron's last phase
 // ("Core"), 1–4 the Guardians and 5–8 the Walkers of lanes 1–4, 9 the
-// Patron ("Titan"), 10–11 the Shrines and 12–15 the Base Guardians of lanes
-// 1–4. The map has lanes 1, 3 and 4: lane 2's bits never clear.
+// Patron's first phase ("Titan"), 10–11 the Shrines and 12–15 the Base
+// Guardians of lanes 1–4. The map has lanes 1, 3 and 4: lane 2's bits
+// never clear.
 const LANES = [1, 3, 4];
 
 /** What still stands of a team's objectives. */

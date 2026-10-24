@@ -70,7 +70,8 @@ interface Pending {
 /**
  * Every path is always asked for with the same ttl, so the caller's ttl,
  * which decides whether an entry is fresh, and the one stored with it,
- * which the sweep uses, agree; and always fresh or never.
+ * which the sweep uses, agree. Likewise, a path is always asked for
+ * `fresh`, or never.
  */
 export class DeadlockApi {
   private cache = new Map<
