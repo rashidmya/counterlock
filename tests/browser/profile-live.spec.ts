@@ -187,7 +187,7 @@ test("the account Overwolf reports on this PC gets the Overwolf tab, whichever a
   await page.getByRole("button", { name: "My profile", exact: true }).click();
   await view(page).getByRole("tab", { name: "Live" }).click();
   await expect(
-    view(page).getByRole("heading", { name: "Live match" }),
+    view(page).getByRole("heading", { name: "Live match", exact: true }),
   ).toBeVisible();
   expect(asked).toEqual(["200"]);
 });

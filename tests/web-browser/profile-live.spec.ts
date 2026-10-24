@@ -184,6 +184,8 @@ test("the Live tab checks again every minute while it's open", async ({
   const stats = page.locator(".live-stats .stat-card");
   await expect(stats.nth(1)).toContainText("Amber +5,426");
   await page.clock.runFor(30_000);
+  // Time for a request the page made to reach the route.
+  await page.waitForTimeout(300);
   expect(asked).toHaveLength(1);
   await page.clock.runFor(30_000);
   await expect(stats.nth(1)).toContainText("Sapphire +5,000");
@@ -257,6 +259,8 @@ test("the minute's checks leave the notice, and focus on its Retry, in place", a
   // Failing again: the same notice, still focused, and nothing announced.
   await page.clock.runFor(60_000);
   await expect.poll(() => asked.length).toBe(3);
+  // Time for the answer to reach the page.
+  await page.waitForTimeout(300);
   await expect(retry).toBeFocused();
   await expect(page.locator(".live-status")).toHaveText("");
   // Going well: the notice goes, and focus moves to the status.

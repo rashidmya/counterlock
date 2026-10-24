@@ -117,8 +117,8 @@ describe("standing", () => {
       guardians: 0,
       walkers: 3,
     });
-    // Lane 2's Guardian bit gone too changes nothing.
-    expect(standing(0b1111111111100001).guardians).toBe(0);
+    // Lane 2's Guardian bit gone from a full mask changes nothing.
+    expect(standing(ALL_STANDING & ~0b100).guardians).toBe(3);
   });
 
   it("has the Patron weakened once its first phase is down, and destroyed with the last", () => {
