@@ -13,6 +13,7 @@ import { WebShell } from "./WebShell";
 import { NotFound } from "./NotFound";
 import "./styles/web.css";
 import "./styles/phone.css";
+import "./styles/polish.css";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (

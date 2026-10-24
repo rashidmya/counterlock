@@ -31,10 +31,10 @@
 **Files:** create `web/app/styles/polish.css`; import in `web/app/root.tsx`; create `tests/web-browser/polish.spec.ts`.
 **Interfaces:** CSS scoped to `.app.web`; existing component class names, no new component interfaces.
 
-- [ ] Write browser regressions: Overview at 320 px has scrollWidth <= clientWidth and All matches fits; targeted controls >=44 px at 375/768/900 px, search/select fonts >=16 px, and 1440 px fine-pointer controls retain density. Include a coarse-pointer 1024 px context and doubled text stress.
-- [ ] Run `npm run test:web -- polish.spec.ts --reporter=line`; expect failures from current overflow/control sizing.
-- [ ] Add narrowly scoped wrapping, sizing and readable control rules. Keep text labels and native input behavior.
-- [ ] Rerun the command; expect all task tests passing. Commit `fix(web): improve responsive headings and control targets`.
+- [x] Write browser regressions: Overview at 320 px has scrollWidth <= clientWidth and All matches fits; targeted controls >=44 px at 375/768/900 px, search/select fonts >=16 px, and 1440 px fine-pointer controls retain density. Include a coarse-pointer 1024 px context and doubled text stress.
+- [x] Run `npm run test:web -- polish.spec.ts --reporter=line`; expect failures from current overflow/control sizing.
+- [x] Add narrowly scoped wrapping, sizing and readable control rules. Keep text labels and native input behavior.
+- [x] Rerun the command; expect all task tests passing. Commit `fix(web): improve responsive headings and control targets`.
 
 ## Task 2: Skip navigation and sticky-header clearance
 

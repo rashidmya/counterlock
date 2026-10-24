@@ -1,0 +1,65 @@
+/* Website usability rules; shared desktop layouts keep their density. */
+.app.web .section-header {
+  flex-wrap: wrap;
+}
+.app.web .section-header h2 {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.app.web .section-header :is(a, button) {
+  max-width: 100%;
+  white-space: normal;
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .app.web
+    :is(
+      input[type="search"],
+      select,
+      .filter-buttons button,
+      .profile-action,
+      .profile-back,
+      .section-header button,
+      .section-header a,
+      .show-more,
+      .retry,
+      .notice button,
+      .report-back,
+      .graph-stat-tabs button,
+      .report-graph .segmented button,
+      .report-graph .graph-check,
+      .graph-ranking button,
+      .hero-table th button
+    ) {
+    min-height: 44px;
+  }
+  .app.web :is(input[type="search"], select) {
+    font-size: 16px;
+    max-width: 100%;
+  }
+  .app.web :is(.profile-back, .section-header a, .report-back) {
+    display: inline-flex;
+    align-items: center;
+  }
+  .app.web
+    :is(
+      .filter-buttons,
+      .heroes-toolbar,
+      .items-toolbar,
+      .heroes-selects,
+      .items-selects
+    ) {
+    flex-wrap: wrap;
+  }
+  .app.web .filter-buttons button {
+    padding-inline: 12px;
+  }
+  .app.web .report-graph .segmented {
+    flex-wrap: wrap;
+  }
+  .app.web .select-field {
+    min-width: 0;
+  }
+}
