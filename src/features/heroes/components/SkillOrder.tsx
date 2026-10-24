@@ -1,3 +1,4 @@
+import { HorizontalScroll } from "@/shared/ui/HorizontalScroll";
 import type { CSSProperties } from "react";
 import { abilityById } from "@/shared/catalog";
 import { Picture } from "@/shared/ui/Picture";
@@ -10,7 +11,8 @@ export function SkillOrder({
   order: number[];
 }) {
   return (
-    <div
+    <HorizontalScroll
+      label="Skill order"
       className="skill-order"
       style={{ "--steps": order.length } as CSSProperties}
     >
@@ -35,6 +37,6 @@ export function SkillOrder({
           </div>
         );
       })}
-    </div>
+    </HorizontalScroll>
   );
 }

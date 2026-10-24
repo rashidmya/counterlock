@@ -106,3 +106,23 @@
   font: 600 11px var(--font-label);
   letter-spacing: 0.06em;
 }
+
+.horizontal-scroll {
+  min-width: 0;
+  max-width: 100%;
+}
+.horizontal-scroll-content {
+  display: grid;
+  gap: inherit;
+  width: max-content;
+  min-width: 100%;
+}
+.horizontal-scroll > [tabindex]:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+.scroll-hint {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}

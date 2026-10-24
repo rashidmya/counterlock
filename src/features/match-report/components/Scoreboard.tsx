@@ -1,3 +1,4 @@
+import { HorizontalScroll } from "@/shared/ui/HorizontalScroll";
 import { RouteLink } from "@/app/links";
 import { heroById } from "@/shared/catalog";
 import { Picture } from "@/shared/ui/Picture";
@@ -32,7 +33,10 @@ export function Scoreboard({
         {TEAM_NAMES[team]}
         {team === winner && " · winner"}
       </h3>
-      <div className="report-table-wrap">
+      <HorizontalScroll
+        className="report-table-wrap"
+        label={`${TEAM_NAMES[team]} scoreboard`}
+      >
         <table className="report-table">
           <thead>
             <tr>
@@ -120,7 +124,7 @@ export function Scoreboard({
               })}
           </tbody>
         </table>
-      </div>
+      </HorizontalScroll>
     </div>
   ));
 }

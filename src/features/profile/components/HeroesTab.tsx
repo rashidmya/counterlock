@@ -1,3 +1,4 @@
+import { HorizontalScroll } from "@/shared/ui/HorizontalScroll";
 import { RetryButton } from "@/shared/ui/RetryButton";
 import { RouteLink } from "@/app/links";
 import type { AsyncState } from "@/shared/api/useAsync";
@@ -114,7 +115,10 @@ export function HeroesTab({
       {matches && !lines.length && <p className="muted">No recorded matches</p>}
       {!!lines.length && (
         <>
-          <div className="hero-table-wrap">
+          <HorizontalScroll
+            className="hero-table-wrap"
+            label="Heroes played table"
+          >
             <table className="hero-table">
               <thead>
                 <tr>
@@ -183,7 +187,7 @@ export function HeroesTab({
                 ))}
               </tbody>
             </table>
-          </div>
+          </HorizontalScroll>
           <p className="data-note">
             K/D/A, last hits and denies are per-game averages. Damage and
             accuracy come from hero stats and show — when unavailable.

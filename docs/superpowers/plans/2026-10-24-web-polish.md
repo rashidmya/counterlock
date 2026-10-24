@@ -51,10 +51,10 @@
 **Files:** create `src/shared/ui/HorizontalScroll.tsx`; modify `src/app/styles/shared.css`, `src/features/profile/components/HeroesTab.tsx`, `src/features/match-report/components/Scoreboard.tsx`, `src/features/heroes/components/SkillOrder.tsx`; create `tests/web-browser/scroll-regions.spec.ts`.
 **Interfaces:** `HorizontalScroll({label, className, style?, children}: {label:string; className:string; style?:CSSProperties; children:ReactNode})`. Preserve current scroll-container class names on the actual scroller; wrap children inside a measurable content element. Only overflowing regions get role=region, aria-label, tabIndex=0, aria-describedby and a hint.
 
-- [ ] Add regressions for named profile/report/skill-order regions, native arrow-key horizontal scrolling, visible hints only on overflow, resize-to-fit removing extra tab stop while preserving current focus, and data/content resize updates.
-- [ ] Run `npm run test:web -- scroll-regions.spec.ts --reporter=line`; expect missing named regions/hints.
-- [ ] Implement one component observing viewport and content sizes, measuring scrollWidth > clientWidth + 1. Clean up observations on unmount; preserve tables, native arrow behavior and component contents. Use distinct team names and unique IDs for hint relationships.
-- [ ] Run task tests; expect PASS. Commit `feat(ui): make wide data scrolling discoverable`.
+- [x] Add regressions for named profile/report/skill-order regions, native arrow-key horizontal scrolling, visible hints only on overflow, resize-to-fit removing extra tab stop while preserving current focus, and data/content resize updates.
+- [x] Run `npm run test:web -- scroll-regions.spec.ts --reporter=line`; expect missing named regions/hints.
+- [x] Implement one component observing viewport and content sizes, measuring scrollWidth > clientWidth + 1. Clean up observations on unmount; preserve tables, native arrow behavior and component contents. Use distinct team names and unique IDs for hint relationships.
+- [x] Run task tests; expect PASS. Commit `feat(ui): make wide data scrolling discoverable`.
 
 ## Task 4: Recoverable empty catalog results
 
