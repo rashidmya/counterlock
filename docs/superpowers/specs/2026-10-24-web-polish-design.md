@@ -1,6 +1,6 @@
 # Web usability and responsive layout polish
 
-Status: proposed for owner approval.
+Status: owner approved; implementation in progress.
 
 ## Intent and constraints
 
