@@ -286,3 +286,49 @@ test("a check that goes well leaves alone focus that has left the notice", async
   await expect(page.locator(".live-status")).not.toBeFocused();
   expect(await onPage()).toBe(true);
 });
+
+test("a check that finds the match over leaves focus in the tab", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockApi(page);
+  await mockLive(page, [{}, null]);
+  await openLive(page);
+  await page
+    .locator(".live-team.team-1")
+    .getByRole("link", { name: "Player 7006" })
+    .focus();
+  await page.clock.runFor(60_000);
+  await expect(
+    page.getByRole("heading", { name: "No live match found" }),
+  ).toBeVisible();
+  await expect(page.locator(".live-status")).toBeFocused();
+});
+
+test("a new match in place of the last leaves focus in the tab", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockApi(page);
+  // The next match has the player where the focused link was.
+  const next = activeMatch(FARGO, { matchId: 999 });
+  next.players[0].account_id = 7006;
+  next.players[6].account_id = FARGO;
+  let asked = 0;
+  await page.route(
+    "https://api.deadlock-api.com/v1/matches/active**",
+    (route) =>
+      route.fulfill({
+        json: [asked++ ? next : activeMatch(FARGO)],
+        headers: cors,
+      }),
+  );
+  await openLive(page);
+  await page
+    .locator(".live-team.team-1")
+    .getByRole("link", { name: "Player 7006" })
+    .focus();
+  await page.clock.runFor(60_000);
+  await expect(page.locator(".live-stats")).toContainText("Match 999");
+  await expect(page.locator(".live-status")).toBeFocused();
+});

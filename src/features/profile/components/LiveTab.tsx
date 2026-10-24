@@ -163,10 +163,15 @@ function SoulsLead({
 function LiveMatchView({
   match,
   accountId,
+  status,
 }: {
   match: LiveMatch;
   accountId: number;
+  status: RefObject<HTMLElement | null>;
 }) {
+  // The players' links are all the view has to focus.
+  const teams = useRef<HTMLDivElement>(null);
+  useKeepFocus(teams, status);
   const ids = match.players.map((p) => p.accountId).filter((id) => id > 0);
   const { data: profiles } = useAsync(
     () => fetchSteamProfiles(ids),
@@ -203,7 +208,7 @@ function LiveMatchView({
           <em>Match {match.matchId}</em>
         </div>
       </div>
-      <div className="live-teams">
+      <div className="live-teams" ref={teams}>
         {TEAMS.map((team) => (
           <LiveTeam key={team} {...{ match, team, accountId, names }} />
         ))}
@@ -218,10 +223,24 @@ function LiveMatchView({
 }
 
 /**
- * A notice with Retry. Taken away with focus in it (a check that went well),
- * it leaves focus on `status` rather than let it fall to the page: React
- * runs the cleanup before it removes the notice.
+ * When a check takes `inside` away with focus in it (the notice once a check
+ * goes well, the match once it's over or another replaces it), focus moves
+ * to `status` rather than fall to the page: React runs the cleanup before it
+ * removes the node.
  */
+function useKeepFocus(
+  inside: RefObject<HTMLElement | null>,
+  status: RefObject<HTMLElement | null>,
+) {
+  useLayoutEffect(() => {
+    const node = inside.current;
+    return () => {
+      if (node?.contains(document.activeElement)) status.current?.focus();
+    };
+  }, [inside, status]);
+}
+
+/** A notice with Retry. */
 function LiveNotice({
   status,
   onRetry,
@@ -232,12 +251,7 @@ function LiveNotice({
   children: ReactNode;
 }) {
   const notice = useRef<HTMLParagraphElement>(null);
-  useLayoutEffect(() => {
-    const node = notice.current;
-    return () => {
-      if (node?.contains(document.activeElement)) status.current?.focus();
-    };
-  }, [status]);
+  useKeepFocus(notice, status);
   return (
     <p className="notice warning" role="status" ref={notice}>
       {children}
@@ -253,8 +267,8 @@ export function LiveTab({ accountId }: { accountId: number }) {
   const live = useLiveMatch(accountId, tab);
   // Retry goes with its notice as soon as it's pressed: focus moves to the
   // status, which says what is being checked, rather than falling to the
-  // page. (Before the notice goes, as not every browser focuses a button
-  // that is clicked.)
+  // page. Here, not in LiveNotice's cleanup: not every browser focuses a
+  // clicked button.
   const status = useRef<HTMLParagraphElement>(null);
   const retry = () => {
     status.current?.focus();
@@ -282,7 +296,16 @@ export function LiveTab({ accountId }: { accountId: number }) {
           minute.
         </LiveEmpty>
       )}
-      {live.match && <LiveMatchView match={live.match} accountId={accountId} />}
+      {live.match && (
+        <LiveMatchView
+          // Another match, another view: its rows go by position, so the
+          // focused row could lose its link.
+          key={live.match.matchId}
+          match={live.match}
+          accountId={accountId}
+          status={status}
+        />
+      )}
     </div>
   );
 }
