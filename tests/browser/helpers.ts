@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import type { MatchState } from "../../src/features/match/types";
 import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
 
 export const item = catalog.items[0];
@@ -42,12 +43,18 @@ export async function nativeWindow(
   page: Page,
   name: string,
   gameMode = "normal",
-  options: { running?: boolean; players?: boolean } = {},
+  options: {
+    running?: boolean;
+    players?: boolean;
+    state?: Partial<MatchState>;
+  } = {},
 ) {
   const { running = true, players = true } = options;
   await page.addInitScript(
-    ({ name, gameMode, running, roster }) => {
+    ({ name, gameMode, running, roster, initial }) => {
       const listeners = new Set<() => void>();
+      const nativeCalls = { moves: [] as unknown[][], drags: [] as string[] };
+      const position = { left: 123, top: 45 };
       let state = {
         mode: "live",
         status: "Connected",
@@ -61,6 +68,7 @@ export async function nativeWindow(
         stats: {},
         error: null,
         loading: false,
+        ...initial,
       };
       const bridge = {
         getSnapshot: () => state,
@@ -71,6 +79,7 @@ export async function nativeWindow(
         refresh: () => {},
       };
       Object.assign(window, {
+        nativeCalls,
         updateMatch: (patch: object) => {
           state = { ...state, ...patch };
           listeners.forEach((listener) => listener());
@@ -81,10 +90,23 @@ export async function nativeWindow(
             getCurrentWindow: (callback: (value: unknown) => void) =>
               callback({
                 success: true,
-                window: { id: name, name, left: 123, top: 45 },
+                window: { id: name, name, ...position },
               }),
-            changePosition: () => {},
-            dragMove: () => {},
+            changePosition: (
+              id: string,
+              left: number,
+              top: number,
+              callback?: (r: unknown) => void,
+            ) => {
+              nativeCalls.moves.push([id, left, top]);
+              Object.assign(position, { left, top });
+              callback?.({ success: true });
+            },
+            dragMove: (id: string, callback?: (r: unknown) => void) => {
+              nativeCalls.drags.push(id);
+              Object.assign(position, { left: 456, top: 78 });
+              callback?.({ success: true });
+            },
             hide: () => {},
           },
           games: {
@@ -107,10 +129,22 @@ export async function nativeWindow(
         },
       });
       localStorage.setItem("scout.overlay.opacity", "75");
-      localStorage.setItem("scout.overlay.recommended-build", "true");
-      localStorage.setItem("scout.overlay.counter-items", "true");
+      for (const id of [
+        "hero-damage",
+        "objective-damage",
+        "healing",
+        "you-vs-average",
+        "spawn-timers",
+      ])
+        localStorage.setItem(`scout.overlay.${id}`, "true");
     },
-    { name, gameMode, running, roster: players ? matchPlayers() : [] },
+    {
+      name,
+      gameMode,
+      running,
+      roster: players ? matchPlayers() : [],
+      initial: options.state ?? {},
+    },
   );
 }
 

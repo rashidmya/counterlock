@@ -24,8 +24,8 @@ export function mountApp(windowName: ForegroundWindowName) {
     });
     return;
   }
-  document.body.dataset.window = windowName;
+  document.body.dataset.window = kWindowNames.desktop;
   createRoot(document.getElementById("root")!).render(
-    <DesktopApp windowName={windowName} />,
+    <DesktopApp windowName={kWindowNames.desktop} />,
   );
 }
