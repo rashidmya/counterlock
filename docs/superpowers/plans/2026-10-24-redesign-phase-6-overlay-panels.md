@@ -114,8 +114,8 @@ For Soul Urn, show time to the next **scheduled spawn**, never a claim that it i
 - `SPAWN_RULES`: readonly `{ id: "soul-urn", label: "Soul Urn", firstS: 600, intervalS: 300, source: string, checkedOn: "2026-10-24" }[]`.
 - `scheduledSpawns(state: MatchState): { id: string; label: string; atS: number; remainingS: number }[]`; empty for invalid/pregame clocks, Init, lobby, PostGame, or Street Brawl. Use only `state.clock`, never elapsed wall time.
 
-- [ ] **Step 1: Write failing helper tests.** Meter rows sort descending, unknowns last, stable ties by numeric slot; all 12 players remain present. For values 100/50/0/null, fractions are 1/0.5/0/0. An all-zero meter has no NaN widths. Only teams 2 and 3 with a unique local player establish ally/enemy; otherwise use neutral tones. Local is gold regardless of rank/account availability.
-- [ ] **Step 2: Write comparison/schedule assertions.** No unique local player returns null. At a time halfway between curve points, each K/D/A average is independently interpolated using existing `averageAt` and `metricById`; fewer deaths is favorable. No arrows for missing fields, no extrapolation past the last usable point, no percentage division by zero, and no level/KP average. Compute KP only with six known same-team kill counts in normal mode, or four in Brawl, a known numerator, valid team 2/3 and a positive denominator; otherwise null. Clamp a temporarily inconsistent numerator to 100%. Souls / min stays null regardless of raw souls.
+- [x] **Step 1: Write failing helper tests.** Meter rows sort descending, unknowns last, stable ties by numeric slot; all 12 players remain present. For values 100/50/0/null, fractions are 1/0.5/0/0. An all-zero meter has no NaN widths. Only teams 2 and 3 with a unique local player establish ally/enemy; otherwise use neutral tones. Local is gold regardless of rank/account availability.
+- [x] **Step 2: Write comparison/schedule assertions.** No unique local player returns null. At a time halfway between curve points, each K/D/A average is independently interpolated using existing `averageAt` and `metricById`; fewer deaths is favorable. No arrows for missing fields, no extrapolation past the last usable point, no percentage division by zero, and no level/KP average. Compute KP only with six known same-team kill counts in normal mode, or four in Brawl, a known numerator, valid team 2/3 and a positive denominator; otherwise null. Clamp a temporarily inconsistent numerator to 100%. Souls / min stays null regardless of raw souls.
 
   ```ts
   expect(
@@ -135,9 +135,9 @@ For Soul Urn, show time to the next **scheduled spawn**, never a claim that it i
   // Resuming with a GEP jump to 10:20 yields 280, without replaying 10:00.
   ```
 
-- [ ] **Step 3: Verify failure.** Run `npx vitest run tests/overlay/meters.test.ts tests/overlay/spawn-timers.test.ts`; missing helpers must fail.
-- [ ] **Step 4: Implement the pure helpers.** Reuse the shared rank interpolation and metric definitions. Keep schedule arithmetic separate from rendering. The Urn's exact boundary is “Scheduled now”; one second later select the next scheduled spawn. None of these helpers sends a request or installs a timer.
-- [ ] **Step 5: Verify and commit.** Run the targeted tests and global checks. Commit `feat(overlay): derive live meters comparisons and spawn schedules`.
+- [x] **Step 3: Verify failure.** Run `npx vitest run tests/overlay/meters.test.ts tests/overlay/spawn-timers.test.ts`; missing helpers must fail.
+- [x] **Step 4: Implement the pure helpers.** Reuse the shared rank interpolation and metric definitions. Keep schedule arithmetic separate from rendering. The Urn's exact boundary is “Scheduled now”; one second later select the next scheduled spawn. None of these helpers sends a request or installs a timer.
+- [x] **Step 5: Verify and commit.** Run the targeted tests and global checks. Commit `feat(overlay): derive live meters comparisons and spawn schedules`.
 
 ## Task 3: Declare five panels and make their visibility act as a group
 
