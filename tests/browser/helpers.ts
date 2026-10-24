@@ -128,7 +128,8 @@ export async function nativeWindow(
           },
         },
       });
-      localStorage.setItem("scout.overlay.opacity", "75");
+      if (localStorage.getItem("scout.overlay.opacity") === null)
+        localStorage.setItem("scout.overlay.opacity", "75");
       for (const id of [
         "hero-damage",
         "objective-damage",
@@ -136,7 +137,8 @@ export async function nativeWindow(
         "you-vs-average",
         "spawn-timers",
       ])
-        localStorage.setItem(`scout.overlay.${id}`, "true");
+        if (localStorage.getItem(`scout.overlay.${id}`) === null)
+          localStorage.setItem(`scout.overlay.${id}`, "true");
     },
     {
       name,

@@ -17,7 +17,7 @@ npm run dev
 
 Open the local URL Vite prints. The browser opens on **Home** with tabs for **Home · Live · Tier list · Heroes · Items**, plus a **My profile** button in the header once an account is remembered. Without Overwolf, **Live** shows "Deadlock isn't running"; with Overwolf it shows "Waiting for a match" until live data arrives. Demo match data is confined to test fixtures. In the browser, Home has no game events to detect your account, so you search for it: **Find a player** accepts a Steam name, an exact SteamID64, account ID, `[U:1:account]` ID or profile link, and the profile's **This is me** button remembers it. **Home**, **Tier list**, **Heroes**, **Items** and profiles make real requests. No API key is required by the endpoints used here.
 
-The root preview redirects to `/desktop/desktop.html`. Open `/in_game/in_game.html` to preview the in-game entrypoint. Without Overwolf, the in-game entrypoint also renders the full browser preview. In Overwolf, it resolves the native window name and mounts the compact build or counter overlay.
+The root preview redirects to `/desktop/desktop.html`. Open `/in_game/in_game.html` to preview the in-game entrypoint. Without Overwolf, the in-game entrypoint also renders the full browser preview. In Overwolf, it resolves the native window name and mounts one of the five performance panels.
 
 ## Load in Overwolf on Windows
 
@@ -25,11 +25,11 @@ The root preview redirects to `/desktop/desktop.html`. Open `/in_game/in_game.ht
 2. Run `npm run build`, then copy the entire `dist/` folder to the Windows PC. Set `VITE_SITE_URL` to the website's address for the build (for example `VITE_SITE_URL=https://counterlock.gg npm run build`): the match report's **Copy link** copies links to it, and the build warns when it is missing.
 3. In Overwolf, open **Settings → About → Development options → Load unpacked extension**. Select the folder containing `manifest.json`, not the project root.
 4. Launch Deadlock and enable its Overwolf overlay. The app targets Overwolf game ID **24482** and starts automatically with the game.
-5. Use **Ctrl+Shift+S** to show or hide Counterlock's in-game window. The binding can be changed in Overwolf. Drag the app header to move the window. The gear button exposes overlay visibility and opacity while Deadlock is running; desktop rows remain compact.
+5. While Deadlock runs, open the gear button and enable the overlay panels you want. Each starts off until enabled. **Ctrl+Shift+S** shows or hides all enabled panels together; the binding can be changed in Overwolf. Drag each panel's header to move it independently; positions persist. The opacity slider changes panel backgrounds while text stays opaque.
 
 The remembered account comes from Deadlock game events: the `background` window stores the last account it detects on this PC in `localStorage` under `counterlock.profile.account`, and Home's **You** section and the header's **My profile** button use it. If none has been detected, search for yourself on Home, open the profile and press **This is me**; it is stored the same way, and the next account detected in-game replaces it. **Not you? Switch account** clears the stored account. It never leaves this PC except as a public ID in API requests.
 
-The `background` window owns the shared live store, game-event subscriptions, feature registration, hotkeys, and overlay lifecycle. The `desktop` window stays independent of overlay visibility. The `in_game` and `counter_overlay` windows both use `in_game/in_game.html`, resolving their native window identity at mount time to render the appropriate compact panel. Each declared HTML path remains stable in `dist/` and in the manifest. Foreground windows subscribe to the background store through `getMainWindow()`; they do not create their own live stores.
+The `background` window owns the shared live store, game-event subscriptions, feature registration, hotkeys, and overlay lifecycle. The `desktop` window stays independent of overlay visibility. The five windows (`hero_damage`, `objective_damage`, `healing`, `you_vs_average`, `spawn_timers`) share `in_game/in_game.html`, resolving their native identity at mount time to render the right panel. Each declared HTML path remains stable in `dist/` and in the manifest. Foreground windows subscribe to the background store through `getMainWindow()`; they do not create their own live stores.
 
 For developer packaging and installation, see [Overwolf's unpacked app instructions](https://dev.overwolf.com/ow-native/getting-started/onboarding-resources/basic-sample-app/) and [OPK packaging reference](https://dev.overwolf.com/ow-native/reference/ow-sdk-introduction/).
 
@@ -49,7 +49,7 @@ For Overwolf development, load the built files. Avoid `debug_url` with this back
 
 **Live match overlays and roster:**
 
-- The Live tab's build panel (**Your build**) shows the same main build as the hero page, so the two never disagree. The hero selector follows your hero by default; owned items are marked, the current phase is tagged **Now**, and the panel can be collapsed. Compact build overlays still show one community build, with its recorded win rate and match count; they follow the local hero and provide a group selector. Build statistics are unavailable in Street Brawl.
+- The Live tab's build panel (**Your build**) shows the same main build as the hero page, so the two never disagree. The hero selector follows your hero by default; owned items are marked, the current phase is tagged **Now**, and the panel can be collapsed. Build statistics are unavailable in Street Brawl.
 - Uses the full in-game shop artwork for both builds and counter cards. All **173 item icons** are bundled locally, so item artwork works without the asset CDN.
 - Identifies your team using the local roster entry; enemy detection waits until that identity is available. Team sizes are dynamic, including Street Brawl.
 - Shows the latest recorded rank, **hero-specific** win rate and recorded games, plus live K/D/A. The API's hero history is filtered to the active game mode and ranked/unranked matches.
@@ -62,7 +62,11 @@ Rank comes from the latest recorded ranked match, not a live rank feed or a hist
 
 The Live counter engine, which is also the hero page's fallback, is a transparent set of strategic heuristics, not a learned optimal build or a statistical claim that an item causes more wins. It does not calculate your build's damage, automatically buy items, or modify Deadlock's files. The budget is a **per-item price limit**, not a shopping-list total or your remaining souls.
 
-The compact overlay's community build is selected by recorded match count among builds with at least 20 matches in the API's aggregate bucket. Its win rate is measured over the last 30 days of ranked and unranked matches and can span multiple build versions. Item groups come from the selected community build. These are adaptable suggestions, not a mandatory purchase order or a claim that the build causes more wins.
+The five performance overlays are **Hero damage**, **Objective damage**, **Healing**, **You vs. average**, and **Spawn timers**. Meters sort every listed player by their GEP total, with portraits, team colors and your own gold highlight; missing measurements show “—”. Each panel has its own enable switch and saved position; its × button disables only that panel. The desktop's builds and counters keep working independently of these switches.
+
+**You vs. average** compares separate kills, deaths and assists with the same hero's rank-average curve at the current match time (interpolated between recorded minutes). It uses the local player's latest recorded rank from the shared lookup, or explicitly all ranks when unavailable, and widens thin bands as the match report does. Level and kill participation show live values with “Average unavailable”: the curve has neither a level average nor the team totals needed for a participation average. Participation needs the complete team's known kill counts and a positive total; an unknown denominator shows “—”. **Souls / min remains unavailable** until a real Windows session confirms that GEP `souls` means total net worth. No comparison is invented from unspent currency. A failed benchmark keeps live counts and offers Retry. Street Brawl shows live counts without normal-mode averages or timers.
+
+**Spawn timers** currently shows the Soul Urn's confirmed schedule: first at 10:00, then every five minutes ([Valve's 2026-06-30 update](https://store.steampowered.com/news/app/1422450/view/688635449342692003), checked 2026-10-24). It counts down from GEP's match clock, so pausing or missing clock updates cannot make a wall-clock timer drift. A scheduled spawn is not evidence that the Urn is still available. No exact Unstable Rift timer is shown because its start varies; no Mid Boss or camp respawn is inferred. Native telemetry cadence, souls semantics, pause recovery, multi-monitor movement and input release still need Windows/Overwolf testing.
 
 Home and the hero and item pages use Deadlock API aggregates, so figures reflect community data for the filters shown, not a complete record. Hero tiers are relative to the current win-rate distribution, not an official ranking. A hero page makes ten analytics requests, plus one for each picked enemy. The Deadlock API allows 200 analytics requests per minute per IP; the client holds requests back rather than go over it, so very rapid browsing slows down instead of hitting the cooldown. Picking an enemy again reuses its cached request.
 
@@ -175,9 +179,9 @@ Before a public release, test in Windows with a live match: game startup and shu
 | `src/features/roster/`                            | Team tables, player rows, roster and inventory styles                                              |
 | `src/features/player-stats/`                      | Batched statistics client, cache/cooldowns, response types, win-rate utility                       |
 | `src/features/home/`                              | Home: search, You card (rank, recent form, latest match) and Top of the city                       |
-| `src/features/builds/`                            | Main build (hero page and Live panel), popular builds, compact overlay build, build analytics      |
-| `src/features/counters/`                          | Hero-page counter items and enemy picker, counter rules, threat types, desktop/compact panels      |
-| `src/features/overlay/`                           | Visibility preferences, persisted keys, settings UI, overlay styles                                |
+| `src/features/builds/`                            | Main build (hero page and Live panel), popular builds and build analytics                          |
+| `src/features/counters/`                          | Hero-page counter items and enemy picker, counter rules, threat types and desktop panels           |
+| `src/features/overlay/`                           | Five performance panels, comparisons, spawn schedules, visibility preferences and settings         |
 | `src/platform/overwolf/`                          | Background lifecycle, store bridge, game detection, window controls and native window hooks        |
 | `src/shared/api/`                                 | Shared Deadlock API client (cache, rate limits and cooldowns across tabs) and async request hook   |
 | `src/shared/catalog/`                             | Typed catalog access (heroes, roles, abilities, items), metadata types and the dated JSON snapshot |
@@ -191,17 +195,17 @@ Seams shared by the Overwolf app and the website: `src/app/links.tsx` (navigatio
 
 Use `@/` imports across feature boundaries and relative imports within a feature. The alias is configured consistently in TypeScript, Vite and Vitest. Types belong to the feature that owns them; shared code must not depend on app composition. Keep Overwolf lifecycle operations in the platform layer and leave game parsing and recommendation calculations independent of React.
 
-The app shell owns the counter hook lifetime so switching tabs preserves their state. Build requests share timeout, abort and stale-response handling while retaining each presentation's error messages. The background remains the only live-store owner. Existing `scout.overlay.*` keys and native window names are compatibility contracts.
+The app shell owns the counter hook lifetime so switching tabs preserves their state. Build requests share timeout, abort and stale-response handling while retaining each presentation's error messages. The background remains the only live-store owner. The `scout.overlay.*` key convention and shared opacity are retained. Phase 6 replaces the two old native window names with five performance windows; old build/counter keys remain inert and do not enable new panels.
 
 Feature styles are composed centrally by `src/app/styles/index.css`. Its import order preserves the original cascade, including responsive and compact overrides; keep that order deliberate when adding styles. There are no new runtime dependencies. Type checking rejects unused imports and parameters.
 
 ## API endpoints
 
-Live player statistics and the compact overlay's community build use `/v1/players/hero-stats`, `/v1/players/rank`, `/v1/analytics/hero-build-stats` and `/v1/builds`, and the catalog uses `/v1/assets/*`. The companion pages add these routes. All of them but the assets are fetched through the shared client in `src/shared/api`:
+Live player statistics use `/v1/players/hero-stats` and `/v1/players/rank`, overlay comparisons reuse `/v1/analytics/player-performance-curve`, and the catalog uses `/v1/assets/*`. The companion pages add these routes. All of them but the assets are fetched through the shared client in `src/shared/api`:
 
 - `/v1/players/steam`, `/v1/players/rank`, `/v1/players/hero-stats`
 - `/v1/players/{id}/match-history` and `/v1/players/{id}/mate-stats`
-- `/v1/matches/{id}/metadata` and `/v1/analytics/player-performance-curve` (match report; the curve also for the Performance tab)
+- `/v1/matches/{id}/metadata` and `/v1/analytics/player-performance-curve` (match report; the curve also serves Performance and the comparison overlay)
 - `/v1/matches/metadata` (bulk; the Performance tab's per-game totals)
 - `/v1/analytics/hero-stats`, `hero-counter-stats`, `hero-synergy-stats`, `ability-order-stats` and `item-stats` (also per build phase and per picked enemy)
 - `/v1/builds` (popular builds on the hero page)
@@ -223,15 +227,15 @@ Deadlock and its game assets belong to Valve. Deadlock API is a community servic
 ## Product source and Underwolf packaging
 
 The source now owns the features previously injected by Underwolf's Scout adapter:
-independent compact build/counter overlays, game-only overlay preferences and
-opacity, purchased-item rows, hero/team identity, live match-clock display, and
-community-build statistics. The desktop remains independent of overlay visibility;
+five independent performance overlays, game-only overlay preferences and
+background opacity, purchased-item rows, hero/team identity, live match-clock
+display, and community builds on hero pages. The desktop remains independent of overlay visibility;
 production has no demo-match or compact-layout switches. Existing `scout.overlay.*`
-preference keys are retained so saved choices and positions remain compatible.
+preference conventions and shared opacity remain; old build/counter switches do not opt users into the new panels.
 
 `npm run build` builds these features directly for native Overwolf using the shared
 background store. `npm test` covers game state, overlay lifecycle, hero identity,
-and build analytics; `npm run test:browser` covers production browser rendering.
+meter calculations, spawn schedules and builds; `npm run test:browser` covers production browser rendering.
 The Underwolf integration test remains in the host repository and accepts
 `SCOUT_OPK` to select a package.
 

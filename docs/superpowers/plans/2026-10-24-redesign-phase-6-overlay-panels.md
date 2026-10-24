@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-redesign-design.md`, especially “In-game overlays”, “Constraints”, “Non-goals” and delivery phase 6. Starting revision: `0447326`.
 
-**Status:** Approved for native execution on 2026-10-24, including the availability qualifications below. Implementation in progress.
+**Status:** Implemented on 2026-10-24 with the approved availability qualifications below. Automated verification passed; native Windows validation remains outstanding.
 
 ## Global Constraints
 
@@ -211,7 +211,7 @@ The benchmark context is the match ID, local hero and resolved rank tier. Reuse 
 
 **Interfaces:** The final `OverlaySettingsProps` has only `hotkey: string`, `overlaySettings: boolean`, `opacity: number`, and `setOpacity(value: number): void`. `OverlaySettings` renders one `OverlayToggle({ panel }: { panel: (typeof OVERLAY_PANELS)[number] })` child per registry entry; each child owns its own `useOverlayPreference(panel.id)` hook. Remove the two build/counter booleans and setters from the parent props. Never call a variable number of hooks in a loop.
 
-- [ ] **Step 1: Write failing settings/regression tests.** While Deadlock runs, settings expose exactly the five panel switches, the current hotkey and opacity. Changing each switch writes only its own key; refreshing retains it. In a plain browser, native controls remain absent. Disabling all overlays leaves desktop Live's build/counter content and selections intact across page changes. Replace old build/counter overlay tests with the new suite; retain desktop build timeout/Retry, stale hero requests, Street Brawl behavior and cross-tab state tests.
+- [x] **Step 1: Write failing settings/regression tests.** While Deadlock runs, settings expose exactly the five panel switches, the current hotkey and opacity. Changing each switch writes only its own key; refreshing retains it. In a plain browser, native controls remain absent. Disabling all overlays leaves desktop Live's build/counter content and selections intact across page changes. Replace old build/counter overlay tests with the new suite; retain desktop build timeout/Retry, stale hero requests, Street Brawl behavior and cross-tab state tests.
 
   ```ts
   await nativeWindow(page, "desktop");
@@ -225,10 +225,10 @@ The benchmark context is the match ID, local hero and resolved rank tier. Reuse 
   ).toBeVisible();
   ```
 
-- [ ] **Step 2: Verify failure.** Run `npx playwright test tests/browser/overlay.spec.ts tests/browser/feature-boundaries.spec.ts tests/browser/overlay-panels.spec.ts` and verify the new settings assertions fail before changing the UI.
-- [ ] **Step 3: Implement settings and remove unreachable code.** Render the five `OverlayToggle` rows with labels `${panel.title} overlay`, using the exact props above; drop build/counter preference hooks from `DesktopApp`. The desktop always renders its existing build/counter panels. Delete its old in-game shell branch, remove the temporary legacy window constants/union members, and delete the now-unused compact-build service/hook/components and their dedicated tests. Keep community/popular-build services used on hero pages. Retain inert old stored keys without migrating or deleting user data.
-- [ ] **Step 4: Update documentation.** Describe five windows, shared hotkey/opacity, independent switches, positions and the confirmed Urn timer. Replace outdated compact-overlay references in README, feature tables and data-source notes. Record exactly which comparisons ship and which still need native evidence. Mark phase 6 implemented only after its accepted requirements and checks pass; explicitly retain outstanding Windows validation. Do not claim Windows testing from mocks.
-- [ ] **Step 5: Run final verification once.**
+- [x] **Step 2: Verify failure.** Run `npx playwright test tests/browser/overlay.spec.ts tests/browser/feature-boundaries.spec.ts tests/browser/overlay-panels.spec.ts` and verify the new settings assertions fail before changing the UI.
+- [x] **Step 3: Implement settings and remove unreachable code.** Render the five `OverlayToggle` rows with labels `${panel.title} overlay`, using the exact props above; drop build/counter preference hooks from `DesktopApp`. The desktop always renders its existing build/counter panels. Delete its old in-game shell branch, remove the temporary legacy window constants/union members, and delete the now-unused compact-build service/hook/components and their dedicated tests. Keep community/popular-build services used on hero pages. Retain inert old stored keys without migrating or deleting user data.
+- [x] **Step 4: Update documentation.** Describe five windows, shared hotkey/opacity, independent switches, positions and the confirmed Urn timer. Replace outdated compact-overlay references in README, feature tables and data-source notes. Record exactly which comparisons ship and which still need native evidence. Mark phase 6 implemented only after its accepted requirements and checks pass; explicitly retain outstanding Windows validation. Do not claim Windows testing from mocks.
+- [x] **Step 5: Run final verification once.**
 
   ```sh
   npm test
@@ -244,7 +244,7 @@ The benchmark context is the match ID, local hero and resolved rank tier. Reuse 
 
   Expected: all unit/browser assertions pass; both type checks/builds succeed; the official manifest schema accepts exactly five new overlay windows and each declared HTML/icon path exists. Inspect screenshots of every panel at default/minimum sizes. Review production references to `CompactBuild`, `CompactCounters`, `useMeasuredBuild`, `recommended-build`, `counter-items`, `counter_overlay` and the old native `in_game` identity; only intentional legacy-key assertions or historical documentation may remain. The `src/in_game/` HTML/build paths remain intentionally.
 
-- [ ] **Step 6: Final review and commit.** Review the full diff against the five Review Focus cases and the accepted spec qualifications. Correct failures and rerun only the affected checks, broadening where a fix affects shared code. Commit `feat(overlay): replace build overlays with five performance panels` and report verified results plus remaining manual checks. Integration/publishing follows the owner's existing preferences; do not publish or push as a side effect of writing this plan.
+- [x] **Step 6: Final review and commit.** Review the full diff against the five Review Focus cases and the accepted spec qualifications. Correct failures and rerun only the affected checks, broadening where a fix affects shared code. Commit `feat(overlay): replace build overlays with five performance panels` and report verified results plus remaining manual checks. Integration/publishing follows the owner's existing preferences; do not publish or push as a side effect of writing this plan.
 
 ## Native validation that this Linux workspace cannot perform
 
@@ -257,4 +257,4 @@ These are release evidence still to collect, not failing automated checks and no
 
 ## Execution recommendation
 
-Native implementation in the current checkout is the proposed default: the tasks share the live-state, panel-registry and window interfaces closely. Establish a clean test baseline before product edits. If the owner selects subagent-driven execution, follow that skill's independent task reviews instead. No product implementation, dependency installation or worktree creation was performed while preparing this plan.
+Native implementation in the current checkout is the proposed default: the tasks share the live-state, panel-registry and window interfaces closely. Establish a clean test baseline before product edits. If the owner selects subagent-driven execution, follow that skill's independent task reviews instead. The owner selected native execution in this checkout. Five task commits implement the phase; no dependencies or worktrees were added.

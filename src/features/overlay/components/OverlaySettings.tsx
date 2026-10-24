@@ -1,22 +1,16 @@
 import { overlayOpacityKey } from "../preferences";
+import { OVERLAY_PANELS } from "../panels";
+import { useOverlayPreference } from "../hooks/useOverlayPreference";
 
 export interface OverlaySettingsProps {
   hotkey: string;
   overlaySettings: boolean;
-  overlayBuild: boolean;
-  setShowBuild: (value: boolean) => void;
-  overlayCounters: boolean;
-  setShowCounters: (value: boolean) => void;
   opacity: number;
   setOpacity: (value: number) => void;
 }
 export function OverlaySettings({
   hotkey,
   overlaySettings,
-  overlayBuild,
-  setShowBuild,
-  overlayCounters,
-  setShowCounters,
   opacity,
   setOpacity,
 }: OverlaySettingsProps) {
@@ -27,24 +21,11 @@ export function OverlaySettings({
         <kbd>{hotkey}</kbd>
       </div>
       {overlaySettings && (
-        <>
-          <label>
-            <input
-              type="checkbox"
-              checked={overlayBuild}
-              onChange={(e) => setShowBuild(e.target.checked)}
-            />{" "}
-            Recommended build in overlay
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={overlayCounters}
-              onChange={(e) => setShowCounters(e.target.checked)}
-            />{" "}
-            Counter items in overlay
-          </label>
-        </>
+        <div className="settings-overlays">
+          {OVERLAY_PANELS.map((panel) => (
+            <OverlayToggle key={panel.id} panel={panel} />
+          ))}
+        </div>
       )}
 
       {overlaySettings && (
@@ -58,7 +39,11 @@ export function OverlaySettings({
             value={opacity}
             onChange={(e) => {
               setOpacity(Number(e.target.value));
-              localStorage.setItem(overlayOpacityKey, e.target.value);
+              try {
+                localStorage.setItem(overlayOpacityKey, e.target.value);
+              } catch {
+                /* Keep the desktop control usable without storage. */
+              }
             }}
           />
           {opacity}%
@@ -69,5 +54,19 @@ export function OverlaySettings({
         Hide the overlay to return full control to the game.
       </span>
     </section>
+  );
+}
+
+function OverlayToggle({ panel }: { panel: (typeof OVERLAY_PANELS)[number] }) {
+  const [enabled, setEnabled] = useOverlayPreference(panel.id);
+  return (
+    <label>
+      <input
+        type="checkbox"
+        checked={enabled}
+        onChange={(event) => setEnabled(event.target.checked)}
+      />
+      {panel.title} overlay
+    </label>
   );
 }

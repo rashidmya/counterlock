@@ -679,6 +679,8 @@ Rajdhani numbers and labels, small serif wordmark or none. They must stay
 readable over gameplay. The builder decides the default positions and
 sizes. Manifest changes (new windows) must follow the Overwolf docs.
 
+Built in phase 6 (2026-10-24, with the availability qualifications accepted in its plan): five new windows (`hero_damage`, `objective_damage`, `healing`, `you_vs_average`, `spawn_timers`) replace the build/counter windows while retaining `in_game/in_game.html` as their shared entrypoint. Each starts disabled, has its own switch and saved position, and follows one group show/hide hotkey; the shared opacity changes backgrounds while text stays opaque. The desktop keeps its builds and counters. Meters show all listed players, real zeroes and explicit missing values, with internal scrolling at smaller sizes. GEP partial updates retain a player's measurements, while a replaced identity clears them; clock and pause events are validated. The comparison panel uses the local player's already loaded current rank, or labels all ranks when unknown; thin bands widen as in the report, and unrelated live updates do not reload the curve. Kills, deaths and assists compare individually with their interpolated averages (fewer deaths is favorable). Level and kill participation show live values without invented averages; the curve lacks those benchmarks. Souls / min stays unavailable pending a native capture that establishes GEP souls as total net worth. The confirmed Soul Urn schedule is 10:00 and every five minutes after that; the panel follows the GEP clock and labels scheduled times without claiming the Urn is still available. No exact Rift, camp or Mid Boss respawn timer is inferred. Automated browser and simulated native checks do not replace the outstanding Windows telemetry, pause recovery, DPI, input-release and readability checks.
+
 ## Delivery phases
 
 Build and ship in this order. Each phase gets its own plan.
@@ -692,7 +694,7 @@ Build and ship in this order. Each phase gets its own plan.
 3. **Match report (done).**
 4. **Performance tab (done).**
 5. **Profile Live tab (done)** (app + web).
-6. **Overlay panels** (five windows, settings, removal of the old
+6. **Overlay panels (done)** (five windows, settings, removal of the old
    overlays).
 
 ## Left to the builder

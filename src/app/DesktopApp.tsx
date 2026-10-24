@@ -13,7 +13,6 @@ import {
   type ForegroundWindowName,
 } from "@/platform/overwolf/constants";
 import { useDeadlockRunning } from "@/platform/overwolf/hooks/useDeadlockRunning";
-import { useOverlayPreference } from "@/features/overlay/hooks/useOverlayPreference";
 import { OverlaySettings } from "@/features/overlay/components/OverlaySettings";
 import { useCounters } from "@/features/counters/hooks/useCounters";
 import { HomePage } from "@/features/home/components/HomePage";
@@ -100,24 +99,14 @@ export function DesktopApp({
   }, [key]);
   const overlaySettings = windowName === kWindowNames.desktop && gameRunning;
   const [settings, setSettings] = useState(false);
-  const [overlayBuild, setShowBuild] =
-    useOverlayPreference("recommended-build");
-  const [overlayCounters, setShowCounters] =
-    useOverlayPreference("counter-items");
-  const showBuild = windowName === kWindowNames.desktop || overlayBuild;
-  const showCounters = windowName === kWindowNames.desktop || overlayCounters;
+  const showBuild = true;
+  const showCounters = true;
   const hotkey = useHotkey();
   return (
     <main
       className="app compact"
       style={{ "--panel-opacity": 1 } as React.CSSProperties}
     >
-      {windowName === kWindowNames.inGame && (
-        <div className="scout-overlay-bar">
-          <strong>Deadlock overlay</strong>
-          <button onClick={hideCurrentWindow}>Hide overlay</button>
-        </div>
-      )}
       <header onMouseDown={dragCurrentWindow}>
         <div className="brand">
           <span>
@@ -168,11 +157,7 @@ export function DesktopApp({
           {inOverwolf && (
             <button
               className="icon-button"
-              aria-label={
-                windowName === kWindowNames.inGame
-                  ? "Hide overlay"
-                  : "Hide window"
-              }
+              aria-label="Hide window"
               onClick={hideCurrentWindow}
             >
               <Icon name="close" />
@@ -185,10 +170,6 @@ export function DesktopApp({
           {...{
             hotkey,
             overlaySettings,
-            overlayBuild,
-            setShowBuild,
-            overlayCounters,
-            setShowCounters,
             opacity,
             setOpacity,
           }}

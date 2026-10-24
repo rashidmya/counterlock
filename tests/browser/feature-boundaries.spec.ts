@@ -1,40 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import catalog from "../../src/shared/catalog/catalog.json" with { type: "json" };
-import { item, nativeWindow, updateMatch } from "./helpers";
-
-async function buildResponses(page: Page) {
-  await page.route("**/analytics/hero-build-stats/7?**", (route) =>
-    route.fulfill({
-      json: [
-        {
-          hero_id: 7,
-          hero_build_id: 99,
-          wins: 15,
-          losses: 5,
-          matches: 20,
-          bucket: 0,
-        },
-      ],
-    }),
-  );
-  await page.route("**/builds/7/99", (route) =>
-    route.fulfill({
-      json: {
-        hero_build: {
-          hero_id: 7,
-          hero_build_id: 99,
-          name: "Fixture build",
-          details: {
-            mod_categories: [
-              { name: "Early game", mods: [{ ability_id: item.id }] },
-              { name: "Late game", mods: [{ ability_id: item.id }] },
-            ],
-          },
-        },
-      },
-    }),
-  );
-}
+import { item, nativeWindow } from "./helpers";
 
 async function mainBuildResponses(page: Page, rows: Record<number, unknown[]>) {
   await page.route("**/v1/analytics/item-stats?**", (route) => {
@@ -53,55 +19,6 @@ const buyRow = (itemId: number) => ({
   losses: 4,
   matches: 10,
   avg_buy_time_s: 120,
-});
-
-test("native build overlay shares live state, loads builds, and saves hide preferences", async ({
-  page,
-}) => {
-  await nativeWindow(page, "in_game");
-  await buildResponses(page);
-  await page.goto("/in_game/in_game.html");
-  await expect(page.locator(".scout-hud")).toHaveCSS("opacity", "0.75");
-  await expect(page.locator(".hud-build")).toContainText("75.0% · 20 games");
-  await expect(page.locator(".hud-item.owned")).toContainText(item.name);
-  await page.getByLabel("Build stage").selectOption("1");
-  await expect(page.getByLabel("Build stage")).toHaveValue("1");
-  await page
-    .getByRole("button", { name: "Hide recommended build overlay" })
-    .click();
-  expect(
-    await page.evaluate(() =>
-      localStorage.getItem("scout.overlay.recommended-build"),
-    ),
-  ).toBe("false");
-  expect(
-    await page.evaluate(() =>
-      JSON.parse(localStorage.getItem("scout.overlay.position.in_game")!),
-    ),
-  ).toEqual({ x: 123, y: 45 });
-});
-
-test("counter window uses its native window identity and responds to live roster changes", async ({
-  page,
-}) => {
-  await nativeWindow(page, "counter_overlay");
-  await page.goto("/in_game/in_game.html");
-  await expect(page.locator(".hud-counters")).toBeVisible();
-  await expect(page.locator(".hud-build")).toHaveCount(0);
-  await page.getByLabel("Counter target").selectOption("player_1");
-  await expect(page.locator(".hud-items")).toContainText("Metal Skin");
-  await updateMatch(page, { players: [] });
-  await expect(page.locator(".hud-empty")).toHaveText(
-    "Waiting for enemy heroes.",
-  );
-  await page
-    .getByRole("button", { name: "Hide counter items overlay" })
-    .click();
-  expect(
-    await page.evaluate(() =>
-      localStorage.getItem("scout.overlay.counter-items"),
-    ),
-  ).toBe("false");
 });
 
 test("desktop retains counter state across tabs and exposes game-only settings", async ({
@@ -126,8 +43,18 @@ test("desktop retains counter state across tabs and exposes game-only settings",
     .getByRole("button", { name: "Overlay settings", exact: true })
     .click();
   await expect(page.locator(".settings kbd")).toHaveText("Alt + S");
-  await expect(page.getByLabel("Recommended build in overlay")).toBeChecked();
-  await page.getByLabel("Recommended build in overlay").uncheck();
+  await expect(page.locator(".settings").getByRole("checkbox")).toHaveCount(5);
+  for (const title of [
+    "Hero damage",
+    "Objective damage",
+    "Healing",
+    "You vs. average",
+    "Spawn timers",
+  ]) {
+    const checkbox = page.getByLabel(`${title} overlay`, { exact: true });
+    await expect(checkbox).toBeChecked();
+    await checkbox.uncheck();
+  }
   await page.getByRole("button", { name: "Live" }).click();
   await expect(page.locator(".build-panel")).toBeVisible();
 });
@@ -175,42 +102,19 @@ test("Live build follows the rank chosen on a hero page", async ({ page }) => {
     .toBe(true);
 });
 
-for (const name of ["desktop", "in_game"]) {
-  test(`${name} retains its Street Brawl build message without making build requests`, async ({
-    page,
-  }) => {
-    await nativeWindow(page, name, "street_brawl");
-    const requests: string[] = [];
-    const buildRequest =
-      name === "desktop" ? "min_bought_at_s" : "hero-build-stats";
-    page.on("request", (request) => {
-      if (request.url().includes(buildRequest)) requests.push(request.url());
-    });
-    await page.goto(
-      name === "desktop" ? "/desktop/desktop.html" : "/in_game/in_game.html",
-    );
-    await expect(
-      page.locator(name === "desktop" ? ".build-empty" : ".hud-empty"),
-    ).toContainText(
-      name === "desktop"
-        ? "Build statistics for Street Brawl are unavailable."
-        : "Build data unavailable for Street Brawl.",
-    );
-    expect(requests).toEqual([]);
+test("desktop retains its Street Brawl build message without build requests", async ({
+  page,
+}) => {
+  await nativeWindow(page, "desktop", "street_brawl");
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("min_bought_at_s")) requests.push(request.url());
   });
-}
-
-test("in_game preserves its build timeout message", async ({ page }) => {
-  await nativeWindow(page, "in_game");
-  await page.clock.install();
-  await page.route("**/analytics/hero-build-stats/7?**", () => {});
-  const requested = page.waitForRequest("**/analytics/hero-build-stats/7?**");
-  await page.goto("/in_game/in_game.html");
-  await requested;
-  await page.clock.runFor(20_001);
-  await expect(page.locator(".hud-empty")).toHaveText(
-    "Build unavailable. Reopen to retry.",
+  await page.goto("/desktop/desktop.html");
+  await expect(page.locator(".build-empty")).toContainText(
+    "Build statistics for Street Brawl are unavailable.",
   );
+  expect(requests).toEqual([]);
 });
 
 test("desktop build shows an error with Retry", async ({ page }) => {
