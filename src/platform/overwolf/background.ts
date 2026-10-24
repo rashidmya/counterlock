@@ -1,5 +1,9 @@
 import { isDeadlock, type GameInfo } from "./game";
-import { overlayPreferenceKey } from "@/features/overlay/preferences";
+import {
+  overlayPreferenceKey,
+  readOverlayEnabled,
+} from "@/features/overlay/preferences";
+import { OVERLAY_PANELS } from "@/features/overlay/panels";
 import { recordDetectedAccount } from "@/features/profile/storage";
 import { LiveStore } from "@/features/match/store/LiveStore";
 import { decode } from "@/features/match/utils/game";
@@ -10,32 +14,31 @@ import {
   type ForegroundWindowName,
 } from "./constants";
 
-const overlayWindows = [
-  [kWindowNames.inGame, "recommended-build"],
-  [kWindowNames.counters, "counter-items"],
-] as const;
-
 const store = new LiveStore();
 window.counterlockStore = store;
 store.subscribe(() => recordDetectedAccount(store.getSnapshot()));
 let running = false;
 let initialized = false;
 let gameRevision = 0;
-const windowRevisions = { desktop: 0, in_game: 0, counter_overlay: 0 };
+const windowRevisions = new Map<string, number>();
+let overlaysShown = true;
 let registration = 0;
 let retry: ReturnType<typeof setTimeout> | undefined;
 
-function showWindow(name: ForegroundWindowName, toggle = false) {
-  const token = ++windowRevisions[name];
+function invalidateWindow(name: string) {
+  const token = (windowRevisions.get(name) ?? 0) + 1;
+  windowRevisions.set(name, token);
+  return token;
+}
+function showWindow(name: ForegroundWindowName) {
+  const token = invalidateWindow(name);
   overwolf.windows.obtainDeclaredWindow(name, (result) => {
-    if (token !== windowRevisions[name]) return;
+    if (token !== windowRevisions.get(name)) return;
     if (!result.success) {
       store.patch({ error: `Unable to open the ${name} window.` });
       return;
     }
-    if (toggle && ["normal", "maximized"].includes(result.window.stateEx))
-      overwolf.windows.hide(result.window.id);
-    else overwolf.windows.restore(result.window.id);
+    overwolf.windows.restore(result.window.id);
   });
 }
 function registerFeatures(attempt = 0) {
@@ -68,6 +71,7 @@ function onGame(info: GameInfo | null | undefined) {
   running = next;
   clearTimeout(retry);
   if (running) {
+    overlaysShown = true;
     registerFeatures();
     syncOverlay();
   } else {
@@ -123,40 +127,36 @@ overwolf.games.events.onError.addListener(() => {
 });
 overwolf.games.onGameInfoUpdated.addListener((event) => onGame(event.gameInfo));
 overwolf.settings.hotkeys.onPressed.addListener((event) => {
-  if (event.name === kHotkeys.toggle && running && overlayEnabled())
-    for (const [name, key] of overlayWindows)
-      if (localStorage.getItem(overlayPreferenceKey(key)) === "true")
-        showWindow(name, true);
+  if (event.name === kHotkeys.toggle && running && overlayEnabled()) {
+    overlaysShown = !overlaysShown;
+    syncOverlay();
+  }
 });
 overwolf.extensions.onAppLaunchTriggered.addListener((event) => {
   if (!event?.origin?.includes("gamelaunchevent")) openCurrentWindow();
 });
 openCurrentWindow();
 function overlayEnabled() {
-  try {
-    return ["recommended-build", "counter-items"].some(
-      (key) => localStorage.getItem(overlayPreferenceKey(key)) === "true",
-    );
-  } catch {
-    return false;
-  }
+  return OVERLAY_PANELS.some((panel) => readOverlayEnabled(panel.id));
 }
 function syncOverlay() {
-  for (const [name, key] of overlayWindows) {
-    if (running && localStorage.getItem(overlayPreferenceKey(key)) === "true")
-      showWindow(name);
-    else {
-      windowRevisions[name]++;
-      overwolf.windows.close(name, () => {});
+  for (const panel of OVERLAY_PANELS) {
+    if (running && readOverlayEnabled(panel.id)) {
+      if (overlaysShown) showWindow(panel.windowName);
+      else {
+        invalidateWindow(panel.windowName);
+        overwolf.windows.hide(panel.windowName);
+      }
+    } else {
+      invalidateWindow(panel.windowName);
+      overwolf.windows.close(panel.windowName, () => {});
     }
   }
 }
 window.addEventListener("storage", (event) => {
   if (
     event.key === null ||
-    ["scout.overlay.recommended-build", "scout.overlay.counter-items"].includes(
-      event.key ?? "",
-    )
+    OVERLAY_PANELS.some((panel) => overlayPreferenceKey(panel.id) === event.key)
   )
     syncOverlay();
 });

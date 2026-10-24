@@ -51,24 +51,70 @@
         },
         "show_in_taskbar": true
       },
-      "in_game": {
+      "hero_damage": {
         "file": "in_game/in_game.html",
         "focus_game_takeover": "ReleaseOnHidden",
         "focus_game_takeover_release_hotkey": "toggle_counterlock",
         "transparent": true,
         "resizable": true,
         "size": {
-          "width": 320,
-          "height": 240
+          "width": 264,
+          "height": 400
         },
         "min_size": {
           "width": 240,
-          "height": 160
+          "height": 240
         },
         "show_in_taskbar": false,
-        "in_game_only": true
+        "in_game_only": true,
+        "start_position": {
+          "left": 16,
+          "top": 80
+        }
       },
-      "counter_overlay": {
+      "objective_damage": {
+        "file": "in_game/in_game.html",
+        "focus_game_takeover": "ReleaseOnHidden",
+        "focus_game_takeover_release_hotkey": "toggle_counterlock",
+        "transparent": true,
+        "resizable": true,
+        "size": {
+          "width": 264,
+          "height": 400
+        },
+        "min_size": {
+          "width": 240,
+          "height": 240
+        },
+        "show_in_taskbar": false,
+        "in_game_only": true,
+        "start_position": {
+          "left": 292,
+          "top": 80
+        }
+      },
+      "healing": {
+        "file": "in_game/in_game.html",
+        "focus_game_takeover": "ReleaseOnHidden",
+        "focus_game_takeover_release_hotkey": "toggle_counterlock",
+        "transparent": true,
+        "resizable": true,
+        "size": {
+          "width": 264,
+          "height": 400
+        },
+        "min_size": {
+          "width": 240,
+          "height": 240
+        },
+        "show_in_taskbar": false,
+        "in_game_only": true,
+        "start_position": {
+          "left": 568,
+          "top": 80
+        }
+      },
+      "you_vs_average": {
         "file": "in_game/in_game.html",
         "focus_game_takeover": "ReleaseOnHidden",
         "focus_game_takeover_release_hotkey": "toggle_counterlock",
@@ -76,18 +122,39 @@
         "resizable": true,
         "size": {
           "width": 280,
-          "height": 220
+          "height": 256
         },
         "min_size": {
           "width": 240,
-          "height": 160
+          "height": 240
         },
         "show_in_taskbar": false,
+        "in_game_only": true,
         "start_position": {
-          "left": 340,
-          "top": 0
+          "left": 844,
+          "top": 80
+        }
+      },
+      "spawn_timers": {
+        "file": "in_game/in_game.html",
+        "focus_game_takeover": "ReleaseOnHidden",
+        "focus_game_takeover_release_hotkey": "toggle_counterlock",
+        "transparent": true,
+        "resizable": true,
+        "size": {
+          "width": 280,
+          "height": 176
         },
-        "in_game_only": true
+        "min_size": {
+          "width": 240,
+          "height": 136
+        },
+        "show_in_taskbar": false,
+        "in_game_only": true,
+        "start_position": {
+          "left": 844,
+          "top": 348
+        }
       }
     },
     "hotkeys": {

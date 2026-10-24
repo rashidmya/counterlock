@@ -51,7 +51,7 @@ function setup(initiallyRunning = false, enabled = true) {
   };
   vi.stubGlobal("overwolf", api);
   const preferences = new Map(
-    enabled ? [["scout.overlay.recommended-build", "true"]] : [],
+    enabled ? [["scout.overlay.hero-damage", "true"]] : [],
   );
   const storage = event();
   const setItem = vi.fn();
@@ -93,6 +93,68 @@ afterEach(() => {
 });
 
 describe("background window lifecycle", () => {
+  it("toggles all enabled panels together and invalidates delayed callbacks", async () => {
+    const { windows, preferences, hotkey, storage, launch, api } = setup(true);
+    preferences.set("scout.overlay.healing", "true");
+    preferences.set("scout.overlay.spawn-timers", "true");
+    await import("@/platform/overwolf/background");
+    expect(windows.restore.mock.calls).toEqual([
+      ["hero_damage"],
+      ["healing"],
+      ["spawn_timers"],
+      ["desktop"],
+    ]);
+    hotkey.emit({ name: "toggle_counterlock" });
+    expect(windows.hide.mock.calls).toEqual([
+      ["hero_damage"],
+      ["healing"],
+      ["spawn_timers"],
+    ]);
+    const pending: Array<{ name: string; finish: (value: unknown) => void }> =
+      [];
+    api.windows.obtainDeclaredWindow.mockImplementation((name, finish) => {
+      pending.push({ name, finish });
+    });
+    hotkey.emit({ name: "toggle_counterlock" });
+    preferences.set("scout.overlay.healing", "false");
+    storage.emit({ key: "scout.overlay.healing" });
+    hotkey.emit({ name: "toggle_counterlock" });
+    const restored = windows.restore.mock.calls.length;
+    for (const call of pending)
+      call.finish({
+        success: true,
+        window: { id: call.name, stateEx: "hidden" },
+      });
+    expect(windows.restore.mock.calls).toHaveLength(restored);
+    expect(windows.hide).toHaveBeenLastCalledWith("spawn_timers");
+    expect(windows.close).toHaveBeenCalledWith("healing", expect.any(Function));
+    launch.emit({ origin: "dock" });
+    const desktop = pending.at(-1)!;
+    desktop.finish({
+      success: true,
+      window: { id: "desktop", stateEx: "hidden" },
+    });
+    expect(windows.restore).toHaveBeenLastCalledWith("desktop");
+    preferences.clear();
+    storage.emit({ key: null });
+    expect(windows.close).toHaveBeenCalledWith(
+      "hero_damage",
+      expect.any(Function),
+    );
+  });
+  it("ignores legacy switches and tolerates storage becoming unavailable", async () => {
+    const { preferences, windows, changeGame, storage } = setup(true, false);
+    preferences.set("scout.overlay.recommended-build", "true");
+    await import("@/platform/overwolf/background");
+    expect(windows.restore.mock.calls).toEqual([["desktop"]]);
+    vi.stubGlobal("localStorage", {
+      getItem: () => {
+        throw Error("blocked");
+      },
+    });
+    expect(() => storage.emit({ key: null })).not.toThrow();
+    expect(() => changeGame(false)).not.toThrow();
+  });
   it("uses validated clock events and pause state, and resets them after a match", async () => {
     const { api, info, changeGame } = setup(true);
     await import("@/platform/overwolf/background");
@@ -143,7 +205,7 @@ describe("background window lifecycle", () => {
     changeGame(true);
     finishQuery({ id: 244820, classId: 24482, isRunning: true });
     expect(windows.restore.mock.calls).toEqual([
-      ["in_game"],
+      ["hero_damage"],
       ["desktop"],
       ["desktop"],
     ]);
@@ -158,7 +220,7 @@ describe("background window lifecycle", () => {
     await import("@/platform/overwolf/background");
     changeGame(true);
     finishQuery(null);
-    expect(windows.restore.mock.calls).toEqual([["in_game"]]);
+    expect(windows.restore.mock.calls).toEqual([["hero_damage"]]);
   });
 
   it("does not restore an obsolete window when native callbacks arrive late", async () => {
@@ -169,7 +231,10 @@ describe("background window lifecycle", () => {
     });
     await import("@/platform/overwolf/background");
     changeGame(false);
-    pending[0]({ success: true, window: { id: "in_game", stateEx: "normal" } });
+    pending[0]({
+      success: true,
+      window: { id: "hero_damage", stateEx: "normal" },
+    });
     pending[1]({ success: true, window: { id: "desktop", stateEx: "normal" } });
     expect(windows.restore.mock.calls).toEqual([["desktop"]]);
   });
@@ -182,12 +247,15 @@ describe("background window lifecycle", () => {
     expect(windows.close.mock.calls.some(([name]) => name === "desktop")).toBe(
       false,
     );
-    expect(windows.restore).toHaveBeenLastCalledWith("in_game");
+    expect(windows.restore).toHaveBeenLastCalledWith("hero_damage");
     expect(api.games.events.setRequiredFeatures).toHaveBeenCalledTimes(1);
     changeGame(true);
     expect(windows.restore).toHaveBeenCalledTimes(2);
     changeGame(false);
-    expect(windows.close).toHaveBeenCalledWith("in_game", expect.any(Function));
+    expect(windows.close).toHaveBeenCalledWith(
+      "hero_damage",
+      expect.any(Function),
+    );
     expect(windows.restore).toHaveBeenCalledTimes(2);
     expect(window.counterlockStore?.getSnapshot().phase).toBe("Init");
   });
@@ -195,12 +263,12 @@ describe("background window lifecycle", () => {
   it("launches directly in game and toggles only the in-game window", async () => {
     const { windows, hotkey, changeGame, setWindowState } = setup(true);
     await import("@/platform/overwolf/background");
-    expect(windows.restore.mock.calls).toEqual([["in_game"], ["desktop"]]);
+    expect(windows.restore.mock.calls).toEqual([["hero_damage"], ["desktop"]]);
     hotkey.emit({ name: "toggle_counterlock" });
-    expect(windows.hide).toHaveBeenLastCalledWith("in_game");
+    expect(windows.hide).toHaveBeenLastCalledWith("hero_damage");
     setWindowState("hidden");
     hotkey.emit({ name: "toggle_counterlock" });
-    expect(windows.restore).toHaveBeenLastCalledWith("in_game");
+    expect(windows.restore).toHaveBeenLastCalledWith("hero_damage");
     changeGame(false);
     const count = windows.obtainDeclaredWindow.mock.calls.length;
     hotkey.emit({ name: "toggle_counterlock" });
@@ -239,18 +307,15 @@ it("starts with overlays off and applies each preference independently", async (
   const { windows, preferences, storage, changeGame } = setup(true, false);
   await import("@/platform/overwolf/background");
   expect(windows.restore.mock.calls).toEqual([["desktop"]]);
-  preferences.set("scout.overlay.counter-items", "true");
-  storage.emit({ key: "scout.overlay.counter-items" });
-  expect(windows.restore.mock.calls).toEqual([
-    ["desktop"],
-    ["counter_overlay"],
-  ]);
-  expect(windows.close).toHaveBeenCalledWith("in_game", expect.any(Function));
-  changeGame(false);
+  preferences.set("scout.overlay.healing", "true");
+  storage.emit({ key: "scout.overlay.healing" });
+  expect(windows.restore.mock.calls).toEqual([["desktop"], ["healing"]]);
   expect(windows.close).toHaveBeenCalledWith(
-    "counter_overlay",
+    "hero_damage",
     expect.any(Function),
   );
+  changeGame(false);
+  expect(windows.close).toHaveBeenCalledWith("healing", expect.any(Function));
   expect(windows.close.mock.calls.some(([name]) => name === "desktop")).toBe(
     false,
   );

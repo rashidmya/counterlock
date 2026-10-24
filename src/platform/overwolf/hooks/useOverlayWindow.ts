@@ -9,10 +9,11 @@ export function useOverlayWindow(name: string) {
   const id = useRef("");
   const positionKey = overlayPositionKey(name);
   useEffect(() => {
+    let active = true;
     const update = () => setOpacity(readOverlayOpacity());
     window.addEventListener("storage", update);
     overwolf.windows.getCurrentWindow((r) => {
-      if (!r.success) return;
+      if (!active || !r.success) return;
       id.current = r.window.id;
       try {
         const p = JSON.parse(localStorage.getItem(positionKey) ?? "null");
@@ -20,15 +21,25 @@ export function useOverlayWindow(name: string) {
           overwolf.windows.changePosition(id.current, p.x, p.y, () => {});
       } catch {}
     });
-    return () => window.removeEventListener("storage", update);
+    return () => {
+      active = false;
+      window.removeEventListener("storage", update);
+    };
   }, [positionKey]);
   const save = () =>
-    overwolf.windows.getCurrentWindow((r) => {
-      if (r.success)
-        localStorage.setItem(
-          positionKey,
-          JSON.stringify({ x: r.window.left, y: r.window.top }),
-        );
-    });
+    new Promise<void>((resolve) =>
+      overwolf.windows.getCurrentWindow((r) => {
+        try {
+          if (r.success)
+            localStorage.setItem(
+              positionKey,
+              JSON.stringify({ x: r.window.left, y: r.window.top }),
+            );
+        } catch {
+          /* Native coordinates remain valid for this session. */
+        }
+        resolve();
+      }),
+    );
   return { opacity, id, save };
 }

@@ -1,15 +1,9 @@
 import { useEffect, useState } from "react";
-import { overlayPreferenceKey } from "../preferences";
+import { overlayPreferenceKey, readOverlayEnabled } from "../preferences";
 
 export function useOverlayPreference(name: string) {
   const key = overlayPreferenceKey(name);
-  const read = () => {
-    try {
-      return localStorage.getItem(key) === "true";
-    } catch {
-      return false;
-    }
-  };
+  const read = () => readOverlayEnabled(name);
   const [visible, setVisible] = useState(read);
   useEffect(() => {
     const update = (event: StorageEvent) => {

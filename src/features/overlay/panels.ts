@@ -1,0 +1,61 @@
+export const OVERLAY_PANELS = [
+  {
+    id: "hero-damage",
+    windowName: "hero_damage",
+    title: "Hero damage",
+    width: 264,
+    height: 400,
+    minWidth: 240,
+    minHeight: 240,
+    left: 16,
+    top: 80,
+  },
+  {
+    id: "objective-damage",
+    windowName: "objective_damage",
+    title: "Objective damage",
+    width: 264,
+    height: 400,
+    minWidth: 240,
+    minHeight: 240,
+    left: 292,
+    top: 80,
+  },
+  {
+    id: "healing",
+    windowName: "healing",
+    title: "Healing",
+    width: 264,
+    height: 400,
+    minWidth: 240,
+    minHeight: 240,
+    left: 568,
+    top: 80,
+  },
+  {
+    id: "you-vs-average",
+    windowName: "you_vs_average",
+    title: "You vs. average",
+    width: 280,
+    height: 256,
+    minWidth: 240,
+    minHeight: 240,
+    left: 844,
+    top: 80,
+  },
+  {
+    id: "spawn-timers",
+    windowName: "spawn_timers",
+    title: "Spawn timers",
+    width: 280,
+    height: 176,
+    minWidth: 240,
+    minHeight: 136,
+    left: 844,
+    top: 348,
+  },
+] as const;
+export type OverlayPanelId = (typeof OVERLAY_PANELS)[number]["id"];
+export type OverlayWindowName = (typeof OVERLAY_PANELS)[number]["windowName"];
+export const panelForWindow = (name: string) =>
+  OVERLAY_PANELS.find((panel) => panel.windowName === name);
