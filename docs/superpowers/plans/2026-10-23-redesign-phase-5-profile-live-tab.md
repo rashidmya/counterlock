@@ -6,11 +6,12 @@
 - **Any player** (the website, and anyone but your own account in the app): their match from the game's Watch list, when it lists them: both teams' heroes and players, the souls lead (rounds won in Street Brawl), the mode, how long it has been running and each team's objectives still standing. Otherwise **No live match found** and why, never "Not in a game".
 - **Checked again every minute** while the tab is on screen, keeping the last answer meanwhile.
 - **Your own account in the desktop app:** your match from Overwolf, as on the Live page, or **Not in a game**.
+- **The final review's fixes (Tasks 6–9):** a check that finds the match over, or a new match in its place, leaves focus in the tab; the tests wait for each answer and name headings exactly; the objectives' labels are readable, and your own tab's error has room under it; the docs and three comments say what the code does.
 
 **Architecture:**
 - **`src/features/profile/utils/live-match.ts`** (new, pure): `parseLiveMatch()` reads `GET /v1/matches/active` into a `LiveMatch`; `standing()` decodes a team's objectives mask; `elapsedS()` and `soulLead()`. **`services/live-api.ts`** (new): `fetchLiveMatch()` through the shared client, with a new `TTL.live`.
 - **`hooks/useLiveMatch.ts`** (new) loads the match, asks again every minute while the tab's element is on screen (the desktop app keeps visited pages mounted, hidden) and keeps the last answer through a check or Retry. **`DeadlockApi.get`** gains `{ fresh }`, to ask past the browser's HTTP cache.
-- **`components/LiveTab.tsx`** (new): the tab; `LiveNotice`, a notice with Retry that hands focus to the status line when it goes; and `LiveEmpty`, the empty state both sources use. `ProfileView` gains the `live` subtab and an optional `live` node, which `ProfilePage` passes on.
+- **`components/LiveTab.tsx`** (new): the tab; `LiveNotice`, a notice with Retry, and `LiveMatchView`, the match (keyed by its id), each handing focus still inside it to the status line when a check takes it away (`useKeepFocus`, Task 6); and `LiveEmpty`, the empty state both sources use. `ProfileView` gains the `live` subtab and an optional `live` node, which `ProfilePage` passes on.
 - **`src/features/live/components/OwnLiveTab.tsx`** (new): your own account's tab in the app, `MatchOverview` (now with `embedded`, a section header instead of the page title) or "Not in a game". `DesktopApp` passes it for the account Overwolf reports playing on this PC, or else the remembered one.
 - **CSS:** the tab's styles at the end of `profile.css`; on phones (`web/app/styles/phone.css`) the stats and teams take one column and the five profile tabs spread over one row.
 
@@ -18,15 +19,15 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-redesign-design.md` ("Profile Live tab (app and website)", the Decisions' "Profile Live tab empty state" call, "Delivery phases" item 5). The owner asked on 2026-10-23 for the plan to be written and reviewed without stopping for questions; the design calls below are marked as the builder's, and the ones worth the owner's eye are under "Follow-ups for the owner".
 
-**Every code block in this plan was built and run before the plan was written** (reference commits in a scratch worktree, replayed from this plan's blocks). The full result:
+**Every code block in this plan was built and run before the plan was written** (reference commits in a scratch worktree, replayed from this plan's blocks). Tasks 6–9, the final review's fixes, were built and checked the same way after Tasks 1–5 ran. The full result:
 - `npm test` 417 passed;
-- `npm run test:browser` 159 passed;
-- `npm run test:web` 94 passed;
+- `npm run test:browser` 160 passed;
+- `npm run test:web` 96 passed;
 - both type checks, `npm run build`, `npm run web:build` and `npm run validate:manifest` passed.
 
-Each task's end state was also checked on its own: type check and unit tests after every task (417 after each), and both browser suites after every task (desktop 154, 155, 156, 159 and 159; website 82, 89, 94, 94 and 94).
+Each task's end state was also checked on its own: type check and unit tests after every task (417 after each, Tasks 6–9 too), and both browser suites after every task (desktop 154, 155, 156, 159 and 159, then 159, 159, 160 and 160 for Tasks 6–9; website 82, 89, 94, 94 and 94, then 96, 96, 96 and 96).
 
-Before the plan was written, the reference commits were reviewed twice, and every finding was fixed in the task it belonged to (listed under the decisions below: the browser's cache, quiet checks and focus, nothing made up, accounts of 0, the visibility check, your own account, the duplicate id, the objective cards' alignment).
+Before the plan was written, the reference commits were reviewed twice, and every finding was fixed in the task it belonged to (listed under the decisions below: the browser's cache, quiet checks and focus, nothing made up, accounts of 0, the visibility check, your own account, the duplicate id, the objective cards' alignment). After Tasks 1–5 ran, the final review's findings were fixed in Tasks 6–9 (under "Final review fixes" below) or listed for the owner.
 
 Copy the code as given. If something fails, fix the cause rather than the test.
 
@@ -46,11 +47,18 @@ Copy the code as given. If something fails, fix the cause rather than the test.
 - **Names and links:** one `GET /v1/players/steam` for everyone in the match ("Player {id}" where it has no name); every other player links to their profile. A player whose account is 0 (none in the sample, but the schema allows it) shows their hero alone, with no link, as the match report's scoreboard does. No ranks: a rank lookup per roster would spend the rank budget (20 a minute) for something the spec doesn't ask for.
 - **Nothing made up:** a team's souls and objectives come from `team_stats`, or else the match's own `net_worth_team_{n}` and `objectives_mask_team{n}`; where neither has them the card shows "—" ("not given") rather than a lead built on a 0.
 - **Only while shown.** The desktop app keeps visited pages mounted, hidden, and the website can sit in a background tab: before each check the tab looks at `document.visibilityState` and whether its own element has a box (`getClientRects()`, which every browser has; Safari before 17.4 has no `checkVisibility()`). A check that falls due while it is hidden waits, looking every 5 s, and goes out once it is back.
-- **Quiet checks, and focus.** The minute's checks don't set `loading`, so they aren't announced, and an error notice and its Retry stay where they are while one runs. A check that fails says "Couldn't check again: {error}" with Retry and keeps the last answer. Retry moves focus to the tab's status line first, as the Performance tab's Retry does (not every browser focuses a clicked button). A check that goes well takes the notice away: `LiveNotice`'s layout-effect cleanup, which React runs before it removes the notice, moves focus that is still inside it to the status line, and leaves focus anywhere else alone.
+- **Quiet checks, and focus.** The minute's checks don't set `loading`, so they aren't announced, and an error notice and its Retry stay where they are while one runs. A check that fails says "Couldn't check again: {error}" with Retry and keeps the last answer. Retry moves focus to the tab's status line first, as the Performance tab's Retry does (not every browser focuses a clicked button). A check that goes well takes the notice away, and one that finds the match over, or a new match in its place, takes the match away (`LiveMatchView` is keyed by match id): the layout-effect cleanup both use (`useKeepFocus`, Task 6), which React runs before it removes them, moves focus that is still inside them to the status line, and leaves focus anywhere else alone.
 - **Your own account** in the app is the account Overwolf reports playing on this PC (`state.localAccountId`, kept across matches), or else the remembered one (`me.meId`). Its Live tab never asks the Watch list. In a match it shows `MatchOverview` with `embedded`: a section header ("Live match · {hero}") instead of the Live page's title, so the profile keeps its single `h1`. Otherwise "Not in a game", with "Deadlock is running: your match shows here as soon as it loads." or "Deadlock isn't running. Your match shows here once you're in one."
 - **One id fewer:** `BuildPanel`'s `id="build-content"` (nothing refers to it) goes, as the Live page and your own Live tab can be mounted at once.
 - **Objective cards** keep their value at the foot, so "Base Guardians", whose label takes two lines in a narrow card, lines up with the rest.
 - **Phones:** the five profile tabs spread over one row (`space-between`, at least 10 px apart; they wrap only below about 340 px), and the stats and teams take one column. Checked at 375 and 360 px.
+- **Kept as decided (owner's choice):** your own Live tab's waiting copy, "Deadlock is running: your match shows here as soon as it loads.", stays, though the app switches to the Live page once per match when your match loads, and "My profile" then opens the profile afresh at Overview.
+- **Final review fixes (2026-10-24), Tasks 6–9,** from the final review and the review of its fixes, after Tasks 1–5 ran:
+  - **A check that ends or replaces the match leaves focus in the tab.** With focus on a player's link, a check that found the match over put "No live match found" in its place and focus fell to the page. So did a new match in place of the last: rows go by position, so the focused row could become the player's own (no link), one with an account of 0 or a row past the team's new size. `LiveNotice`'s cleanup becomes `useKeepFocus(inside, status)`, which `LiveMatchView` uses too, on `.live-teams`, and the view is keyed by match id, so a new match is a new view (the last one's failed portraits go with it). Rows stay keyed by position: within one match, focus stays on the same link (while the API keeps the players in order). The comment by Retry says why it moves focus itself: not every browser focuses a clicked button, so the notice's cleanup could find no focus in it.
+  - **The tests wait for each answer.** "The minute's checks leave the notice…" counted a request when it reached the route, then moved the clock a minute at once: an answer the page handled late scheduled its next check after the jump (with the answer held 150 ms, the test failed 3 times in 3). It now waits 300 ms after the count, the file's way, and so does the check that nothing was asked at 30 s. The desktop test that finds "Live match" names it exactly, and the unit test of lane 2's Guardian starts from a full mask, so it can fail.
+  - **Readable objective labels:** `--muted` (6.8:1 on `--surface-2`) rather than `--dim` (3.9:1, under AA's 4.5:1 at 10.5 px), as the tab's other labels.
+  - **Room under your own tab's error:** `.live-tab > .notice`, meant for the Watch list's notice, also caught `MatchOverview`'s error banner, whose bottom border then met the build panel's. `.live-tab.own > .notice` gives it 14 px under it and keeps it flush with the profile's padding at every width (checked at 1260, 1000 and 850 px).
+  - **The docs** say every other player links to their profile, `duration_s` has been empty so far, the website has no live data from your own game, and the Live tab's requests are checked with the API rather than skipping the browser's cache; the Windows checklist covers the Live tab. Three comments: the API's copy "can be two minutes old", bit 9 is the Patron's first phase, and a path is always asked for `fresh`, or never.
 
 ## Follow-ups for the owner (not built)
 
@@ -60,8 +68,18 @@ Copy the code as given. If something fails, fix the cause rather than the test.
 - **No live mark on the tab's label:** the profile's **Live** tab doesn't show whether the player is in a match until it is opened.
 - **"Weakened" and the Core** come from one finished match and the protobuf names; the in-game wording is unchecked.
 - **Match time** counts from the API's `start_time`, which may include the time before the match clock starts; unchecked against the game's clock.
-- **Before Overwolf reports this PC's account**, the remembered account counts as yours.
-- **Overwolf:** `visibilityState` in hidden or minimised Overwolf windows is unchecked (it needs Windows and Overwolf).
+- **Before Overwolf reports this PC's account**, the remembered account counts as yours. "This PC's account" is also decided two ways: `recordDetectedAccount` takes the local player's account from the match roster too, while `DesktopApp` uses `state.localAccountId` alone, so for a moment the remembered account can count.
+- **Overwolf:** `visibilityState` in hidden or minimised Overwolf windows is unchecked (it needs Windows and Overwolf); it is on the README's Windows checklist.
+- **Your own tab's waiting copy (kept, owner's choice; may revisit):** "Deadlock is running: your match shows here as soon as it loads." The app switches to the Live page once per match when your match loads, so the profile is hidden by then, and "My profile" opens it afresh at Overview. "Your match shows here once you're in one." reads the same way.
+- **Names** show "Player {id}", the viewed player's too, until the name lookup answers, and a failed lookup isn't asked again (Retry asks the Watch list only), as the profile header does.
+- **Screen readers** hear neither "found" nor "No live match found" when the first look ends, and a failure's notice is a newly inserted `role="status"`, which VoiceOver may not read, as on the Performance tab.
+- **Focus handed back by a quiet check** lands on the status line, which may be empty and shows no ring, and scrolls the page up to it (on a phone, from a Sapphire player's link most of a screen).
+- **Your own tab drops focus to the page** when Overwolf reports the match over, as the Live page does.
+- **A Watch-list tab that appears while its profile is hidden** (Switch account from your own profile) makes one request before it looks at visibility.
+- **The player's own row without a hero drops the whole match:** rows without an id, hero or team are left out before the player is looked for. None in the sample.
+- **Names could flicker each minute** if the API reordered the players: the lookup is keyed by the ids in order. A focused link could then show another player, or fall to the page if it became the player's own row. Unchecked.
+- **A profile hidden in the app looks every 5 s** while hidden; `visibilitychange` and a `ResizeObserver` would make it event-driven.
+- **Tests not written:** browser tests of "Even", "Destroyed" and Street Brawl's "—" (unit tests cover them); `team_stats` winning over the top-level fields when they differ; `fetchLiveMatch` passing its signal.
 - **Retry shifts the tab a little:** while it runs, the notice gives way to the status line ("Checking again…"), which is shorter. The Performance tab's status takes no space of its own; this one does.
 - **A hidden profile in the desktop app isn't shown again:** every way back to a profile but the match report's "Back to profile" opens it afresh, so a Live tab left behind another page only stops checking. Coming back on the website is tested.
 - The second follow-up pass's list (`docs/superpowers/plans/2026-10-23-redesign-phase-4-second-follow-ups.md`, "Follow-ups for the owner") still stands.
@@ -72,7 +90,7 @@ Copy the code as given. If something fails, fix the cause rather than the test.
 - One shared copy of the feature code for the app and the website. Never match players by nickname; no demo data outside test fixtures.
 - **Exported, and imported by tests:** `parseLiveMatch`, `standing`, `elapsedS` and `soulLead` (now `soulLead(amber, sapphire)`) from `live-match.ts`; `fetchLiveMatch` from `live-api.ts`; `TTL.live`. `DeadlockApi.get(path, ttl, signal?, { fresh }?)` takes a fourth argument. The fixture `tests/fixtures/live-match.ts` uses relative imports only (Playwright loads it too).
 - **Exported for other modules:** `LiveEmpty` from `LiveTab.tsx` (`OwnLiveTab` uses it); `MatchOverview` takes `embedded`; `ProfilePage` and `ProfileView` take `live`.
-- **New copy strings (tests assert them):**
+- **New copy strings (tests assert them; Tasks 6–9 add none):**
   - "Live match", "Match time", "since it started", "Souls lead", "Even", "Amber {souls} – {souls} Sapphire", "not given", "Rounds won", "Amber – Sapphire", "Mode", "Match {id}", "Objectives standing", "Guardians", "Walkers", "Base Guardians", "Shrines", "Patron", "Standing", "Weakened", "Destroyed".
   - **Empty:** "No live match found" with "Live matches show here only while the game's Watch list has them: about the top 200 matches being played. This tab checks again every minute."
   - **Status:** "Looking for a live match…", "Checking again…".
@@ -88,11 +106,11 @@ Copy the code as given. If something fails, fix the cause rather than the test.
 
 1. **Reading the Watch list.** One player's match, both teams, the mode; a team without stats falls back to the match's own fields, and nothing stands in for what neither has. Tests: `reads the account's match: players, teams and modes`, `falls back to the match's own fields for a team without stats, and has nothing where neither has it`, `leaves out players without an id, hero or team, and keeps one without an account`, `nothing stands in for souls the API didn't give, nor a link for a player without an account`.
 2. **Objectives.** Lanes 1, 3 and 4 only; the Patron standing, weakened or destroyed. Tests: `counts everything at the start`, `counts lanes 1, 3 and 4 only`, `has the Patron weakened once its first phase is down, and destroyed with the last`, `the Live tab shows the player's live match from the Watch list`.
-3. **Fresh answers.** Only the live request skips the browser's cache. Tests: `asks past the browser's cache for a fresh request only`, `asks the Watch list for the account alone, past the browser's cache`.
-4. **The minute's checks.** Every minute while shown; nothing while hidden; a check that fell due while hidden goes out once the page is back. Tests: `the Live tab checks again every minute while it's open`, `a check that falls due while the page is hidden waits until it's back`, `a profile hidden behind another page of the app checks nothing`.
-5. **Failures and focus.** A failure keeps the last answer and offers Retry; Retry, a quiet check and a check that goes well never drop focus to the page, nor take it from elsewhere. Tests: `a failed lookup says so; Retry keeps focus in place and asks again`, `a check that fails keeps the match shown and says so; Retry asks again`, `the minute's checks leave the notice, and focus on its Retry, in place`, `a check that goes well leaves alone focus that has left the notice`.
+3. **Fresh answers.** Only the live request asks past the browser's cache. Tests: `asks past the browser's cache for a fresh request only`, `asks the Watch list for the account alone, past the browser's cache`.
+4. **The minute's checks.** Every minute while shown; nothing while hidden; a check that fell due while hidden goes out once the page is back. A test that checks nothing was asked, or moves the clock on after an answer it can't see, first waits 300 ms (Task 7). Tests: `the Live tab checks again every minute while it's open`, `a check that falls due while the page is hidden waits until it's back`, `a profile hidden behind another page of the app checks nothing`.
+5. **Failures and focus.** A failure keeps the last answer and offers Retry; Retry, a quiet check, a check that goes well and one that finds the match over or a new match never drop focus to the page, nor take it from elsewhere. Tests: `a failed lookup says so; Retry keeps focus in place and asks again`, `a check that fails keeps the match shown and says so; Retry asks again`, `the minute's checks leave the notice, and focus on its Retry, in place`, `a check that goes well leaves alone focus that has left the notice`, `a check that finds the match over leaves focus in the tab`, `a new match in place of the last leaves focus in the tab`.
 6. **The empty state.** "No live match found", never "Not in a game", for the Watch list. Test: `a player off the Watch list has no live match found, never 'Not in a game'`.
-7. **Your own account.** Overwolf's match, or "Not in a game", never the Watch list, for the account Overwolf reports on this PC or else the remembered one. Tests: `your own Live tab in the app shows the match from Overwolf, not the Watch list`, `your own Live tab says Deadlock isn't running`, `the account Overwolf reports on this PC gets the Overwolf tab, whichever account is remembered`.
+7. **Your own account.** Overwolf's match, or "Not in a game", never the Watch list, for the account Overwolf reports on this PC or else the remembered one; an error from Overwolf keeps clear of the build below it. Tests: `your own Live tab in the app shows the match from Overwolf, not the Watch list`, `your own Live tab says Deadlock isn't running`, `your own Live tab keeps an error clear of the build below it`, `the account Overwolf reports on this PC gets the Overwolf tab, whichever account is remembered`.
 8. **Phones.** Tests: `the profile's Live tab stacks the teams, with its five tabs in one row`, and the existing `profile page has no page scroll; wide tables scroll inside their container`.
 
 ## File structure
@@ -104,7 +122,7 @@ Copy the code as given. If something fails, fix the cause rather than the test.
 | `src/shared/api/DeadlockApi.ts` | `TTL.live`; `get(…, { fresh })` asks past the browser's cache |
 | `src/features/profile/utils/match-history.ts` | `modeLabel()` takes any `{ gameMode, matchMode }` |
 | `src/features/profile/hooks/useLiveMatch.ts` (new) | The live match, checked again every minute while shown, quietly |
-| `src/features/profile/components/LiveTab.tsx` (new) | The tab: status, notice with Retry (`LiveNotice`), empty state (`LiveEmpty`), stats, teams and objectives |
+| `src/features/profile/components/LiveTab.tsx` (new) | The tab: status, notice with Retry (`LiveNotice`), empty state (`LiveEmpty`), stats, teams and objectives; focus handed to the status when a check takes the notice or the match away (`useKeepFocus`) |
 | `src/features/profile/components/ProfileView.tsx` | The `live` subtab; a `live` node in place of the Watch list's tab |
 | `src/features/profile/components/ProfilePage.tsx` | Passes `live` on |
 | `src/features/live/components/OwnLiveTab.tsx` (new) | Your own account's tab in the app: `MatchOverview` or "Not in a game" |
@@ -3018,4 +3036,772 @@ Check only the README with prettier; the spec has never been prettier-formatted,
 npx prettier --check README.md
 git add README.md docs/superpowers/specs/2026-10-21-redesign-design.md
 git commit -m "docs: the profile Live tab"
+```
+
+---
+
+### Task 6: A check that ends or replaces the match keeps focus in the Live tab
+
+**Files:**
+- Modify: `src/features/profile/components/LiveTab.tsx`
+- Test: `tests/web-browser/profile-live.spec.ts`
+
+What changes:
+- **Why:** with focus on a player's link, a check that finds the match over swaps the match for "No live match found", and focus falls to the page. So does a new match in place of the last: the view stays mounted and its rows go by position, so the focused row can become the player's own (no link), one with an account of 0, or a row past the team's new size. Review Focus 5 says no check drops focus to the page.
+- **`useKeepFocus(inside, status)`** is `LiveNotice`'s layout-effect cleanup, lifted into a hook: React runs it before it removes the node, and focus still inside goes to the status line; focus anywhere else stays. `LiveNotice` and `LiveMatchView` (which now takes `status`) both use it. The view's is on `.live-teams`, which holds its only focusable things, the players' links; the view itself is a fragment whose parts the CSS styles as `.live-tab > …`.
+- **`LiveMatchView` is keyed by match id:** a new match is a new view: the last one's cleanup hands focus back, and its failed portraits go with it. Rows stay keyed by position, so within one match focus stays on the same link.
+- **The comment by Retry** says why Retry moves focus itself rather than leave it to the notice's cleanup: not every browser focuses a clicked button.
+- **Tests (website):** focus on a player's link; the minute's check answers `[]`, or a new match with the player in the focused row; focus is on the status line.
+
+- [ ] **Step 1: Write the failing tests**
+
+In `tests/web-browser/profile-live.spec.ts`:
+
+Add at the end of the file:
+
+```ts
+test("a check that finds the match over leaves focus in the tab", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockApi(page);
+  await mockLive(page, [{}, null]);
+  await openLive(page);
+  await page
+    .locator(".live-team.team-1")
+    .getByRole("link", { name: "Player 7006" })
+    .focus();
+  await page.clock.runFor(60_000);
+  await expect(
+    page.getByRole("heading", { name: "No live match found" }),
+  ).toBeVisible();
+  await expect(page.locator(".live-status")).toBeFocused();
+});
+
+test("a new match in place of the last leaves focus in the tab", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await mockApi(page);
+  // The next match has the player where the focused link was.
+  const next = activeMatch(FARGO, { matchId: 999 });
+  next.players[0].account_id = 7006;
+  next.players[6].account_id = FARGO;
+  let asked = 0;
+  await page.route(
+    "https://api.deadlock-api.com/v1/matches/active**",
+    (route) =>
+      route.fulfill({
+        json: [asked++ ? next : activeMatch(FARGO)],
+        headers: cors,
+      }),
+  );
+  await openLive(page);
+  await page
+    .locator(".live-team.team-1")
+    .getByRole("link", { name: "Player 7006" })
+    .focus();
+  await page.clock.runFor(60_000);
+  await expect(page.locator(".live-stats")).toContainText("Match 999");
+  await expect(page.locator(".live-status")).toBeFocused();
+});
+```
+
+- [ ] **Step 2: Run them and confirm they fail**
+
+Run: `npx playwright test -c playwright.web.config.ts tests/web-browser/profile-live.spec.ts`
+Expected: FAIL (2 failed, 11 passed: the two new tests find the status line unfocused (`Received: inactive`)).
+
+- [ ] **Step 3: Keep focus in the tab**
+
+In `src/features/profile/components/LiveTab.tsx`:
+
+1. Replace:
+
+```tsx
+function LiveMatchView({
+  match,
+  accountId,
+}: {
+  match: LiveMatch;
+  accountId: number;
+}) {
+  const ids = match.players.map((p) => p.accountId).filter((id) => id > 0);
+  const { data: profiles } = useAsync(
+    () => fetchSteamProfiles(ids),
+```
+
+with:
+
+```tsx
+function LiveMatchView({
+  match,
+  accountId,
+  status,
+}: {
+  match: LiveMatch;
+  accountId: number;
+  status: RefObject<HTMLElement | null>;
+}) {
+  // The players' links are all the view has to focus.
+  const teams = useRef<HTMLDivElement>(null);
+  useKeepFocus(teams, status);
+  const ids = match.players.map((p) => p.accountId).filter((id) => id > 0);
+  const { data: profiles } = useAsync(
+    () => fetchSteamProfiles(ids),
+```
+
+2. Replace:
+
+```tsx
+          <em>Match {match.matchId}</em>
+        </div>
+      </div>
+      <div className="live-teams">
+        {TEAMS.map((team) => (
+          <LiveTeam key={team} {...{ match, team, accountId, names }} />
+        ))}
+```
+
+with:
+
+```tsx
+          <em>Match {match.matchId}</em>
+        </div>
+      </div>
+      <div className="live-teams" ref={teams}>
+        {TEAMS.map((team) => (
+          <LiveTeam key={team} {...{ match, team, accountId, names }} />
+        ))}
+```
+
+3. Replace:
+
+```tsx
+}
+
+/**
+ * A notice with Retry. Taken away with focus in it (a check that went well),
+ * it leaves focus on `status` rather than let it fall to the page: React
+ * runs the cleanup before it removes the notice.
+ */
+function LiveNotice({
+  status,
+  onRetry,
+```
+
+with:
+
+```tsx
+}
+
+/**
+ * When a check takes `inside` away with focus in it (the notice once a check
+ * goes well, the match once it's over or another replaces it), focus moves
+ * to `status` rather than fall to the page: React runs the cleanup before it
+ * removes the node.
+ */
+function useKeepFocus(
+  inside: RefObject<HTMLElement | null>,
+  status: RefObject<HTMLElement | null>,
+) {
+  useLayoutEffect(() => {
+    const node = inside.current;
+    return () => {
+      if (node?.contains(document.activeElement)) status.current?.focus();
+    };
+  }, [inside, status]);
+}
+
+/** A notice with Retry. */
+function LiveNotice({
+  status,
+  onRetry,
+```
+
+4. Replace:
+
+```tsx
+  children: ReactNode;
+}) {
+  const notice = useRef<HTMLParagraphElement>(null);
+  useLayoutEffect(() => {
+    const node = notice.current;
+    return () => {
+      if (node?.contains(document.activeElement)) status.current?.focus();
+    };
+  }, [status]);
+  return (
+    <p className="notice warning" role="status" ref={notice}>
+      {children}
+```
+
+with:
+
+```tsx
+  children: ReactNode;
+}) {
+  const notice = useRef<HTMLParagraphElement>(null);
+  useKeepFocus(notice, status);
+  return (
+    <p className="notice warning" role="status" ref={notice}>
+      {children}
+```
+
+5. Replace:
+
+```tsx
+  const live = useLiveMatch(accountId, tab);
+  // Retry goes with its notice as soon as it's pressed: focus moves to the
+  // status, which says what is being checked, rather than falling to the
+  // page. (Before the notice goes, as not every browser focuses a button
+  // that is clicked.)
+  const status = useRef<HTMLParagraphElement>(null);
+  const retry = () => {
+    status.current?.focus();
+```
+
+with:
+
+```tsx
+  const live = useLiveMatch(accountId, tab);
+  // Retry goes with its notice as soon as it's pressed: focus moves to the
+  // status, which says what is being checked, rather than falling to the
+  // page. Here, not in LiveNotice's cleanup: not every browser focuses a
+  // clicked button.
+  const status = useRef<HTMLParagraphElement>(null);
+  const retry = () => {
+    status.current?.focus();
+```
+
+6. Replace:
+
+```tsx
+          minute.
+        </LiveEmpty>
+      )}
+      {live.match && <LiveMatchView match={live.match} accountId={accountId} />}
+    </div>
+  );
+}
+```
+
+with:
+
+```tsx
+          minute.
+        </LiveEmpty>
+      )}
+      {live.match && (
+        <LiveMatchView
+          // Another match, another view: its rows go by position, so the
+          // focused row could lose its link.
+          key={live.match.matchId}
+          match={live.match}
+          accountId={accountId}
+          status={status}
+        />
+      )}
+    </div>
+  );
+}
+```
+
+- [ ] **Step 4: Run the tests and confirm they pass**
+
+Run: `npx playwright test -c playwright.web.config.ts tests/web-browser/profile-live.spec.ts --repeat-each 5`
+Expected: PASS (65 tests).
+
+- [ ] **Step 5: Check and commit**
+
+```bash
+npx tsc --noEmit && npm run web:typecheck
+npm test
+npx prettier --write src/features/profile/components/LiveTab.tsx tests/web-browser/profile-live.spec.ts
+npm run test:browser && npm run test:web
+git add src/features/profile/components/LiveTab.tsx tests/web-browser/profile-live.spec.ts
+git commit -m "fix(profile): a check that ends or replaces the match keeps focus in the Live tab"
+```
+
+Expected: 417 unit, 159 desktop and 96 website tests pass.
+
+---
+
+### Task 7: The Live tab's tests wait for each answer, name headings exactly and check lane 2
+
+**Files:**
+- Test: `tests/web-browser/profile-live.spec.ts`, `tests/browser/profile-live.spec.ts`, `tests/profile/live-match.test.ts`
+
+What changes, in tests only:
+- **Each answer reaches the page before the clock moves on.** "The minute's checks leave the notice, and focus on its Retry, in place" counted a request when it reached the route, not when the page had handled its answer, then moved the clock a minute at once: an answer handled late scheduled the next check after the jump, and the test timed out waiting for the notice to go. With the third answer held 150 ms at the route, it failed 3 times in 3; with a 300 ms wait after the count, the file's way, it passes. "The Live tab checks again every minute" checks that nothing was asked at 30 s; it now first gives a request the same 300 ms to reach the route.
+- **The heading named exactly:** the desktop test of the account Overwolf reports finds "Live match" with `exact: true`, as its comment means (the name alone also matches "Live match · {hero}" and "No live match found").
+- **Lane 2, a real check:** "Lane 2's Guardian bit gone too changes nothing" started from a mask whose Guardians were already 0, so it couldn't fail. It now clears bit 2 from a full mask and expects 3.
+
+- [ ] **Step 1: Wait for each answer**
+
+In `tests/web-browser/profile-live.spec.ts`:
+
+1. Replace:
+
+```ts
+  const stats = page.locator(".live-stats .stat-card");
+  await expect(stats.nth(1)).toContainText("Amber +5,426");
+  await page.clock.runFor(30_000);
+  expect(asked).toHaveLength(1);
+  await page.clock.runFor(30_000);
+  await expect(stats.nth(1)).toContainText("Sapphire +5,000");
+```
+
+with:
+
+```ts
+  const stats = page.locator(".live-stats .stat-card");
+  await expect(stats.nth(1)).toContainText("Amber +5,426");
+  await page.clock.runFor(30_000);
+  // Time for a request the page made to reach the route.
+  await page.waitForTimeout(300);
+  expect(asked).toHaveLength(1);
+  await page.clock.runFor(30_000);
+  await expect(stats.nth(1)).toContainText("Sapphire +5,000");
+```
+
+2. Replace:
+
+```ts
+  // Failing again: the same notice, still focused, and nothing announced.
+  await page.clock.runFor(60_000);
+  await expect.poll(() => asked.length).toBe(3);
+  await expect(retry).toBeFocused();
+  await expect(page.locator(".live-status")).toHaveText("");
+  // Going well: the notice goes, and focus moves to the status.
+```
+
+with:
+
+```ts
+  // Failing again: the same notice, still focused, and nothing announced.
+  await page.clock.runFor(60_000);
+  await expect.poll(() => asked.length).toBe(3);
+  // Time for the answer to reach the page.
+  await page.waitForTimeout(300);
+  await expect(retry).toBeFocused();
+  await expect(page.locator(".live-status")).toHaveText("");
+  // Going well: the notice goes, and focus moves to the status.
+```
+
+- [ ] **Step 2: Name the heading exactly**
+
+In `tests/browser/profile-live.spec.ts`:
+
+Replace:
+
+```ts
+  await page.getByRole("button", { name: "My profile", exact: true }).click();
+  await view(page).getByRole("tab", { name: "Live" }).click();
+  await expect(
+    view(page).getByRole("heading", { name: "Live match" }),
+  ).toBeVisible();
+  expect(asked).toEqual(["200"]);
+});
+```
+
+with:
+
+```ts
+  await page.getByRole("button", { name: "My profile", exact: true }).click();
+  await view(page).getByRole("tab", { name: "Live" }).click();
+  await expect(
+    view(page).getByRole("heading", { name: "Live match", exact: true }),
+  ).toBeVisible();
+  expect(asked).toEqual(["200"]);
+});
+```
+
+- [ ] **Step 3: Check lane 2 from a full mask**
+
+In `tests/profile/live-match.test.ts`:
+
+Replace:
+
+```ts
+      guardians: 0,
+      walkers: 3,
+    });
+    // Lane 2's Guardian bit gone too changes nothing.
+    expect(standing(0b1111111111100001).guardians).toBe(0);
+  });
+
+  it("has the Patron weakened once its first phase is down, and destroyed with the last", () => {
+```
+
+with:
+
+```ts
+      guardians: 0,
+      walkers: 3,
+    });
+    // Lane 2's Guardian bit gone from a full mask changes nothing.
+    expect(standing(ALL_STANDING & ~0b100).guardians).toBe(3);
+  });
+
+  it("has the Patron weakened once its first phase is down, and destroyed with the last", () => {
+```
+
+- [ ] **Step 4: Run the tests and confirm they pass**
+
+Run: `npx vitest run tests/profile/live-match.test.ts`
+Expected: PASS (11 tests).
+
+Run: `npx playwright test tests/browser/profile-live.spec.ts`
+Expected: PASS (5 tests).
+
+Run: `npx playwright test -c playwright.web.config.ts tests/web-browser/profile-live.spec.ts --repeat-each 5`
+Expected: PASS (65 tests).
+
+- [ ] **Step 5: Check and commit**
+
+```bash
+npx tsc --noEmit && npm run web:typecheck
+npm test
+npx prettier --write tests/web-browser/profile-live.spec.ts tests/browser/profile-live.spec.ts tests/profile/live-match.test.ts
+npm run test:browser && npm run test:web
+git add tests/web-browser/profile-live.spec.ts tests/browser/profile-live.spec.ts tests/profile/live-match.test.ts
+git commit -m "test(profile): the Live tab's tests wait for each answer, name headings exactly and check lane 2"
+```
+
+Expected: 417 unit, 159 desktop and 96 website tests pass.
+
+---
+
+### Task 8: Readable objective labels; room under your own Live tab's error
+
+**Files:**
+- Modify: `src/features/profile/styles/profile.css`
+- Test: `tests/browser/profile-live.spec.ts`
+
+What changes, in CSS only:
+- **Objective labels in `--muted`:** `--dim` on `--surface-2` is 3.9:1 at 10.5 px, under WCAG AA's 4.5:1. `--muted` is 6.8:1, as the tab's other labels (`.stat-card small`, `.live-team h4`) and the match report's and Home's `dt` labels use.
+- **Room under your own tab's error:** `.live-tab > .notice` (the Watch list's notice, 12 px under the status line) also caught `MatchOverview`'s error banner in your own tab, which then had nothing under it: its bottom border met the build panel's top border. `.live-tab.own > .notice { margin: 0 0 14px; }` gives it 14 px under it, as the section header's row has, and keeps it flush with the profile's padding like the header and the build (the Live page's own side margins, 30 px or 20 px up to 1100 px wide, would push it in). Checked by eye at 1260, 1000 and 850 px.
+- **Test (desktop):** an error from Overwolf on your own tab leaves at least 14 px between the banner and the build panel, and the two line up on the left. The labels' colour has no test.
+
+- [ ] **Step 1: Write the failing test**
+
+In `tests/browser/profile-live.spec.ts`:
+
+Replace:
+
+```ts
+  expect(asked).toEqual([]);
+});
+
+test("the account Overwolf reports on this PC gets the Overwolf tab, whichever account is remembered", async ({
+  page,
+}) => {
+```
+
+with:
+
+```ts
+  expect(asked).toEqual([]);
+});
+
+test("your own Live tab keeps an error clear of the build below it", async ({
+  page,
+}) => {
+  await nativeWindow(page, "desktop");
+  await storeMe(page);
+  await routeApi(page);
+  await openMyLive(page);
+  await updateMatch(page, { error: "Game events are unavailable." });
+  const tab = view(page).locator(".live-tab");
+  const error = tab.getByRole("alert");
+  await expect(error).toHaveText("Game events are unavailable.");
+  const notice = (await error.boundingBox())!;
+  const build = (await tab
+    .getByRole("region", { name: "Your build" })
+    .boundingBox())!;
+  // Room between them, and in line.
+  expect(build.y - (notice.y + notice.height)).toBeGreaterThanOrEqual(14);
+  expect(notice.x).toBe(build.x);
+});
+
+test("the account Overwolf reports on this PC gets the Overwolf tab, whichever account is remembered", async ({
+  page,
+}) => {
+```
+
+- [ ] **Step 2: Run it and confirm it fails**
+
+Run: `npx playwright test tests/browser/profile-live.spec.ts`
+Expected: FAIL (1 failed, 5 passed: the banner meets the build panel (`Expected: >= 14`, `Received: 0`)).
+
+- [ ] **Step 3: The labels' colour and the banner's room**
+
+In `src/features/profile/styles/profile.css`:
+
+1. Replace:
+
+```css
+  font: 600 10.5px var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.live-objectives dd {
+  margin: 0;
+```
+
+with:
+
+```css
+  font: 600 10.5px var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.live-objectives dd {
+  margin: 0;
+```
+
+2. Replace:
+
+```css
+  flex: 1;
+  margin: 22px 0 0;
+}
+.live-tab.own .workspace {
+  padding: 0;
+}
+```
+
+with:
+
+```css
+  flex: 1;
+  margin: 22px 0 0;
+}
+/* MatchOverview's error. */
+.live-tab.own > .notice {
+  margin: 0 0 14px;
+}
+.live-tab.own .workspace {
+  padding: 0;
+}
+```
+
+- [ ] **Step 4: Run the tests and confirm they pass**
+
+Run: `npx playwright test tests/browser/profile-live.spec.ts`
+Expected: PASS (6 tests).
+
+- [ ] **Step 5: Check and commit**
+
+```bash
+npx tsc --noEmit && npm run web:typecheck
+npm test
+npx prettier --write src/features/profile/styles/profile.css tests/browser/profile-live.spec.ts
+npm run test:browser && npm run test:web
+git add src/features/profile/styles/profile.css tests/browser/profile-live.spec.ts
+git commit -m "fix(profile): readable objective labels; room under your own Live tab's error"
+```
+
+Expected: 417 unit, 160 desktop and 96 website tests pass.
+
+---
+
+### Task 9: Docs after the final review, and final check
+
+**Files:**
+- Modify: `README.md`
+- Modify: `docs/superpowers/specs/2026-10-21-redesign-design.md`
+- Modify: `src/features/profile/services/live-api.ts`, `src/features/profile/utils/live-match.ts`, `src/shared/api/DeadlockApi.ts` (a comment each)
+
+- [ ] **Step 1: README**
+
+The Live tab's section: every other player links to their profile (the player whose profile it is doesn't), and `duration_s` has been empty so far (`elapsedS()` takes it should the API fill it). The website has no live data from your own game, though its profiles have a Live tab. `cache: "no-cache"` has the browser check with the API rather than skip its cache. The Windows checklist adds the profile's Live tab, as `visibilityState` in hidden or minimised Overwolf windows is unchecked. Each paragraph is one line, so prettier leaves it as it is.
+
+In `README.md`:
+
+1. Replace:
+
+```markdown
+- **Any player** (on the website, and for anyone but your own account in the app): `GET /v1/matches/active?account_ids={id}`, the game's Watch list (about the top 200 matches being played) filtered to the player. It shows both teams' heroes and players (each linked to their profile), the souls lead (rounds won in Street Brawl), the mode, the minutes since the match started (the API's `duration_s` is always empty, so they count from `start_time`) and each team's objectives still standing: the Guardians, Walkers and Base Guardians of the three lanes, the two Shrines and the Patron ("Weakened" once its first phase is down). Those come from the team's `objectives_mask`, one bit per objective as the game numbers them (`ECitadelObjective`); Street Brawl has none. A value the API leaves out shows "—", and a player without an account has no link. A player who isn't on the list gets **No live match found** and why, never "Not in a game".
+```
+
+with:
+
+```markdown
+- **Any player** (on the website, and for anyone but your own account in the app): `GET /v1/matches/active?account_ids={id}`, the game's Watch list (about the top 200 matches being played) filtered to the player. It shows both teams' heroes and players (every other player linked to their profile), the souls lead (rounds won in Street Brawl), the mode, the minutes since the match started (the API's `duration_s` has always been empty so far, so they count from `start_time`) and each team's objectives still standing: the Guardians, Walkers and Base Guardians of the three lanes, the two Shrines and the Patron ("Weakened" once its first phase is down). Those come from the team's `objectives_mask`, one bit per objective as the game numbers them (`ECitadelObjective`); Street Brawl has none. A value the API leaves out shows "—", and a player without an account has no link. A player who isn't on the list gets **No live match found** and why, never "Not in a game".
+```
+
+2. Replace:
+
+```markdown
+Counterlock also builds as a public static website with the nav **Home · Tier list · Heroes · Items** (the tier list lives at `/tier-list`) and player profiles, with real URLs, pre-rendered hero and item pages and share previews. It has no **Live** page, overlay or hotkeys; Home searches for a Steam account by name or ID, and the header's **My profile** opens the remembered account. A profile's **Live** tab shows the player's match from the game's Watch list, as in the app. The layout is full width with side gutters and has phone layouts down to 375px. Hero pages have the same **Build** and **Popular builds** tabs and **Counter items** as the app; the website has no live match, so you always pick the enemy heroes. It lives in `web/` (React Router v8 framework mode on Vite, `ssr: false` with `prerender`) and reuses the feature code in `src/`, so the Overwolf app is unaffected.
+```
+
+with:
+
+```markdown
+Counterlock also builds as a public static website with the nav **Home · Tier list · Heroes · Items** (the tier list lives at `/tier-list`) and player profiles, with real URLs, pre-rendered hero and item pages and share previews. It has no **Live** page, overlay or hotkeys; Home searches for a Steam account by name or ID, and the header's **My profile** opens the remembered account. A profile's **Live** tab shows the player's match from the game's Watch list, as in the app. The layout is full width with side gutters and has phone layouts down to 375px. Hero pages have the same **Build** and **Popular builds** tabs and **Counter items** as the app; the website has no live data from your own game, so you always pick the enemy heroes. It lives in `web/` (React Router v8 framework mode on Vite, `ssr: false` with `prerender`) and reuses the feature code in `src/`, so the Overwolf app is unaffected.
+```
+
+3. Replace:
+
+```markdown
+Before a public release, test in Windows with a live match: game startup and shutdown, joining an existing match, both team assignments, Street Brawl, blank IDs, hero changes, consecutive matches, window drag/resize/hide, changed hotkey bindings, a provider outage, and API throttling. Follow Overwolf's developer review and distribution process before publishing.
+```
+
+with:
+
+```markdown
+Before a public release, test in Windows with a live match: game startup and shutdown, joining an existing match, both team assignments, Street Brawl, blank IDs, hero changes, consecutive matches, window drag/resize/hide, changed hotkey bindings, a provider outage, API throttling, and the profile's **Live** tab: your own in and out of a match, and whether another player's stops checking while the window is hidden or minimised. Follow Overwolf's developer review and distribution process before publishing.
+```
+
+4. Replace:
+
+```markdown
+The client caches in memory (30 seconds to ten minutes depending on the data) and drops responses that have expired, times out after 15 seconds and shares in-flight requests; the profile Live tab's requests also skip the browser's own HTTP cache. It keeps requests within the API's per-IP limits for analytics (200 a minute, shared by every analytics endpoint), bulk metadata (30) and rank lookups (20) by holding them back, counting every tab of the website and every window of the app together: the counts, and the cooldowns of those three groups and of a 503 (below), are kept in `localStorage`, claimed under a Web Lock where the browser has one. A request no one waits for any more leaves the queue, and a cooldown fails the waiting ones at once. A 429 pauses only what was refused: the whole group for those three, otherwise the one request, as other endpoints' limits depend on where the data comes from. A 503, the API shedding load, pauses everything. Either honours `Retry-After`, with a 30-second minimum and, as a cooldown outlives a reload, a ten-minute maximum. The Performance tab also keeps each stored game's totals for the session.
+```
+
+with:
+
+```markdown
+The client caches in memory (30 seconds to ten minutes depending on the data) and drops responses that have expired, times out after 15 seconds and shares in-flight requests; the profile Live tab's requests are also checked with the API rather than taken straight from the browser's HTTP cache. It keeps requests within the API's per-IP limits for analytics (200 a minute, shared by every analytics endpoint), bulk metadata (30) and rank lookups (20) by holding them back, counting every tab of the website and every window of the app together: the counts, and the cooldowns of those three groups and of a 503 (below), are kept in `localStorage`, claimed under a Web Lock where the browser has one. A request no one waits for any more leaves the queue, and a cooldown fails the waiting ones at once. A 429 pauses only what was refused: the whole group for those three, otherwise the one request, as other endpoints' limits depend on where the data comes from. A 503, the API shedding load, pauses everything. Either honours `Retry-After`, with a 30-second minimum and, as a cooldown outlives a reload, a ten-minute maximum. The Performance tab also keeps each stored game's totals for the session.
+```
+
+- [ ] **Step 2: Spec**
+
+Phase 5's paragraph: the players linked to their profiles are the other players. Its "focus stays in place through Retry and the minute's checks" holds once Task 6 is in.
+
+In `docs/superpowers/specs/2026-10-21-redesign-design.md`:
+
+Replace:
+
+```markdown
+Built in phase 5: the website's tab, and the app's for anyone but your own account, asks `GET /v1/matches/active?account_ids=…` for the player alone. It shows each team's heroes and players (linked to their profiles), the souls lead (rounds won in Street Brawl), the mode, the minutes since `start_time` (the API's `duration_s` has always been empty) and each team's objectives still standing, read from its `objectives_mask` (the game's `ECitadelObjective` bits: the Guardians, Walkers and Base Guardians of lanes 1, 3 and 4, the two Shrines and the Patron, "Weakened" once its first phase is down; Street Brawl has none); a value the API leaves out shows "—". It checks again every minute while it is on screen, past the browser's HTTP cache (which would keep an answer for up to four minutes); a check that falls due while it is hidden waits until it is back, and the API's own copy of the list can be a few minutes old. A check that fails keeps the last answer and says so, with Retry; focus stays in place through Retry and the minute's checks. Your own account in the app (the account Overwolf reports playing on this PC, or else the remembered one) shows the Live page's match overview under a section header, or "Not in a game" with whether Deadlock is running. On phones the teams stack and the five profile tabs spread over one row.
+```
+
+with:
+
+```markdown
+Built in phase 5: the website's tab, and the app's for anyone but your own account, asks `GET /v1/matches/active?account_ids=…` for the player alone. It shows each team's heroes and players (the other players linked to their profiles), the souls lead (rounds won in Street Brawl), the mode, the minutes since `start_time` (the API's `duration_s` has always been empty) and each team's objectives still standing, read from its `objectives_mask` (the game's `ECitadelObjective` bits: the Guardians, Walkers and Base Guardians of lanes 1, 3 and 4, the two Shrines and the Patron, "Weakened" once its first phase is down; Street Brawl has none); a value the API leaves out shows "—". It checks again every minute while it is on screen, past the browser's HTTP cache (which would keep an answer for up to four minutes); a check that falls due while it is hidden waits until it is back, and the API's own copy of the list can be a few minutes old. A check that fails keeps the last answer and says so, with Retry; focus stays in place through Retry and the minute's checks. Your own account in the app (the account Overwolf reports playing on this PC, or else the remembered one) shows the Live page's match overview under a section header, or "Not in a game" with whether Deadlock is running. On phones the teams stack and the five profile tabs spread over one row.
+```
+
+The spec has never been prettier-formatted: leave its existing formatting alone. Check that the edit adds no new differences (prettier's differences from the file are the ones it had before the edit):
+
+```bash
+spec=docs/superpowers/specs/2026-10-21-redesign-design.md
+diff <(git show HEAD:$spec | npx prettier --stdin-filepath $spec | diff - <(git show HEAD:$spec)) <(npx prettier $spec | diff - $spec)
+```
+
+Expected: no output.
+
+- [ ] **Step 3: Three comments**
+
+The API's copy "can be two minutes old"; bit 9 is the Patron's first phase, as bit 0 is its last; and every path is asked for `fresh` always or never, a second rule beside the ttl's.
+
+In `src/features/profile/services/live-api.ts`:
+
+Replace:
+
+```ts
+ * The account's live match from the game's Watch list (about the top 200
+ * matches being played), or null when it isn't on it. Fresh: the browser
+ * would keep the API's answer for up to four minutes (max-age=120 and
+ * stale-while-revalidate=120), when the API's own copy can be two old.
+ */
+export async function fetchLiveMatch(
+  accountId: number,
+```
+
+with:
+
+```ts
+ * The account's live match from the game's Watch list (about the top 200
+ * matches being played), or null when it isn't on it. Fresh: the browser
+ * would keep the API's answer for up to four minutes (max-age=120 and
+ * stale-while-revalidate=120), while the API's own copy can be two
+ * minutes old.
+ */
+export async function fetchLiveMatch(
+  accountId: number,
+```
+
+In `src/features/profile/utils/live-match.ts`:
+
+Replace:
+
+```ts
+// A team's objectives mask has a bit per objective, set while it stands, as
+// numbered in the game's ECitadelObjective: 0 the Patron's last phase
+// ("Core"), 1–4 the Guardians and 5–8 the Walkers of lanes 1–4, 9 the
+// Patron ("Titan"), 10–11 the Shrines and 12–15 the Base Guardians of lanes
+// 1–4. The map has lanes 1, 3 and 4: lane 2's bits never clear.
+const LANES = [1, 3, 4];
+
+/** What still stands of a team's objectives. */
+```
+
+with:
+
+```ts
+// A team's objectives mask has a bit per objective, set while it stands, as
+// numbered in the game's ECitadelObjective: 0 the Patron's last phase
+// ("Core"), 1–4 the Guardians and 5–8 the Walkers of lanes 1–4, 9 the
+// Patron's first phase ("Titan"), 10–11 the Shrines and 12–15 the Base
+// Guardians of lanes 1–4. The map has lanes 1, 3 and 4: lane 2's bits
+// never clear.
+const LANES = [1, 3, 4];
+
+/** What still stands of a team's objectives. */
+```
+
+In `src/shared/api/DeadlockApi.ts`:
+
+Replace:
+
+```ts
+/**
+ * Every path is always asked for with the same ttl, so the caller's ttl,
+ * which decides whether an entry is fresh, and the one stored with it,
+ * which the sweep uses, agree; and always fresh or never.
+ */
+export class DeadlockApi {
+  private cache = new Map<
+```
+
+with:
+
+```ts
+/**
+ * Every path is always asked for with the same ttl, so the caller's ttl,
+ * which decides whether an entry is fresh, and the one stored with it,
+ * which the sweep uses, agree. Likewise, a path is always asked for
+ * `fresh`, or never.
+ */
+export class DeadlockApi {
+  private cache = new Map<
+```
+
+- [ ] **Step 4: Final check**
+
+Run all of these; every one must pass:
+- `npm test` (417)
+- `npx tsc --noEmit`
+- `npm run web:typecheck`
+- `npm run test:browser` (160)
+- `npm run test:web` (96)
+- `npm run build`
+- `npm run web:build`
+- `npm run validate:manifest`
+
+- [ ] **Step 5: Commit**
+
+Check the README and the comments with prettier; the spec was checked in Step 2.
+
+```bash
+npx prettier --check README.md src/features/profile/services/live-api.ts src/features/profile/utils/live-match.ts src/shared/api/DeadlockApi.ts
+git add README.md docs/superpowers/specs/2026-10-21-redesign-design.md src/features/profile/services/live-api.ts src/features/profile/utils/live-match.ts src/shared/api/DeadlockApi.ts
+git commit -m "docs: the profile Live tab after its final review"
 ```
