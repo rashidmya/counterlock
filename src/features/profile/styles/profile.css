@@ -843,7 +843,7 @@
   font: 600 10.5px var(--font-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--dim);
+  color: var(--muted);
 }
 .live-objectives dd {
   margin: 0;
@@ -860,6 +860,10 @@
 .live-tab.own .intro .section-header {
   flex: 1;
   margin: 22px 0 0;
+}
+/* MatchOverview's error. */
+.live-tab.own > .notice {
+  margin: 0 0 14px;
 }
 .live-tab.own .workspace {
   padding: 0;

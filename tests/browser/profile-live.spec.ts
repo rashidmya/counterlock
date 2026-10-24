@@ -165,6 +165,26 @@ test("your own Live tab says Deadlock isn't running", async ({ page }) => {
   expect(asked).toEqual([]);
 });
 
+test("your own Live tab keeps an error clear of the build below it", async ({
+  page,
+}) => {
+  await nativeWindow(page, "desktop");
+  await storeMe(page);
+  await routeApi(page);
+  await openMyLive(page);
+  await updateMatch(page, { error: "Game events are unavailable." });
+  const tab = view(page).locator(".live-tab");
+  const error = tab.getByRole("alert");
+  await expect(error).toHaveText("Game events are unavailable.");
+  const notice = (await error.boundingBox())!;
+  const build = (await tab
+    .getByRole("region", { name: "Your build" })
+    .boundingBox())!;
+  // Room between them, and in line.
+  expect(build.y - (notice.y + notice.height)).toBeGreaterThanOrEqual(14);
+  expect(notice.x).toBe(build.x);
+});
+
 test("the account Overwolf reports on this PC gets the Overwolf tab, whichever account is remembered", async ({
   page,
 }) => {
